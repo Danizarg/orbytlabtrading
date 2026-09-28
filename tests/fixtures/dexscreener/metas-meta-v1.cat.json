@@ -1,0 +1,280 @@
+{
+  "description": "pspspspspsp",
+  "icon": {
+    "type": "emoji",
+    "value": "🐈"
+  },
+  "name": "Cat",
+  "slug": "cat",
+  "marketCap": 451790865,
+  "liquidity": 33341244.59,
+  "volume": 3981910.36,
+  "tokenCount": 46,
+  "marketCapChange": {
+    "m5": -0.8821170141806547,
+    "h1": -1.3724361379628116,
+    "h6": -0.5583610698722039,
+    "h24": -2.4185321756502915
+  },
+  "marketCapDelta": {
+    "m5": -3985324.088678953,
+    "h1": -6200541.09927478,
+    "h6": -2522624.307398884,
+    "h24": -10926707.436673772
+  },
+  "pairs": [
+    {
+      "chainId": "robinhood",
+      "dexId": "up",
+      "url": "https://dexscreener.com/robinhood/0x4e8649be40ae67ebbcff99c291b92ee03015917b",
+      "pairAddress": "0x4E8649Be40aE67EBbcff99C291B92eE03015917b",
+      "labels": [
+        "v3"
+      ],
+      "baseToken": {
+        "address": "0x020bfC650A365f8BB26819deAAbF3E21291018b4",
+        "name": "Cash Cat",
+        "symbol": "CASHCAT"
+      },
+      "quoteToken": {
+        "address": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+        "name": "WETH",
+        "symbol": "WETH"
+      },
+      "priceNative": "0.00006709",
+      "priceUsd": "0.1798",
+      "txns": {
+        "m5": {
+          "buys": 4,
+          "sells": 4
+        },
+        "h1": {
+          "buys": 4,
+          "sells": 46
+        },
+        "h6": {
+          "buys": 155,
+          "sells": 126
+        },
+        "h24": {
+          "buys": 756,
+          "sells": 933
+        }
+      },
+      "volume": {
+        "h24": 632432.48,
+        "h6": 102259.6,
+        "h1": 22462.71,
+        "m5": 8457.93
+      },
+      "priceChange": {
+        "m5": -2.1,
+        "h1": -3.69,
+        "h6": -0.87,
+        "h24": 3.78
+      },
+      "liquidity": {
+        "usd": 118886.41,
+        "base": 470357,
+        "quote": 12.7914
+      },
+      "fdv": 177682031,
+      "marketCap": 177682031,
+      "info": {
+        "imageUrl": "https://cdn.dexscreener.com/cms/images/Lq7a3pS9Wn8EuGp0?width=800&height=800&quality=95&format=auto",
+        "header": "https://cdn.dexscreener.com/cms/images/PfcMZWxAGU7_TDa8?width=1500&height=500&quality=95&format=auto",
+        "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x020bfc650a365f8bb26819deaabf3e21291018b4?timestamp=1790628600000",
+        "websites": [
+          {
+            "url": "https://cashcat.cc/",
+            "label": "Website"
+          },
+          {
+            "url": "https://letscash.fun/",
+            "label": "Letscash"
+          }
+        ],
+        "socials": [
+          {
+            "url": "https://x.com/cashcat_token",
+            "type": "twitter"
+          },
+          {
+            "url": "https://t.me/cashcat_robinhood",
+            "type": "telegram"
+          },
+          {
+            "url": "https://www.reddit.com/r/cashcattoken/s/L8GOOuy9Ch",
+            "type": "reddit"
+          }
+        ]
+      }
+    },
+    {
+      "chainId": "base",
+      "dexId": "aerodrome",
+      "url": "https://dexscreener.com/base/0xfba22a6b7629a2fec052cc2a6eddd2c9d6da5ea5",
+      "pairAddress": "0xfbA22a6B7629a2FEC052CC2a6Eddd2C9D6Da5eA5",
+      "baseToken": {
+        "address": "0xB2000000000000000000004c27f6523082f41D01",
+        "name": "Basecat",
+        "symbol": "Basecat"
+      },
+      "quoteToken": {
+        "address": "0x4200000000000000000000000000000000000006",
+        "name": "Wrapped Ether",
+        "symbol": "WETH"
+      },
+      "priceNative": "0.000005471",
+      "priceUsd": "0.01466",
+      "txns": {
+        "m5": {
+          "buys": 2,
+          "sells": 0
+        },
+        "h1": {
+          "buys": 9,
+          "sells": 30
+        },
+        "h6": {
+          "buys": 72,
+          "sells": 362
+        },
+        "h24": {
+          "buys": 1060,
+          "sells": 1288
+        }
+      },
+      "volume": {
+        "h24": 468064.9,
+        "h6": 86900.61,
+        "h1": 11079.17,
+        "m5": 261.49
+      },
+      "priceChange": {
+        "m5": -0.04,
+        "h1": -0.2,
+        "h6": -5.82,
+        "h24": -13.9
+      },
+      "liquidity": {
+        "usd": 71369.32,
+        "base": 3891273,
+        "quote": 5.3329
+      },
+      "fdv": 14667239,
+      "marketCap": 14667239,
+      "info": {
+        "imageUrl": "https://cdn.dexscreener.com/cms/images/c1GM37sU6jS_D7Cq?width=800&height=800&quality=95&format=auto",
+        "header": "https://cdn.dexscreener.com/cms/images/5ekvchTa3FBX_mIr?width=1500&height=500&quality=95&format=auto",
+        "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb2000000000000000000004c27f6523082f41d01?timestamp=1790628600000",
+        "websites": [
+          {
+            "url": "https://basecatonbase.com/",
+            "label": "Website"
+          },
+          {
+            "url": "https://x.com/i/chat/group_join/g2089742168302784872/buAWC54kPw",
+            "label": "X CHAT"
+          }
+        ],
+        "socials": [
+          {
+            "url": "https://x.com/BasecatOnBase",
+            "type": "twitter"
+          },
+          {
+            "url": "https://t.me/basecatonbase",
+            "type": "telegram"
+          },
+          {
+            "url": "https://discord.gg/WSRRKSsYf",
+            "type": "discord"
+          }
+        ]
+      }
+    },
+    {
+      "chainId": "base",
+      "dexId": "uniswap",
+      "url": "https://dexscreener.com/base/0x4b0aaf3ebb163dd45f663b38b6d93f6093ebc2d3",
+      "pairAddress": "0x4b0Aaf3EBb163dd45F663b38b6d93f6093EBC2d3",
+      "labels": [
+        "v3"
+      ],
+      "baseToken": {
+        "address": "0xAC1Bd2486aAf3B5C0fc3Fd868558b082a531B2B4",
+        "name": "Toshi",
+        "symbol": "TOSHI"
+      },
+      "quoteToken": {
+        "address": "0x4200000000000000000000000000000000000006",
+        "name": "Wrapped Ether",
+        "symbol": "WETH"
+      },
+      "priceNative": "0.00000004500",
+      "priceUsd": "0.0001202",
+      "txns": {
+        "m5": {
+          "buys": 0,
+          "sells": 0
+        },
+        "h1": {
+          "buys": 0,
+          "sells": 0
+        },
+        "h6": {
+          "buys": 18,
+          "sells": 13
+        },
+        "h24": {
+          "buys": 26,
+          "sells": 82
+        }
+      },
+      "volume": {
+        "h24": 36341.63,
+        "h6": 17.26,
+        "h1": 0,
+        "m5": 0
+      },
+      "priceChange": {
+        "h6": 0.28,
+        "h24": -5.74
+      },
+      "liquidity": {
+        "usd": 1180036.3,
+        "base": 5790220497,
+        "quote": 181.05967
+      },
+      "fdv": 50588024,
+      "marketCap": 50588024,
+      "pairCreatedAt": 1699314201000,
+      "info": {
+        "imageUrl": "https://cdn.dexscreener.com/cms/images/81335196ed123df49cf07f60a69d9101630ca6a150edf22130bd46542e60bdca?width=800&height=800&quality=95&format=auto",
+        "header": "https://cdn.dexscreener.com/cms/images/9ea4b6e246d0e161aadc4d976258c7d85765f7cfec696134c720108205427a40?width=1500&height=500&quality=95&format=auto",
+        "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xac1bd2486aaf3b5c0fc3fd868558b082a531b2b4?timestamp=1790628600000",
+        "websites": [
+          {
+            "url": "https://www.toshithecat.com/",
+            "label": "Website"
+          }
+        ],
+        "socials": [
+          {
+            "url": "https://x.com/Toshi",
+            "type": "twitter"
+          },
+          {
+            "url": "https://t.me/toshibase",
+            "type": "telegram"
+          },
+          {
+            "url": "https://www.tiktok.com/@toshionbase?lang=en",
+            "type": "tiktok"
+          }
+        ]
+      }
+    }
+  ]
+}

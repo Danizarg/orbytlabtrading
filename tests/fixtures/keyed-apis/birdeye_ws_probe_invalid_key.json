@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "source": "Birdeye WebSocket handshake probes (no valid key), captured 2026-09-28T20:48Z with Node ws client",
+    "note": "Genuine server responses. Shows (a) missing key -> HTTP 400 'x-api-key is required' before upgrade; (b) any key string -> 101 upgrade + WELCOME, then ERROR on first SUBSCRIBE_* when key/origin invalid."
+  },
+  "probe_no_key": {
+    "request": "GET wss://public-api.birdeye.so/socket/solana  (Origin: https://www.orbytai.org, Sec-WebSocket-Protocol: echo-protocol)",
+    "http_status": 400,
+    "body": "x-api-key is required"
+  },
+  "probe_invalid_key": {
+    "request": "wss://public-api.birdeye.so/socket/solana?x-api-key=invalid  (Origin: https://www.orbytai.org, Sec-WebSocket-Protocol: echo-protocol)",
+    "upgrade_status": 101,
+    "upgrade_headers": { "sec-websocket-protocol": "echo-protocol", "origin": "https://www.orbytai.org" },
+    "messages": [
+      { "type": "WELCOME", "data": null },
+      { "data": "Invalid request with origin or api-key", "statusCode": 400, "type": "ERROR" }
+    ],
+    "sent": { "type": "SUBSCRIBE_PRICE", "data": { "queryType": "simple", "chartType": "1m", "address": "So11111111111111111111111111111111111111112", "currency": "usd" } }
+  }
+}

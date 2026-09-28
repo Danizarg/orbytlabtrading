@@ -1,0 +1,32 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/networks/solana/pools/CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs/ohlcv/second?aggregate=1&limit=100",
+    "http_status": 401,
+    "fetched_at": "2026-09-28T20:48:21.147Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "BYPASS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:48:21 GMT",
+      "vary": "Accept, Origin, accept-encoding",
+      "x-runtime": "0.044046"
+    },
+    "trimmed": "untrimmed error body"
+  },
+  "errors": [
+    {
+      "status": "401",
+      "title": "timeframe=second is exclusive to Paid plan subscribers only. Upgrade to Analyst plan & above to access: https://www.coingecko.com/en/api/pricing."
+    }
+  ],
+  "meta": {
+    "ref_id": "8a42df12-f7f4-4b00-8091-d099488f3929"
+  }
+}

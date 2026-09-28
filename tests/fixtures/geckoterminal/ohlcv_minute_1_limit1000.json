@@ -1,0 +1,70 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/networks/solana/pools/CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs/ohlcv/minute?aggregate=1&limit=1000&currency=usd&token=base",
+    "http_status": 200,
+    "fetched_at": "2026-09-28T20:46:00.605Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "MISS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:46:00 GMT",
+      "etag": "W/\"29e530f0c7330b608aab35161a032bd9\"",
+      "vary": "Accept, Origin, accept-encoding",
+      "x-runtime": "0.144083"
+    },
+    "trimmed": "ohlcv_list trimmed to first 3 of 48 returned candles (newest first)"
+  },
+  "data": {
+    "id": "680cc85e-3732-4fec-8ee9-60b67f536ba8",
+    "type": "ohlcv_request_response",
+    "attributes": {
+      "ohlcv_list": [
+        [
+          1790628300,
+          0.0009049786059522766,
+          0.0009464581412148887,
+          0.0008801633798638143,
+          0.0009385780967054462,
+          10722.599971221984
+        ],
+        [
+          1790628240,
+          0.0009211624439675153,
+          0.0010104919926712417,
+          0.0008201264313320256,
+          0.0009049786059522766,
+          146667.66950697431
+        ],
+        [
+          1790628180,
+          0.001123915167112856,
+          0.0012118118691018872,
+          0.0008762917304188277,
+          0.0009211624439675153,
+          91674.76880046637
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "base": {
+      "name": "CLONES",
+      "symbol": "CLONES",
+      "coingecko_coin_id": null,
+      "address": "5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs"
+    },
+    "quote": {
+      "name": "Wrapped SOL",
+      "symbol": "SOL",
+      "coingecko_coin_id": "wrapped-solana",
+      "address": "So11111111111111111111111111111111111111112"
+    }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/tokens/info_recently_updated?network=solana&include=network",
+    "http_status": 200,
+    "fetched_at": "2026-09-28T20:55:48.017Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "MISS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:55:48 GMT",
+      "etag": "W/\"74e6922a9d18ebe421ade746b2614b3a\"",
+      "vary": "Accept, Origin, accept-encoding",
+      "x-runtime": "0.242987"
+    },
+    "trimmed": "arrays trimmed to <=3 items; included[] filtered to referenced ids"
+  },
+  "data": [
+    {
+      "id": "solana_DJ7vji2BU7RjNgktPAKN4L42CiXTFHEt4Eeeyr5FiTmy",
+      "type": "token",
+      "attributes": {
+        "address": "DJ7vji2BU7RjNgktPAKN4L42CiXTFHEt4Eeeyr5FiTmy",
+        "name": "ASPECTA",
+        "symbol": "ASP",
+        "decimals": 9,
+        "image_url": "https://coin-images.coingecko.com/coins/images/67447/large/asp.jpg?1752813877",
+        "coingecko_coin_id": "aspecta",
+        "websites": [
+          "https://aspecta.ai"
+        ],
+        "discord_url": null,
+        "farcaster_url": null,
+        "zora_url": null,
+        "telegram_handle": "build_key",
+        "twitter_handle": "aspecta_ai",
+        "description": "Aspecta is the blockchain infrastructure that facilitates intelligent attestation and price discovery for trillion illiquid assets. Unlock lifecycle liquidity for pre-TGE shares, locked tokens, private equities, RWAs and more.",
+        "gt_score": 33.506493506493506,
+        "metadata_updated_at": "2026-09-28T19:45:53Z"
+      },
+      "relationships": {
+        "network": {
+          "data": {
+            "id": "solana",
+            "type": "network"
+          }
+        }
+      }
+    },
+    {
+      "id": "solana_GvEMgNT6GKiYTvg7TskDio6RKzQdCuhwmH55tVCLaJTe",
+      "type": "token",
+      "attributes": {
+        "address": "GvEMgNT6GKiYTvg7TskDio6RKzQdCuhwmH55tVCLaJTe",
+        "name": "sUSD.infra",
+        "symbol": "sUSD.infra",
+        "decimals": 6,
+        "image_url": "https://coin-images.coingecko.com/coins/images/102178895/large/sUSD.infra_Circle_Dark_BG.png?1790620530",
+        "coingecko_coin_id": "staked-usd-infra",
+        "websites": [],
+        "discord_url": null,
+        "farcaster_url": null,
+        "zora_url": null,
+        "telegram_handle": null,
+        "twitter_handle": null,
+        "description": "About sUSD.infra\n\nsUSD.infra is DAWN's yield-bearing dollar, backed by loans to real-world digital infrastructure under long-term commercial contracts.\n\n• Users deposit USD.infra into the DAWN vault to mint sUSD.infra, whose exchange rate rises as yield accrues.\n• Yield is generated from loans to AI infrastructure, connectivity, and compute projects whose revenue comes from commercial contracts, with liquidity held in reserve.\n• Yield is paid from underlying cash flows and is not guaranteed.\n\nWhat is sUSD.infra\n\nsUSD.infra is the yield-bearing token of DAWN, an RWA protocol bringing digital infrastructure finance on-chain. It represents a share of the USD.infra Vault, which lends to real-world infrastructure projects and returns their contracted cash flows to holders. DAWN finances the physical layer that AI runs on, the networks that carry it and the compute that runs it, alongside adjacent digital infrastructure and services that generate revenue through commercial contracts.\n\nValue moves through the system as the vault deploys USD.infra into loans to project entities holding long-term infrastructure contracts. Borrowers make contract payments to the vault, and those payments accrue to the value of sUSD.infra. Holders can exit by redeeming sUSD.infra for USD.infra at the current exchange rate, subject to the vault's liquidity, or by trading it on secondary markets. As DAWN's loan book grows across connectivity, compute and AI infrastructure, the vault scales accordingly.\n\nWhat Makes sUSD.infra Unique\n\n• Contract-backed yield: sUSD.infra is underwritten on long-term commercial contracts rather than on hardware collateral or crypto-native trading strategies, so its yield is tied to contracted revenue from real-world infrastructure.\n\n• Project-finance structure: Each financed project sits in its own bankruptcy-remote entity, with contract revenue as the source of repayment and a servicer in place for the life of the contract.\nFull-stack digital infrastructure exposure: A single token provides exposure to connectivity, compute and AI infrastructure financing, an asset class historically accessible only through private credit and infrastructure funds.\n\n• Non-rebasing accrual: Yield accrues through a rising exchange rate against USD.infra rather than through rebasing, so sUSD.infra stays composable across DeFi.\nWhat Can You Use sUSD.infra for?\nsUSD.infra is designed to accrue yield relative to USD.infra. The protocol offers the following use cases:\n\n• Yield generation: Hold sUSD.infra to earn yield from real-world digital infrastructure financing, paid from contract cash flows rather than token emissions.\nInfrastructure credit exposure: Gain on-chain exposure to infrastructure credit, an asset class traditionally accessed through private funds.\n\n• Collateralization: Use sUSD.infra as collateral in lending markets and as a base asset for yield-trading markets on Solana\n\n• Liquidity: Trade sUSD.infra on decentralized exchanges or redeem it for USD.infra through the DAWN vault.\n\nHow Does sUSD.infra Work?\n\nUsers deposit USD.infra into the DAWN vault and receive sUSD.infra at the current exchange rate. The vault lends USD.infra to project entities that hold long-term revenue contracts with infrastructure operators. Each loan is secured by the project's contracted cash flows, held in a bankruptcy-remote structure and serviced by an operator for the life of the contract.\n\nAs borrowers make payments, the vault's assets grow and the exchange rate of sUSD.infra to USD.infra rises, so yield accrues automatically without rebasing. A portion of vault assets is held in liquid reserves to support redemptions. The yield is paid from the underlying cash flows under the terms of the instrument and is not guaranteed. The protocol charges fees at the application level, while users pay Solana network fees in SOL.",
+        "gt_score": 18.493506493506494,
+        "metadata_updated_at": "2026-09-28T18:44:06Z"
+      },
+      "relationships": {
+        "network": {
+          "data": {
+            "id": "solana",
+            "type": "network"
+          }
+        }
+      }
+    },
+    {
+      "id": "solana_dawn7ZUF7h7anFuEsDdAU1Y3HYwikwqNMAENZsQJdNL",
+      "type": "token",
+      "attributes": {
+        "address": "dawn7ZUF7h7anFuEsDdAU1Y3HYwikwqNMAENZsQJdNL",
+        "name": "USD.tel",
+        "symbol": "USD.tel",
+        "decimals": 6,
+        "image_url": "https://coin-images.coingecko.com/coins/images/102178896/large/USD.infra_Circle_Dark_BG.png?1790620647",
+        "coingecko_coin_id": "usd-infra",
+        "websites": [
+          "https://infrastructure.finance"
+        ],
+        "discord_url": "https://discord.com/invite/dawninternet",
+        "farcaster_url": null,
+        "zora_url": null,
+        "telegram_handle": null,
+        "twitter_handle": "dawninternet",
+        "description": "About USD.infra\n\nUSD.infra is a stablecoin designed to maintain a 1:1 value with the US Dollar and to settle real-world infrastructure payments on-chain and across DeFi\n\n• USD.infra is the settlement dollar of DAWN, an RWA protocol bringing AI and digital infrastructure on-chain\n• It can be deposited into the USD.infra vault to mint sUSD.infra, a separate yield-bearing token that accrues value from financed digital infrastructure.\n• DAWN finances AI infrastructure, connectivity infrastructure, and compute infrastructure that generates revenue through commercial contracts.\n\n\nWhat is USD.infra\n\nUSD.infra is the settlement dollar at the center of DAWN, an RWA protocol that brings project finance for digital infrastructure on-chain. DAWN lends to real-world infrastructure projects (RWAs), like AI infrastructure, connectivity networks, and compute facilities, whose revenue comes from long-term commercial contracts and it returns those contracted cash flows to on-chain capital as yield. USD.infra is the unit in which that capital is deposited, deployed, and repaid.\n\nValue moves through the system as users mint USD.infra against dollar reserves and either hold it as a stable unit of account, use it to settle infrastructure payments, or deposit it to earn yield. Capital committed to financing is deployed into loans against infrastructure contracts, or held in reserve. Contract revenue flows back through the protocol in USD.infra. As more digital infrastructure is financed on DAWN, the utility of USD.infra as the settlement layer for that activity grows.\n\nWhat makes USD.infra Unique\n\n• Infrastructure settlement: USD.infra is built for on-chain settlement of real-world infrastructure payments, the recurring revenue generated by networks and compute\n• Contract-based financing: DAWN underwrites long-term commercial contracts rather than hardware collateral, so the capital USD.infra denominates is tied to contracted cash flows from RWA infrastructure\n• Full-stack digital infrastructure: DAWN finances connectivity, compute, and AI infrastructure under one protocol, making USD.infra the common dollar across all infrastructure that powers AI and the Internet.\n\nWhat Can You Use USD.infra for?\n\nUSD.infra is pegged to the US dollar. The DAWN protocol offers the following use cases:\n\n\n• Value retention: Hold a stable, dollar-denominated unit of account on-chain, insulated from broader crypto market volatility\n• Infrastructure settlement: Pay for and settle real-world infrastructure services on-chain in USD.infra\n• Yield generation: Deposit USD.infra to mint sUSD.infra, which accrues yield from DAWN’s loans to real-world digital infrastructure\n• Collaterialization: Use USD.infra as a liquid, composable asset, paired with sUSD.infra, in decentralized exchanges, lending markets, and other DeFi applications.\n\n\nHow Does USD.infra Work?\n\nUSD.infra is minted one-to-one against dollar-denominated reserves and can be redeemed at par through the protocol. Its peg is maintained by full reserve backing, collateralized by other stablecoins and US Treasuries.\n\nWithin DAWN, USD.infra is the currency of the protocol's financing activity. Loans to infrastructure projects are made in USD.infra, contract payments are collected in USD.infra, and holders who want exposure to that activity deposit USD.infra to mint sUSD.infra, whose value rises as contract payments accrue. DAWN operates on Solana, so users pay network fees in SOL, while the protocol's own fees are handled at the application level.",
+        "gt_score": 42.857142857142854,
+        "metadata_updated_at": "2026-09-28T18:44:05Z"
+      },
+      "relationships": {
+        "network": {
+          "data": {
+            "id": "solana",
+            "type": "network"
+          }
+        }
+      }
+    }
+  ],
+  "included": [
+    {
+      "id": "solana",
+      "type": "network",
+      "attributes": {
+        "name": "Solana",
+        "coingecko_asset_platform_id": "solana"
+      }
+    }
+  ]
+}

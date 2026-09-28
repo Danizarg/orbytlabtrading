@@ -1,0 +1,69 @@
+// PumpPortal live data test (Node 24 global WebSocket, keyless, ONE connection).
+// Phase 1 (0-35s): subscribeNewToken + subscribeMigration
+// Phase 2 (35-65s): subscribeTokenTrade on 2 fresh mints (keyless) + a migrated mint
+// Phase 3 (65-75s): subscribeAccountTrade on one trader + unsubscribe tests
+import { writeFileSync } from 'node:fs';
+
+const OUT = process.argv[2] || './ws_log.jsonl';
+const MIGRATED_FALLBACK = process.argv[3] || null; // a recently migrated mint (pump-amm) if none seen live
+const log = [];
+const t0 = Date.now();
+const rec = (phase, dir, data) => {
+  const entry = { t_ms: Date.now() - t0, phase, dir, data };
+  log.push(entry);
+  const s = typeof data === 'string' ? data : JSON.stringify(data);
+  console.log(`[${entry.t_ms}] ${phase} ${dir} ${s.slice(0, 300)}`);
+};
+
+let phase = 'p1';
+const creates = [];
+const migrations = [];
+const ws = new WebSocket('wss://pumpportal.fun/api/data', {
+  headers: { Origin: 'https://www.orbytai.org' },
+});
+const send = (obj) => { rec(phase, 'out', obj); ws.send(JSON.stringify(obj)); };
+
+ws.addEventListener('open', () => {
+  rec(phase, 'evt', 'open');
+  send({ method: 'subscribeNewToken' });
+  send({ method: 'subscribeMigration' });
+});
+ws.addEventListener('message', (ev) => {
+  let d;
+  try { d = JSON.parse(ev.data); } catch { d = String(ev.data); }
+  rec(phase, 'in', d);
+  if (d && d.txType === 'create') creates.push(d);
+  if (d && (d.txType === 'migrate' || d.txType === 'migration' || (d.pool && !d.txType))) migrations.push(d);
+});
+ws.addEventListener('close', (ev) => rec(phase, 'evt', { close: ev.code, reason: ev.reason }));
+ws.addEventListener('error', (ev) => rec(phase, 'evt', { error: String(ev.message || ev.type) }));
+
+setTimeout(() => {
+  phase = 'p2';
+  // pick 2 most recent creates
+  const mints = creates.slice(-2).map((c) => c.mint);
+  const migrated = migrations.length ? migrations[migrations.length - 1].mint : null;
+  const keys = [...mints];
+  if (migrated) keys.push(migrated);
+  if (MIGRATED_FALLBACK) keys.push(MIGRATED_FALLBACK); // active PumpSwap (pump-amm) token
+  rec(phase, 'note', { tokenTradeKeys: keys, migratedMint: migrated });
+  send({ method: 'subscribeTokenTrade', keys });
+}, 35000);
+
+setTimeout(() => {
+  phase = 'p3';
+  // try an account subscription on a trader seen so far
+  const trader = log.find((e) => e.dir === 'in' && e.data && e.data.traderPublicKey)?.data.traderPublicKey;
+  if (trader) send({ method: 'subscribeAccountTrade', keys: [trader] });
+  send({ method: 'unsubscribeNewToken' });
+  send({ method: 'unsubscribeMigration' });
+}, 65000);
+
+setTimeout(() => {
+  ws.close(1000, 'done');
+  setTimeout(() => {
+    writeFileSync(OUT, log.map((e) => JSON.stringify(e)).join('\n'));
+    console.log('saved', log.length, 'entries to', OUT, 'creates', creates.length, 'migrations', migrations.length);
+    process.exit(0);
+  }, 1000);
+}, 77000);

@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "source": "Solana Tracker Datastream handshake with an invalid key, captured 2026-09-28T20:50:48Z via Node ws client",
+    "request": "wss://datastream.solanatracker.io/invalid-key-test (Origin: https://www.orbytai.org)",
+    "note": "Matches documented behaviour: handshake completes (101) then server closes immediately with no JSON error and no 'joined' ack."
+  },
+  "upgrade_status": 101,
+  "upgrade_headers": {
+    "access-control-allow-origin": "https://www.orbytai.org",
+    "access-control-allow-methods": "*",
+    "access-control-allow-headers": "*",
+    "access-control-allow-credentials": "true",
+    "x-powered-by": "Solana Tracker"
+  },
+  "sent": {"type":"join","room":"latest"},
+  "messages": [],
+  "close": {"code": 1000, "reason": "", "after_ms": 194}
+}

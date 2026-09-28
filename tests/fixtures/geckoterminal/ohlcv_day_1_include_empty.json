@@ -1,0 +1,70 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/networks/solana/pools/Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE/ohlcv/day?aggregate=1&limit=1000&currency=usd&token=base&include_empty_intervals=true",
+    "http_status": 200,
+    "fetched_at": "2026-09-28T20:56:16.649Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "MISS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:56:16 GMT",
+      "etag": "W/\"d94cf66685cb2f2a10838b242c279d15\"",
+      "vary": "Accept, Origin, accept-encoding",
+      "x-runtime": "1.331501"
+    },
+    "trimmed": "ohlcv_list trimmed to first 3 of 184 returned candles (newest first)"
+  },
+  "data": {
+    "id": "f0ed22ff-52d3-48b0-8692-7bfaa83dad3e",
+    "type": "ohlcv_request_response",
+    "attributes": {
+      "ohlcv_list": [
+        [
+          1790553600,
+          121.971807309343,
+          122.991944649965,
+          117.117117117117,
+          118.896066274959,
+          208440350.4856224
+        ],
+        [
+          1790467200,
+          121.2181511225394,
+          125.634517766497,
+          119.920475654589,
+          121.971807309343,
+          125108746.26338975
+        ],
+        [
+          1790380800,
+          122.458261789015,
+          122.558226494221,
+          119.526627218935,
+          121.2181511225394,
+          77922548.26287267
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "base": {
+      "name": "Wrapped SOL",
+      "symbol": "SOL",
+      "coingecko_coin_id": "wrapped-solana",
+      "address": "So11111111111111111111111111111111111111112"
+    },
+    "quote": {
+      "name": "USD Coin",
+      "symbol": "USDC",
+      "coingecko_coin_id": "usd-coin",
+      "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+    }
+  }
+}

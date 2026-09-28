@@ -1,0 +1,66 @@
+{
+  "_note": "Captured live 2026-09-28T21:01:13.299Z from wss://solana-rpc.publicnode.com; account = pump AMM protocol-fee WSOL token account",
+  "subscribeRequest": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "accountSubscribe",
+    "params": [
+      "Bvtgim23rfocUzxVX9j9QFxTbBnH8JZxnaGLCEkXvjKS",
+      {
+        "encoding": "jsonParsed",
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  "subscribeResponse": {
+    "jsonrpc": "2.0",
+    "result": 325034,
+    "id": 2
+  },
+  "notifications": [
+    {
+      "jsonrpc": "2.0",
+      "method": "accountNotification",
+      "params": {
+        "result": {
+          "context": {
+            "slot": 451433741
+          },
+          "value": {
+            "data": {
+              "parsed": {
+                "info": {
+                  "isNative": true,
+                  "mint": "So11111111111111111111111111111111111111112",
+                  "owner": "9rPYyANsfQZw3DnDmKE3YCQF5E8oD89UXoHn9JFEhJUz",
+                  "rentExemptReserve": {
+                    "amount": "1488440",
+                    "decimals": 9,
+                    "uiAmount": 0.00148844,
+                    "uiAmountString": "0.00148844"
+                  },
+                  "state": "initialized",
+                  "tokenAmount": {
+                    "amount": "367291947437",
+                    "decimals": 9,
+                    "uiAmount": 367.291947437,
+                    "uiAmountString": "367.291947437"
+                  }
+                },
+                "type": "account"
+              },
+              "program": "spl-token",
+              "space": 165
+            },
+            "executable": false,
+            "lamports": 367293435877,
+            "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "rentEpoch": 18446744073709552000,
+            "space": 165
+          }
+        },
+        "subscription": 325034
+      }
+    }
+  ]
+}

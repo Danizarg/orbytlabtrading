@@ -1,0 +1,11 @@
+{
+  "_note": "Live 2026-09-28T21:00:00.751Z https://solana-rpc.publicnode.com with Origin https://www.orbytai.org. HTTP 403; headers {\"access-control-allow-origin\":\"*\",\"content-encoding\":\"br\"}",
+  "response": {
+    "jsonrpc": "2.0",
+    "error": {
+      "code": -32602,
+      "message": "Indexed requests require a personal token. Get one at: https://www.allnodes.com/publicnode"
+    },
+    "id": 1
+  }
+}

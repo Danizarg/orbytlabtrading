@@ -1,8 +1,23 @@
+# dependencies
 node_modules/
+
+# next.js / build
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# vercel
 .vercel/
+
+# env (never commit secrets; .env.example is the documented template)
 .env
 .env.*
 !.env.example
+
+# misc
 *.log
 .DS_Store
 Thumbs.db

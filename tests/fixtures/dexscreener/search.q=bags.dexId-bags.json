@@ -1,0 +1,156 @@
+{
+  "schemaVersion": "1.0.0",
+  "pairs": [
+    {
+      "chainId": "solana",
+      "dexId": "bags",
+      "url": "https://dexscreener.com/solana/gwbahatuxyreuqmsvk1k36alzdptrs391pyp6zfq7qdw",
+      "pairAddress": "GWBAhATuxYreuQMSvK1k36aLzDptrS391PyP6ZfQ7QdW",
+      "baseToken": {
+        "address": "CMqgebQkDkeWttY1zTaRFe2v3eBQ9EKQRkZpmGiPBAGS",
+        "name": "BAGSINU",
+        "symbol": "BAGSINU"
+      },
+      "quoteToken": {
+        "address": "So11111111111111111111111111111111111111112",
+        "name": "Wrapped SOL",
+        "symbol": "SOL"
+      },
+      "priceNative": "0.00000002908",
+      "priceUsd": "0.000003454",
+      "txns": {
+        "m5": {
+          "buys": 33,
+          "sells": 35
+        },
+        "h1": {
+          "buys": 33,
+          "sells": 35
+        },
+        "h6": {
+          "buys": 33,
+          "sells": 35
+        },
+        "h24": {
+          "buys": 33,
+          "sells": 35
+        }
+      },
+      "volume": {
+        "h24": 7377.73,
+        "h6": 7377.73,
+        "h1": 7377.73,
+        "m5": 7377.73
+      },
+      "priceChange": {
+        "m5": -11.67,
+        "h1": -11.67,
+        "h6": -11.67,
+        "h24": -11.67
+      },
+      "fdv": 3454.94,
+      "marketCap": 3454.94,
+      "pairCreatedAt": 1790628250000
+    },
+    {
+      "chainId": "solana",
+      "dexId": "bags",
+      "url": "https://dexscreener.com/solana/fkfwsu5trnygsrgrfcyjlid9vojrtss4wewyjeoudt1e",
+      "pairAddress": "FKfwSU5TRnyGsRgRfcYJLiD9vojRTss4wewyJeoudT1e",
+      "baseToken": {
+        "address": "k3nvpKdRTb4faKp6JpocCR1CTT1G6Rr4rKn35G8BAGS",
+        "name": "BLOWER",
+        "symbol": "BLWR"
+      },
+      "quoteToken": {
+        "address": "So11111111111111111111111111111111111111112",
+        "name": "Wrapped SOL",
+        "symbol": "SOL"
+      },
+      "priceNative": "0.0000001360",
+      "priceUsd": "0.00001611",
+      "txns": {
+        "m5": {
+          "buys": 0,
+          "sells": 0
+        },
+        "h1": {
+          "buys": 0,
+          "sells": 1
+        },
+        "h6": {
+          "buys": 0,
+          "sells": 14
+        },
+        "h24": {
+          "buys": 5,
+          "sells": 40
+        }
+      },
+      "volume": {
+        "h24": 69.87,
+        "h6": 4.81,
+        "h1": 0.72,
+        "m5": 0
+      },
+      "priceChange": {
+        "h1": -1,
+        "h6": -0.16,
+        "h24": -2.56
+      },
+      "fdv": 16113.61,
+      "marketCap": 16113.61,
+      "pairCreatedAt": 1778031871000
+    },
+    {
+      "chainId": "solana",
+      "dexId": "bags",
+      "url": "https://dexscreener.com/solana/9d1bylbuu8s5jsik4odddchntt7peaootedwdn94kjgh",
+      "pairAddress": "9D1ByLbUU8S5JSik4oDDdCHntt7PEaootedWDN94kjGh",
+      "baseToken": {
+        "address": "H8WTvo3ZXSYHJAcYqzCforbG8coR1FDAX2kHFfqHBAGS",
+        "name": "BagsPay",
+        "symbol": "BAGSPAY"
+      },
+      "quoteToken": {
+        "address": "So11111111111111111111111111111111111111112",
+        "name": "Wrapped SOL",
+        "symbol": "SOL"
+      },
+      "priceNative": "0.00000005116",
+      "priceUsd": "0.000006083",
+      "txns": {
+        "m5": {
+          "buys": 0,
+          "sells": 0
+        },
+        "h1": {
+          "buys": 2,
+          "sells": 6
+        },
+        "h6": {
+          "buys": 9,
+          "sells": 14
+        },
+        "h24": {
+          "buys": 10,
+          "sells": 30
+        }
+      },
+      "volume": {
+        "h24": 1523.04,
+        "h6": 1311.4,
+        "h1": 0.46,
+        "m5": 0
+      },
+      "priceChange": {
+        "h1": -0.38,
+        "h6": -4.64,
+        "h24": -13.82
+      },
+      "fdv": 6083.92,
+      "marketCap": 6083.92,
+      "pairCreatedAt": 1789521936000
+    }
+  ]
+}

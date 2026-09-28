@@ -1,0 +1,110 @@
+{
+  "_note": "Captured live 2026-09-28T20:53:08.007Z from wss://api.mainnet-beta.solana.com; account = pump AMM protocol-fee WSOL token account",
+  "subscribeRequest": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "accountSubscribe",
+    "params": [
+      "Bvtgim23rfocUzxVX9j9QFxTbBnH8JZxnaGLCEkXvjKS",
+      {
+        "encoding": "jsonParsed",
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  "subscribeResponse": {
+    "jsonrpc": "2.0",
+    "result": 59419172,
+    "id": 2
+  },
+  "notifications": [
+    {
+      "jsonrpc": "2.0",
+      "method": "accountNotification",
+      "params": {
+        "result": {
+          "context": {
+            "slot": 451431891
+          },
+          "value": {
+            "lamports": 366091955031,
+            "data": {
+              "program": "spl-token",
+              "parsed": {
+                "info": {
+                  "isNative": true,
+                  "mint": "So11111111111111111111111111111111111111112",
+                  "owner": "9rPYyANsfQZw3DnDmKE3YCQF5E8oD89UXoHn9JFEhJUz",
+                  "rentExemptReserve": {
+                    "amount": "1488440",
+                    "decimals": 9,
+                    "uiAmount": 0.00148844,
+                    "uiAmountString": "0.00148844"
+                  },
+                  "state": "initialized",
+                  "tokenAmount": {
+                    "amount": "366090466591",
+                    "decimals": 9,
+                    "uiAmount": 366.090466591,
+                    "uiAmountString": "366.090466591"
+                  }
+                },
+                "type": "account"
+              },
+              "space": 165
+            },
+            "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "executable": false,
+            "rentEpoch": 18446744073709552000,
+            "space": 165
+          }
+        },
+        "subscription": 59419172
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "accountNotification",
+      "params": {
+        "result": {
+          "context": {
+            "slot": 451431892
+          },
+          "value": {
+            "lamports": 366092189777,
+            "data": {
+              "program": "spl-token",
+              "parsed": {
+                "info": {
+                  "isNative": true,
+                  "mint": "So11111111111111111111111111111111111111112",
+                  "owner": "9rPYyANsfQZw3DnDmKE3YCQF5E8oD89UXoHn9JFEhJUz",
+                  "rentExemptReserve": {
+                    "amount": "1488440",
+                    "decimals": 9,
+                    "uiAmount": 0.00148844,
+                    "uiAmountString": "0.00148844"
+                  },
+                  "state": "initialized",
+                  "tokenAmount": {
+                    "amount": "366090701337",
+                    "decimals": 9,
+                    "uiAmount": 366.090701337,
+                    "uiAmountString": "366.090701337"
+                  }
+                },
+                "type": "account"
+              },
+              "space": 165
+            },
+            "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "executable": false,
+            "rentEpoch": 18446744073709552000,
+            "space": 165
+          }
+        },
+        "subscription": 59419172
+      }
+    }
+  ]
+}

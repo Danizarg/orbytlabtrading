@@ -1,0 +1,58 @@
+[
+  {
+    "url": "https://dexscreener.com/solana/hd6u8sflwczcreyrt5xfwk2nzat5qb3b8pbbvst4tg5x",
+    "chainId": "solana",
+    "tokenAddress": "Hd6U8SfLWCZCREYrT5XfwK2Nzat5QB3B8pbBvST4Tg5X",
+    "icon": "https://cdn.dexscreener.com/cms/images/I28-o7egAMbqxjRJ?width=64&height=64&fit=crop&quality=95&format=auto",
+    "header": "https://cdn.dexscreener.com/cms/images/6kkZLAx2DVys9iBn?width=600&height=200&fit=crop&quality=95&format=auto",
+    "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/Hd6U8SfLWCZCREYrT5XfwK2Nzat5QB3B8pbBvST4Tg5X?timestamp=1790628300000",
+    "description": "Mullet Dog",
+    "links": [
+      {
+        "type": "twitter",
+        "url": "https://x.com/mulletdogpf"
+      }
+    ],
+    "claimDate": "2026-09-28T20:00:29.668Z"
+  },
+  {
+    "url": "https://dexscreener.com/solana/2yu92oyzbwladvpu8boalzmm1oxpshoboay2bxmeddzr",
+    "chainId": "solana",
+    "tokenAddress": "2yu92oYzBWLAdVpu8BoaLzmM1oxPsHoboay2BXmeDDZr",
+    "icon": "https://cdn.dexscreener.com/cms/images/TNI6WrFovNqZOJAp?width=64&height=64&fit=crop&quality=95&format=auto",
+    "header": "https://cdn.dexscreener.com/cms/images/jXuanog55LTc2NNc?width=600&height=200&fit=crop&quality=95&format=auto",
+    "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/2yu92oYzBWLAdVpu8BoaLzmM1oxPsHoboay2BXmeDDZr?timestamp=1790628300000",
+    "description": "launch coins for X creators. fees can only be claimed if they post the ticker.",
+    "links": [
+      {
+        "label": "Website",
+        "url": "https://froink.com"
+      },
+      {
+        "type": "twitter",
+        "url": "https://x.com/froinkapp"
+      },
+      {
+        "type": "discord",
+        "url": "https://discord.gg/bXcetAKnYQ"
+      }
+    ],
+    "claimDate": "2026-09-28T18:26:28.380Z"
+  },
+  {
+    "url": "https://dexscreener.com/solana/bgdmnyfbc5xj8aktewzx28dpnfbqgkkksaae6kxqftyu",
+    "chainId": "solana",
+    "tokenAddress": "BgdmnYfBc5xj8akTewzX28DPNfBqgkkKSaAE6KxqfTYu",
+    "icon": "https://cdn.dexscreener.com/cms/images/qSY0jRTlG0qK7viv?width=64&height=64&fit=crop&quality=95&format=auto",
+    "header": "https://cdn.dexscreener.com/cms/images/fr-4vYC7crzXkblu?width=600&height=200&fit=crop&quality=95&format=auto",
+    "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/BgdmnYfBc5xj8akTewzX28DPNfBqgkkKSaAE6KxqfTYu?timestamp=1790628300000",
+    "description": "Only true ninjas know that Canary was destined to work with Injective since its early days.",
+    "links": [
+      {
+        "type": "twitter",
+        "url": "https://x.com/CanaryonSF"
+      }
+    ],
+    "claimDate": "2026-09-28T17:27:58.810Z"
+  }
+]

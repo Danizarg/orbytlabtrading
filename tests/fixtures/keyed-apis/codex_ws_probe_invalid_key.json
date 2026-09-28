@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "source": "Codex GraphQL WebSocket handshake with an invalid key, captured 2026-09-28T20:53:43Z via Node ws client",
+    "request": "wss://graph.codex.io/graphql  subprotocol graphql-transport-ws  (Origin: https://www.orbytai.org)",
+    "note": "Genuine server behaviour: 101 upgrade, then after connection_init with an unknown key the server closes with code 4403."
+  },
+  "upgrade_status": 101,
+  "upgrade_headers": {
+    "sec-websocket-protocol": "graphql-transport-ws",
+    "sec-websocket-extensions": "permessage-deflate",
+    "access-control-allow-origin": "*",
+    "access-control-expose-headers": "*",
+    "via": "1.1 cloudfront"
+  },
+  "sent": {"type":"connection_init","payload":{"Authorization":"invalid-key"}},
+  "messages": [],
+  "close": {"code": 4403, "reason": "Your API key was not found", "after_ms": 716}
+}

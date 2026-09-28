@@ -1,0 +1,217 @@
+[
+  {
+    "chainId": "solana",
+    "dexId": "meteora",
+    "url": "https://dexscreener.com/solana/dzznxsvpvdgqftjverc9md6hx4ane425wb74bxrk4vlj",
+    "pairAddress": "DzZNXsvPVDGQftjvErc9MD6hx4ANE425wB74BXrK4vLj",
+    "labels": [
+      "DLMM"
+    ],
+    "baseToken": {
+      "address": "8T193DFGTGcimGaotbnYdHTsTRGgLAaiy3sMGgL6pump",
+      "name": "Fomo Candle",
+      "symbol": "FOMOCANDLE"
+    },
+    "quoteToken": {
+      "address": "So11111111111111111111111111111111111111112",
+      "name": "Wrapped SOL",
+      "symbol": "SOL"
+    },
+    "priceNative": "0.000001175",
+    "priceUsd": "0.0001395",
+    "txns": {
+      "m5": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h1": {
+        "buys": 232,
+        "sells": 249
+      },
+      "h6": {
+        "buys": 232,
+        "sells": 249
+      },
+      "h24": {
+        "buys": 232,
+        "sells": 249
+      }
+    },
+    "volume": {
+      "h24": 9485.86,
+      "h6": 9485.86,
+      "h1": 9485.86,
+      "m5": 0
+    },
+    "priceChange": {
+      "h1": 4.97,
+      "h6": 4.97,
+      "h24": 4.97
+    },
+    "liquidity": {
+      "usd": 904.6,
+      "base": 742173,
+      "quote": 6.7465
+    },
+    "fdv": 136905,
+    "marketCap": 136905,
+    "pairCreatedAt": 1790626496000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/Mr_D6Zg5pRRGqx5B?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/x4MBtwmY-UpMNegX?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/8T193DFGTGcimGaotbnYdHTsTRGgLAaiy3sMGgL6pump?timestamp=1790628300000",
+      "websites": [
+        {
+          "url": "https://fomocandle.pro",
+          "label": "Website"
+        }
+      ],
+      "socials": [
+        {
+          "url": "https://x.com/FomoCandle",
+          "type": "twitter"
+        }
+      ]
+    }
+  },
+  {
+    "chainId": "solana",
+    "dexId": "pumpswap",
+    "url": "https://dexscreener.com/solana/buaa3jui2qmgdkdtf7eut8pkbgsyhh4okqopuvxwg7g2",
+    "pairAddress": "BuaA3jui2qmGDkdTF7Eut8pKbgsyhH4okQopUVXWg7G2",
+    "baseToken": {
+      "address": "8T193DFGTGcimGaotbnYdHTsTRGgLAaiy3sMGgL6pump",
+      "name": "Fomo Candle",
+      "symbol": "FOMOCANDLE"
+    },
+    "quoteToken": {
+      "address": "So11111111111111111111111111111111111111112",
+      "name": "Wrapped SOL",
+      "symbol": "SOL"
+    },
+    "priceNative": "0.00000002375",
+    "priceUsd": "0.000002824",
+    "txns": {
+      "m5": {
+        "buys": 2,
+        "sells": 1
+      },
+      "h1": {
+        "buys": 5248,
+        "sells": 5143
+      },
+      "h6": {
+        "buys": 5248,
+        "sells": 5143
+      },
+      "h24": {
+        "buys": 5248,
+        "sells": 5143
+      }
+    },
+    "volume": {
+      "h24": 1664702.44,
+      "h6": 1664702.44,
+      "h1": 1664702.44,
+      "m5": 14.65
+    },
+    "priceChange": {
+      "m5": 0.94,
+      "h1": -94.2,
+      "h6": -94.2,
+      "h24": -94.2
+    },
+    "liquidity": {
+      "usd": 3208.24,
+      "base": 937448961,
+      "quote": 4.7165
+    },
+    "fdv": 2824,
+    "marketCap": 2824,
+    "pairCreatedAt": 1790626194000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/Mr_D6Zg5pRRGqx5B?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/x4MBtwmY-UpMNegX?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/8T193DFGTGcimGaotbnYdHTsTRGgLAaiy3sMGgL6pump?timestamp=1790628300000",
+      "websites": [
+        {
+          "url": "https://fomocandle.pro",
+          "label": "Website"
+        }
+      ],
+      "socials": [
+        {
+          "url": "https://x.com/FomoCandle",
+          "type": "twitter"
+        }
+      ]
+    }
+  },
+  {
+    "chainId": "solana",
+    "dexId": "pumpfun",
+    "url": "https://dexscreener.com/solana/gvgc42ds7sb9keyctrfzr9hzfd9nxemwln3pzuazvcq2",
+    "pairAddress": "GVgC42Ds7sB9KEYCTrFzr9HZFd9nxEmWLN3pZuAZvcQ2",
+    "baseToken": {
+      "address": "8T193DFGTGcimGaotbnYdHTsTRGgLAaiy3sMGgL6pump",
+      "name": "Fomo Candle",
+      "symbol": "FOMOCANDLE"
+    },
+    "quoteToken": {
+      "address": "So11111111111111111111111111111111111111112",
+      "name": "Wrapped SOL",
+      "symbol": "SOL"
+    },
+    "priceNative": "0.0000004108",
+    "priceUsd": "0.00004866",
+    "txns": {
+      "m5": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h1": {
+        "buys": 59,
+        "sells": 13
+      },
+      "h6": {
+        "buys": 59,
+        "sells": 13
+      },
+      "h24": {
+        "buys": 59,
+        "sells": 13
+      }
+    },
+    "volume": {
+      "h24": 12659,
+      "h6": 12659,
+      "h1": 12659,
+      "m5": 0
+    },
+    "priceChange": {
+      "h1": 1365,
+      "h6": 1365,
+      "h24": 1365
+    },
+    "fdv": 48664.65,
+    "marketCap": 48664.65,
+    "pairCreatedAt": 1790626172000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/Mr_D6Zg5pRRGqx5B?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/x4MBtwmY-UpMNegX?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/8T193DFGTGcimGaotbnYdHTsTRGgLAaiy3sMGgL6pump?timestamp=1790628300000",
+      "websites": [
+        {
+          "url": "https://fomocandle.pro",
+          "label": "Website"
+        }
+      ],
+      "socials": [
+        {
+          "url": "https://x.com/FomoCandle",
+          "type": "twitter"
+        }
+      ]
+    }
+  }
+]

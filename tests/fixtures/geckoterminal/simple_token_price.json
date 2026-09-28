@@ -1,0 +1,55 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/simple/networks/solana/token_price/5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs,So11111111111111111111111111111111111111112,62zeow8T5HL7nsUCqJPmc9c6vViwnPqhxa5Dd2pgpump?include_market_cap=true&mcap_fdv_fallback=true&include_24hr_vol=true&include_24hr_price_change=true&include_total_reserve_in_usd=true",
+    "http_status": 200,
+    "fetched_at": "2026-09-28T20:54:04.760Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "MISS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:54:04 GMT",
+      "etag": "W/\"01c769b24d51999e835e4776575231b3\"",
+      "vary": "Accept-Encoding, Accept, Origin",
+      "x-runtime": "0.084145"
+    },
+    "trimmed": "untrimmed"
+  },
+  "data": {
+    "id": "6af9709b-c7e0-4c05-ba9b-01166745c473",
+    "type": "simple_token_price",
+    "attributes": {
+      "token_prices": {
+        "5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs": "0.001026933215080194170338062043110785286231502953490150848836139414",
+        "62zeow8T5HL7nsUCqJPmc9c6vViwnPqhxa5Dd2pgpump": "0.00000339535158471543679151623025865086599778821101713748324970576645",
+        "So11111111111111111111111111111111111111112": "118.560136522185771225495042648"
+      },
+      "market_cap_usd": {
+        "5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs": "1026933.2150801942",
+        "62zeow8T5HL7nsUCqJPmc9c6vViwnPqhxa5Dd2pgpump": "3395.3515847154367",
+        "So11111111111111111111111111111111111111112": "1438743250.2749581"
+      },
+      "h24_volume_usd": {
+        "5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs": "5044119.18132736",
+        "62zeow8T5HL7nsUCqJPmc9c6vViwnPqhxa5Dd2pgpump": "19571.6574084494",
+        "So11111111111111111111111111111111111111112": "3592021760.99405"
+      },
+      "h24_price_change_percentage": {
+        "5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs": "3109.4842518138",
+        "62zeow8T5HL7nsUCqJPmc9c6vViwnPqhxa5Dd2pgpump": "-34.24702086172247",
+        "So11111111111111111111111111111111111111112": "-3.4878990442001956"
+      },
+      "total_reserve_in_usd": {
+        "5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs": "47676.84922726953085803954794",
+        "62zeow8T5HL7nsUCqJPmc9c6vViwnPqhxa5Dd2pgpump": "2650.8604602315205333993909636",
+        "So11111111111111111111111111111111111111112": "16107434475.37293038643615185083138036039689993349913597516134247346139577574872066145871541829320613402714115348910257493129150644"
+      }
+    }
+  }
+}

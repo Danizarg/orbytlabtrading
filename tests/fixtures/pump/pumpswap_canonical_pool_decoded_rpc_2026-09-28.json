@@ -1,0 +1,97 @@
+{
+  "_note": "REAL mainnet data 2026-09-28T20:59:41.546Z via https://api.mainnet-beta.solana.com. Pool layout from pump-public-docs idl/pump_amm.json.",
+  "pools": [
+    {
+      "mint": "4ov9rwwS4iBHeTWGCrVaQYW1HzWK51MSfs8csGAApump",
+      "pool_authority": "6jT6Nzfgc686ntt9NADdTwU6TBwHupy9GaUiF8LwdAQV",
+      "derived_pool": "8HbgiXuiNbHRcxiNG8UBD8GLewoy6QVDnPFPgjFGmszf",
+      "pool_owner": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+      "decoded_pool": {
+        "pool_bump": 255,
+        "index": 0,
+        "creator": "6jT6Nzfgc686ntt9NADdTwU6TBwHupy9GaUiF8LwdAQV",
+        "base_mint": "4ov9rwwS4iBHeTWGCrVaQYW1HzWK51MSfs8csGAApump",
+        "quote_mint": "So11111111111111111111111111111111111111112",
+        "lp_mint": "9AK13ffX4ZmPyJoKXJF64dKxEDGsAYerpEEsoMKqFXLD",
+        "pool_base_token_account": "A83YJrgMMSrFSYrxTYqEhRBCXxTh3zpsgwvJBUsHP3d",
+        "pool_quote_token_account": "9xYjmwazaSYTRgGf9u9jjTc6uhJXNUWn5cp5BiJxYzM6",
+        "lp_supply": "4193388282604",
+        "coin_creator": "8V4qxjK2BS53EKjMra9bzJzH6BLJtf7jQUF4ekYSSNfb",
+        "is_mayhem_mode": false,
+        "is_cashback_coin": false,
+        "virtual_quote_reserves": "17584505288",
+        "creator_fee_bps": "0",
+        "can_edit_creator_fee": false,
+        "is_holder_reward": false,
+        "_account_data_len": 301,
+        "_decoded_bytes": 271
+      },
+      "pool_creator_equals_pool_authority": true,
+      "vaults": {
+        "base_tokenAmount": {
+          "amount": "994648830504123",
+          "decimals": 6,
+          "uiAmount": 994648830.504123,
+          "uiAmountString": "994648830.504123"
+        },
+        "quote_tokenAmount": {
+          "amount": "202080743",
+          "decimals": 9,
+          "uiAmount": 0.202080743,
+          "uiAmountString": "0.202080743"
+        },
+        "base_token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+      },
+      "derived": {
+        "price_sol_per_token": 1.788227712687817e-8,
+        "effective_quote_reserves_sol": 17.786586031
+      }
+    },
+    {
+      "mint": "GJJ6TADXU6TdvBR8siNxLqYzbcwc6ixgxFCg7Ystpump",
+      "pool_authority": "82Fqvy6gEAdMPxcJTuUJjp9GdFG51tApFGrubYSEBD6n",
+      "derived_pool": "4N5bUkvsWX5pQYz1WNNzszmVEua77ZwBMaJnKrPpddTX",
+      "pool_owner": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+      "decoded_pool": {
+        "pool_bump": 255,
+        "index": 0,
+        "creator": "82Fqvy6gEAdMPxcJTuUJjp9GdFG51tApFGrubYSEBD6n",
+        "base_mint": "GJJ6TADXU6TdvBR8siNxLqYzbcwc6ixgxFCg7Ystpump",
+        "quote_mint": "So11111111111111111111111111111111111111112",
+        "lp_mint": "2BBPugs4p4kPm1gixnVBQ3BGumZ7hayNCtALTx9L6JK8",
+        "pool_base_token_account": "296Qfj9zDSutxwYKtq3TUgfeKPaV3rV8A8eoyi21TPA4",
+        "pool_quote_token_account": "93XnjuNzWKUBNDCQPPU1saEyKUHsavr8cEtBV9e1biTk",
+        "lp_supply": "154956809268",
+        "coin_creator": "8zp75jBnxbA6rSLV9MrzEPhxT96RCU6W6n7Zrg8uwm9R",
+        "is_mayhem_mode": true,
+        "is_cashback_coin": false,
+        "virtual_quote_reserves": "0",
+        "creator_fee_bps": "0",
+        "can_edit_creator_fee": false,
+        "is_holder_reward": false,
+        "_account_data_len": 301,
+        "_decoded_bytes": 271
+      },
+      "pool_creator_equals_pool_authority": true,
+      "vaults": {
+        "base_tokenAmount": {
+          "amount": "1030685024578885",
+          "decimals": 6,
+          "uiAmount": 1030685024.578885,
+          "uiAmountString": "1030685024.578885"
+        },
+        "quote_tokenAmount": {
+          "amount": "23516797",
+          "decimals": 9,
+          "uiAmount": 0.023516797,
+          "uiAmountString": "0.023516797"
+        },
+        "base_token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+      },
+      "derived": {
+        "price_sol_per_token": 2.2816667011930672e-11,
+        "effective_quote_reserves_sol": 0.023516797
+      }
+    }
+  ]
+}

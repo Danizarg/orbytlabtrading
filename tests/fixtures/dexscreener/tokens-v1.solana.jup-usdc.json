@@ -1,0 +1,146 @@
+[
+  {
+    "chainId": "solana",
+    "dexId": "orca",
+    "url": "https://dexscreener.com/solana/c1mglojnlwbkadvu9bhdtgzz1ozx4dz5zgdgcgvvw8wz",
+    "pairAddress": "C1MgLojNLWBKADvu9BHdtgzz1oZX4dZ5zGdGcgvvW8Wz",
+    "labels": [
+      "wp"
+    ],
+    "baseToken": {
+      "address": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+      "name": "Jupiter",
+      "symbol": "JUP"
+    },
+    "quoteToken": {
+      "address": "So11111111111111111111111111111111111111112",
+      "name": "Wrapped SOL",
+      "symbol": "SOL"
+    },
+    "priceNative": "0.002772",
+    "priceUsd": "0.3293",
+    "txns": {
+      "m5": {
+        "buys": 22,
+        "sells": 26
+      },
+      "h1": {
+        "buys": 485,
+        "sells": 332
+      },
+      "h6": {
+        "buys": 5739,
+        "sells": 4959
+      },
+      "h24": {
+        "buys": 21620,
+        "sells": 21900
+      }
+    },
+    "volume": {
+      "h24": 6283969.72,
+      "h6": 1649694.35,
+      "h1": 102085.19,
+      "m5": 7296.55
+    },
+    "priceChange": {
+      "m5": -0.35,
+      "h1": 0.73,
+      "h6": -0.11,
+      "h24": -4.22
+    },
+    "liquidity": {
+      "usd": 805020.63,
+      "base": 1281740,
+      "quote": 3224.3868
+    },
+    "fdv": 2305175665,
+    "marketCap": 1093107522,
+    "pairCreatedAt": 1706675725000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/4afaadf0f388adf44bd3a33cedfc601938f74ab7ede6d78e4063777bb0f64780?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/97669b5c651a5568520c92b0d265278d9368368e69fa88b9aeb3815e35f9c8ea?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN?timestamp=1790628300000",
+      "websites": [
+        {
+          "url": "https://jup.ag",
+          "label": "Website"
+        }
+      ],
+      "socials": [
+        {
+          "url": "https://twitter.com/JupiterExchange",
+          "type": "twitter"
+        },
+        {
+          "url": "https://discord.gg/jup",
+          "type": "discord"
+        }
+      ]
+    }
+  },
+  {
+    "chainId": "solana",
+    "dexId": "raydium",
+    "url": "https://dexscreener.com/solana/bztgqeys6exuxicyphecyq7pybqodxqmvkjubp4r8muu",
+    "pairAddress": "BZtgQEyS6eXUXicYPHecYQ7PybqodXQMvkjUbP4R8mUU",
+    "labels": [
+      "CLMM"
+    ],
+    "baseToken": {
+      "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "name": "USD Coin",
+      "symbol": "USDC"
+    },
+    "quoteToken": {
+      "address": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+      "name": "USDT",
+      "symbol": "USDT"
+    },
+    "priceNative": "1.0003737",
+    "priceUsd": "1.00037",
+    "txns": {
+      "m5": {
+        "buys": 6,
+        "sells": 0
+      },
+      "h1": {
+        "buys": 106,
+        "sells": 18
+      },
+      "h6": {
+        "buys": 722,
+        "sells": 103
+      },
+      "h24": {
+        "buys": 2031,
+        "sells": 585
+      }
+    },
+    "volume": {
+      "h24": 1533476.16,
+      "h6": 535953.77,
+      "h1": 75817.75,
+      "m5": 223.28
+    },
+    "priceChange": {
+      "h6": 0.01,
+      "h24": 0.02
+    },
+    "liquidity": {
+      "usd": 1573812.65,
+      "base": 618329,
+      "quote": 955252
+    },
+    "fdv": 9346390250,
+    "marketCap": 75170088300,
+    "pairCreatedAt": 1723699296000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/913e72ef4901644569197a61dd198656ab488e9cd648a326fc2fca21b0d2521d?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/913e72ef4901644569197a61dd198656ab488e9cd648a326fc2fca21b0d2521d?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v?timestamp=1790628300000",
+      "websites": [],
+      "socials": []
+    }
+  }
+]

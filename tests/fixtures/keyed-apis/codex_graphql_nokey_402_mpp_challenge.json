@@ -1,0 +1,28 @@
+{
+  "_meta": {
+    "source": "Codex GraphQL POST without Authorization header (auto MPP mode), captured 2026-09-28T20:53:28Z",
+    "request": "POST https://graph.codex.io/graphql  body: { getTokenPrices(inputs:[{address:\"So111...112\", networkId:1399811149}]) { address priceUsd timestamp } }  (Origin: https://www.orbytai.org)",
+    "http_status": 402,
+    "headers": {
+      "content-type": "application/problem+json; charset=utf-8",
+      "cache-control": "no-store",
+      "access-control-allow-origin": "*",
+      "www-authenticate": "Payment id=\"xRw7KKg0m4GzxtMpmC987-CmZ67IXAyL4pKSRAPc6_8\", realm=\"graph.codex.io\", method=\"tempo\", intent=\"charge\", request=\"eyJhbW91bnQiOiIxMDAwIiwiY3VycmVuY3kiOiIweDIwYzAwMDAwMDAwMDAwMDAwMDAwMDAwMGI5NTM3ZDExYzYwZThiNTAiLCJleHBpcmVzIjoiMjAyNi0wOS0yOFQyMDo1NToyOC43OTFaIiwibWV0aG9kRGV0YWlscyI6eyJjaGFpbklkIjo0MjE3fSwicmVjaXBpZW50IjoiMHhjMTJCNUQ4MDJEYTkwZDE0YThiMzVkRWMxY0ZiNmZkNWNlZURFNjBCIn0\", description=\"Codex GraphQL query charge\", expires=\"2026-09-28T20:55:28.791Z\""
+    }
+  },
+  "body": {
+    "type": "https://ietf.org/payment/problems/payment-required",
+    "title": "Payment Required",
+    "status": 402,
+    "detail": "Payment is required to execute this GraphQL query in MPP mode."
+  },
+  "www_authenticate_request_decoded": {
+    "amount": "1000",
+    "currency": "0x20c000000000000000000000b9537d11c60e8b50",
+    "expires": "2026-09-28T20:55:28.791Z",
+    "methodDetails": {
+      "chainId": 4217
+    },
+    "recipient": "0xc12B5D802Da90d14a8b35dEc1cFb6fd5ceeDE60B"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.coingecko.com/api/v3/onchain/networks/solana/trending_pools?include=base_token,quote_token,dex&duration=5m",
+    "http_status": 401,
+    "fetched_at": "2026-09-28T20:53:02.778Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET, POST, OPTIONS, DELETE, PUT, PATCH",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "no-cache",
+      "cf-cache-status": "MISS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:53:02 GMT",
+      "vary": "Accept-Encoding, Origin",
+      "x-runtime": "0.001719"
+    },
+    "trimmed": "untrimmed error body"
+  },
+  "status": {
+    "timestamp": "2026-09-28T20:53:02.712Z",
+    "error_code": 401,
+    "error_message": "Requests without API key are not allowed for this endpoint. Sign up for an API plan at: https://www.coingecko.com/en/api/pricing."
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "_note": "REAL responses 2026-09-28, keyless requests with Origin: https://www.orbytai.org. 404 = route removed (pump.fun discovery endpoints removed by Moralis on 2026-07-31); 401 = route exists but needs X-API-Key.",
+  "probes": [
+    {"request": "GET https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new?limit=2", "http_status": 404, "headers": {"access-control-allow-origin": "*"}, "body": {"message": "Resource not found. Please check out the API documentation: https://docs.moralis.com/"}},
+    {"request": "GET https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/bonding?limit=2", "http_status": 404, "headers": {"access-control-allow-origin": "*"}, "body": {"message": "Resource not found. Please check out the API documentation: https://docs.moralis.com/"}},
+    {"request": "GET https://solana-gateway.moralis.io/token/mainnet/dB98iqo6YQ2p1X1KtvmLRDFmtQauEiA2CtxL8cvpump/bonding-status", "http_status": 404, "headers": {"access-control-allow-origin": "*"}, "body": {"message": "Resource not found. Please check out the API documentation: https://docs.moralis.com/"}},
+    {"request": "GET https://solana-gateway.moralis.io/token/mainnet/dB98iqo6YQ2p1X1KtvmLRDFmtQauEiA2CtxL8cvpump/swaps?limit=2", "http_status": 401, "headers": {"access-control-allow-origin": "*"}, "body": {"message": "Missing api key."}},
+    {"request": "GET https://solana-gateway.moralis.io/token/mainnet/dB98iqo6YQ2p1X1KtvmLRDFmtQauEiA2CtxL8cvpump/price", "http_status": 401, "headers": {"access-control-allow-origin": "*"}, "body": {"message": "Missing api key."}}
+  ]
+}

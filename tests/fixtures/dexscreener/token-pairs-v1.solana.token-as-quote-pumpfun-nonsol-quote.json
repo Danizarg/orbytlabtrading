@@ -1,0 +1,131 @@
+[
+  {
+    "chainId": "solana",
+    "dexId": "pumpfun",
+    "url": "https://dexscreener.com/solana/4ojrmtczdjhjou81spmfgskl2gutapugtuxa9cjg3uaw",
+    "pairAddress": "4oJRmtCZdjhJoU81SpmFgSkL2GuTApUGTuxA9cjG3UAW",
+    "baseToken": {
+      "address": "4EXC8RP4wXHeMseNnfuCDZGndUW8gxr5MYYpPfJ7pump",
+      "name": "67 Rabbit",
+      "symbol": "67RABBIT"
+    },
+    "quoteToken": {
+      "address": "9AvytnUKsLxPxFHFqS6VLxaxt5p6BhYNr53SD2Chpump",
+      "name": "The Official 67 Coin",
+      "symbol": "67"
+    },
+    "priceNative": "0.002220",
+    "txns": {
+      "m5": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h1": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h6": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h24": {
+        "buys": 1,
+        "sells": 2
+      }
+    },
+    "volume": {
+      "h24": 0,
+      "h6": 0,
+      "h1": 0,
+      "m5": 0
+    },
+    "priceChange": {},
+    "pairCreatedAt": 1789383073000
+  },
+  {
+    "chainId": "solana",
+    "dexId": "pumpfun",
+    "url": "https://dexscreener.com/solana/4ihbetvgsqce1qjy6pkwt9wjy1dgkagwlyqm4e1vye3a",
+    "pairAddress": "4iHbEtvGSQCE1QjY6PKWT9wJy1DGKAgwLYQM4E1VYe3a",
+    "baseToken": {
+      "address": "3zEx3tmjFwMDUR2C2b1qi3oAgYHmox71okwZRoXHpump",
+      "name": "69Rat",
+      "symbol": "69Rat"
+    },
+    "quoteToken": {
+      "address": "9AvytnUKsLxPxFHFqS6VLxaxt5p6BhYNr53SD2Chpump",
+      "name": "The Official 67 Coin",
+      "symbol": "67"
+    },
+    "priceNative": "0.002326",
+    "txns": {
+      "m5": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h1": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h6": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h24": {
+        "buys": 3,
+        "sells": 3
+      }
+    },
+    "volume": {
+      "h24": 0,
+      "h6": 0,
+      "h1": 0,
+      "m5": 0
+    },
+    "priceChange": {},
+    "pairCreatedAt": 1790553443000
+  },
+  {
+    "chainId": "solana",
+    "dexId": "pumpfun",
+    "url": "https://dexscreener.com/solana/cvxn6mfm988xrpu6fgxrfwfnedmaugawncc3hscyagjo",
+    "pairAddress": "Cvxn6MfM988xRPu6fGxRFwfNeDMauGAWncc3HScyAgjo",
+    "baseToken": {
+      "address": "3Ag2AbbF3GPr8tyBP4ZAVNcDBF11vK5E1SJAWSZYFbZM",
+      "name": "crimegta6",
+      "symbol": "CRIME"
+    },
+    "quoteToken": {
+      "address": "9AvytnUKsLxPxFHFqS6VLxaxt5p6BhYNr53SD2Chpump",
+      "name": "The Official 67 Coin",
+      "symbol": "67"
+    },
+    "priceNative": "0.002220",
+    "txns": {
+      "m5": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h1": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h6": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h24": {
+        "buys": 0,
+        "sells": 1
+      }
+    },
+    "volume": {
+      "h24": 0,
+      "h6": 0,
+      "h1": 0,
+      "m5": 0
+    },
+    "priceChange": {},
+    "pairCreatedAt": 1789933578000
+  }
+]

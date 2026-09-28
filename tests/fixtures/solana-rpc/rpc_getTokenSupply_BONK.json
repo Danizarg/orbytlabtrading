@@ -1,0 +1,25 @@
+{
+  "_note": "Live response 2026-09-28T20:49:21.588Z from https://api.mainnet-beta.solana.com.",
+  "request": {
+    "method": "getTokenSupply",
+    "params": [
+      "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+    ]
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "result": {
+      "context": {
+        "apiVersion": "4.3.0",
+        "slot": 451431087
+      },
+      "value": {
+        "amount": "8799437915923265810",
+        "decimals": 5,
+        "uiAmount": 87994379159232.66,
+        "uiAmountString": "87994379159232.6581"
+      }
+    },
+    "id": 1
+  }
+}

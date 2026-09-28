@@ -1,0 +1,65 @@
+[
+  {
+    "chainId": "solana",
+    "dexId": "pumpfun",
+    "url": "https://dexscreener.com/solana/ffk6jzjsqnbgrprdtuchneulxyk4mgtn6sidfpwc8ysb",
+    "pairAddress": "FFk6jzJsqNBgRprDTUChNeULXyK4mGtN6SidFPWc8YSB",
+    "baseToken": {
+      "address": "FtvDpvtyVepN9YFhwymwQRC3oEuig57kiDxBSMgkpump",
+      "name": "KolPacks",
+      "symbol": "KolPacks"
+    },
+    "quoteToken": {
+      "address": "So11111111111111111111111111111111111111112",
+      "name": "Wrapped SOL",
+      "symbol": "SOL"
+    },
+    "priceNative": "0.00000002892",
+    "priceUsd": "0.000003434",
+    "txns": {
+      "m5": {
+        "buys": 3,
+        "sells": 43
+      },
+      "h1": {
+        "buys": 735,
+        "sells": 633
+      },
+      "h6": {
+        "buys": 735,
+        "sells": 633
+      },
+      "h24": {
+        "buys": 735,
+        "sells": 633
+      }
+    },
+    "volume": {
+      "h24": 62342.04,
+      "h6": 62342.04,
+      "h1": 62342.04,
+      "m5": 443.24
+    },
+    "priceChange": {
+      "m5": -18.35,
+      "h1": -23.95,
+      "h6": -23.95,
+      "h24": -23.95
+    },
+    "fdv": 3434.65,
+    "marketCap": 3434.65,
+    "pairCreatedAt": 1790627602000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/6SFwyNnBHnkT080I?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/suURhMcadHh8s-yR?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/FtvDpvtyVepN9YFhwymwQRC3oEuig57kiDxBSMgkpump?timestamp=1790628300000",
+      "websites": [
+        {
+          "url": "https://kolpacks.fun",
+          "label": "Website"
+        }
+      ],
+      "socials": []
+    }
+  }
+]

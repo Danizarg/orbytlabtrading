@@ -1,0 +1,42 @@
+{
+  "inputMint": "So11111111111111111111111111111111111111112",
+  "inAmount": "100000000",
+  "outputMint": "DKxXdaMC1so182urvrrnhs6V6fGTrttPS8br6JuEpump",
+  "outAmount": "40184755771",
+  "otherAmountThreshold": "39782908214",
+  "swapMode": "ExactIn",
+  "slippageBps": 100,
+  "platformFee": null,
+  "priceImpactPct": "0.0069547693538208820245537531",
+  "routePlan": [
+    {
+      "swapInfo": {
+        "ammKey": "A8mMNioRKoRXcb8nVVRy9KV7ZSPyfTTm13ye4bSgHw7F",
+        "label": "Pump.fun Amm",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "outputMint": "DKxXdaMC1so182urvrrnhs6V6fGTrttPS8br6JuEpump",
+        "inAmount": "100000000",
+        "outAmount": "40184755771",
+        "updateContextSlot": "451431012"
+      },
+      "percent": 100,
+      "bps": null
+    }
+  ],
+  "contextSlot": 451431012,
+  "timeTaken": 0.000092215,
+  "swapUsdValue": "11.870164541071160",
+  "mostReliableAmmsQuoteReport": {
+    "info": {
+      "DKxXdaMC1so182urvrrnhs6V6fGTrttPS8br6JuEpump": "Not found",
+      "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+    }
+  },
+  "longtailMarketQuoteReport": null,
+  "useIncurredSlippageForQuoting": null,
+  "useRewards": null,
+  "otherRoutePlans": null,
+  "loadedLongtailToken": false,
+  "instructionVersion": null,
+  "transactionVersion": 0
+}

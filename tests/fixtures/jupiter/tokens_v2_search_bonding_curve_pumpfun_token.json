@@ -1,0 +1,80 @@
+[
+  {
+    "id": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+    "name": "Corgi Capital",
+    "symbol": "CC",
+    "icon": "https://gateway.pinata.cloud/ipfs/bafkreidtmvpv4o3f33qbn35oamb4egurvqexb5oab3ftfgvvjnba6pgnmy",
+    "decimals": 6,
+    "dev": "CmwFWFQsK2tuNpz3HAbjoxDVSf5miY5vbP425UTRg5Rd",
+    "circSupply": 1000000000,
+    "totalSupply": 1000000000,
+    "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "launchpad": "pump.fun",
+    "holderCount": 14,
+    "fdv": 5539.8859815403985,
+    "mcap": 5539.8859815403985,
+    "usdPrice": 0.0000055398859815403985,
+    "priceBlockId": 451430452,
+    "liquidity": 4598.314949757288,
+    "stats5m": {
+      "priceChange": -0.6526267903133846,
+      "holderChange": 27.27272727272727,
+      "buyVolume": 1055.4137078924866,
+      "sellVolume": 20.017327469048606,
+      "numBuys": 17,
+      "numSells": 4,
+      "numTraders": 17,
+      "numNetBuyers": 15
+    },
+    "stats1h": {
+      "priceChange": -0.6526267903133846,
+      "holderChange": 27.27272727272727,
+      "buyVolume": 1055.4137078924866,
+      "sellVolume": 20.017327469048606,
+      "numBuys": 17,
+      "numSells": 4,
+      "numTraders": 17,
+      "numNetBuyers": 15
+    },
+    "stats6h": {
+      "priceChange": -0.6526267903133846,
+      "holderChange": 27.27272727272727,
+      "buyVolume": 1055.4137078924866,
+      "sellVolume": 20.017327469048606,
+      "numBuys": 17,
+      "numSells": 4,
+      "numTraders": 17,
+      "numNetBuyers": 15
+    },
+    "stats24h": {
+      "priceChange": -0.6526267903133846,
+      "holderChange": 27.27272727272727,
+      "buyVolume": 1055.4137078924866,
+      "sellVolume": 20.017327469048606,
+      "numBuys": 17,
+      "numSells": 4,
+      "numTraders": 17,
+      "numNetBuyers": 15
+    },
+    "firstPool": {
+      "id": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+      "createdAt": "2026-09-28T20:45:50Z"
+    },
+    "audit": {
+      "mintAuthorityDisabled": true,
+      "freezeAuthorityDisabled": true,
+      "topHoldersPercentage": 24.514412749176103,
+      "devBalancePercentage": 6.6285714223523,
+      "devMigrations": 14,
+      "devMints": 1264
+    },
+    "organicScore": 0,
+    "organicScoreLabel": "low",
+    "tags": [
+      "unknown",
+      "token-2022"
+    ],
+    "createdAt": "2026-09-28T20:45:50Z",
+    "updatedAt": "2026-09-28T20:46:38.609721955Z"
+  }
+]

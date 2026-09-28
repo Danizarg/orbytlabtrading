@@ -1,0 +1,112 @@
+{
+  "_note": "Live response 2026-09-28T20:49:25.538Z from https://api.mainnet-beta.solana.com. Order of value[] = order of requested keys (null for missing). Token-2022 mint parses incl. extensions (tokenMetadata name/symbol/uri); the pump.fun bonding curve (program-owned, not a token account) falls back to base64 [data, \"base64\"].",
+  "request": {
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+        "5R4MoQJCn3NDtMCzTNeJi6mFKB5cfTvyehFQcudPhWCU",
+        "9ZZuz4cVoYhbAFomLMHJjpPijY7EXryqHRjY79f9VC7A"
+      ],
+      {
+        "encoding": "jsonParsed",
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "result": {
+      "context": {
+        "apiVersion": "4.3.0",
+        "slot": 451431134
+      },
+      "value": [
+        {
+          "data": {
+            "parsed": {
+              "info": {
+                "decimals": 6,
+                "extensions": [
+                  {
+                    "extension": "metadataPointer",
+                    "state": {
+                      "authority": null,
+                      "metadataAddress": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump"
+                    }
+                  },
+                  {
+                    "extension": "tokenMetadata",
+                    "state": {
+                      "additionalMetadata": [],
+                      "mint": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+                      "name": "Corgi Capital",
+                      "symbol": "CC",
+                      "updateAuthority": null,
+                      "uri": "https://gateway.pinata.cloud/ipfs/bafkreiayapwpeno6y5lcw2csdodxotsbtzrklxosixwiej3sk72ous32ku"
+                    }
+                  }
+                ],
+                "freezeAuthority": null,
+                "isInitialized": true,
+                "mintAuthority": null,
+                "supply": "1000000000000000"
+              },
+              "type": "mint"
+            },
+            "program": "spl-token-2022",
+            "space": 426
+          },
+          "executable": false,
+          "lamports": 2814320,
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "rentEpoch": 18446744073709552000,
+          "space": 426
+        },
+        {
+          "data": {
+            "parsed": {
+              "info": {
+                "extensions": [
+                  {
+                    "extension": "immutableOwner"
+                  }
+                ],
+                "isNative": false,
+                "mint": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+                "owner": "9ZZuz4cVoYhbAFomLMHJjpPijY7EXryqHRjY79f9VC7A",
+                "state": "initialized",
+                "tokenAmount": {
+                  "amount": "603185974343956",
+                  "decimals": 6,
+                  "uiAmount": 603185974.343956,
+                  "uiAmountString": "603185974.343956"
+                }
+              },
+              "type": "account"
+            },
+            "program": "spl-token-2022",
+            "space": 170
+          },
+          "executable": false,
+          "lamports": 1513840,
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "rentEpoch": 18446744073709552000,
+          "space": 170
+        },
+        {
+          "data": [
+            "F7f4N2DYrGAUic3Q/GYCAGlqfhULAAAAFPG6hGtoAQBpvloZBAAAAACAxqR+jQMAAK7zc9nf46UNiqjIdPG8RVTGq+zCYcxU4ZmaapoogTu8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+            "base64"
+          ],
+          "executable": false,
+          "lamports": 17606663889,
+          "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+          "rentEpoch": 18446744073709552000,
+          "space": 151
+        }
+      ]
+    },
+    "id": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "_note": "Live 2026-09-28T21:00:01.677Z https://solana-rpc.publicnode.com with Origin https://www.orbytai.org (browser-style, CORS *). HTTP 200; headers {\"access-control-allow-origin\":\"*\",\"content-encoding\":\"br\"}. value[1] = pump.fun bonding curve (decode: 8B disc, u64 virtual_token_reserves, u64 virtual_sol_reserves, u64 real_token_reserves, u64 real_sol_reserves, u64 token_total_supply, bool complete, pubkey creator, ...).",
+  "response": {
+    "jsonrpc": "2.0",
+    "result": {
+      "context": {
+        "apiVersion": "4.2.2",
+        "slot": 451433510
+      },
+      "value": [
+        {
+          "data": [
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIDGpH6NAwAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARIAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGLO1E6dcotUAel8xXBzV90RoMwEAJU0LE+0XI0b+X/vEwC8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYs7UTp1yi1QB6XzFcHNX3RGgzAQAlTQsT7RcjRv5f+8NAAAAQ29yZ2kgQ2FwaXRhbAIAAABDQ10AAABodHRwczovL2dhdGV3YXkucGluYXRhLmNsb3VkL2lwZnMvYmFma3JlaWF5YXB3cGVubzZ5NWxjdzJjc2RvZHhvdHNidHpya2x4b3NpeHdpZWozc2s3Mm91czMya3UAAAAA",
+            "base64"
+          ],
+          "executable": false,
+          "lamports": 2814320,
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "rentEpoch": 18446744073709552000,
+          "space": 426
+        },
+        {
+          "data": [
+            "F7f4N2DYrGDdEHSemmICAH5N3SkLAAAA3XhhUglkAQB+obktBAAAAACAxqR+jQMAAK7zc9nf46UNiqjIdPG8RVTGq+zCYcxU4ZmaapoogTu8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+            "base64"
+          ],
+          "executable": false,
+          "lamports": 17948426726,
+          "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+          "rentEpoch": 18446744073709552000,
+          "space": 151
+        }
+      ]
+    },
+    "id": 1
+  }
+}

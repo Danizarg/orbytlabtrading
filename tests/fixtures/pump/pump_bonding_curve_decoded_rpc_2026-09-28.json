@@ -1,0 +1,334 @@
+{
+  "_note": "REAL mainnet data fetched 2026-09-28T20:51:57.905Z from https://api.mainnet-beta.solana.com (getAccountInfo/getMultipleAccounts, base64, commitment confirmed). Decoded with pump IDL layout. u64 values are raw integers as strings: token amounts have 6 decimals, quote (SOL) amounts are lamports (9 decimals).",
+  "rpc_response_headers": [
+    {
+      "method": "getAccountInfo",
+      "status": 200,
+      "headers": {
+        "access-control-allow-origin": "backend_traffic",
+        "x-ratelimit-method-limit": "50",
+        "x-ratelimit-method-remaining": "49",
+        "x-ratelimit-rps-limit": "250",
+        "x-ratelimit-rps-remaining": "249",
+        "x-ratelimit-conn-limit": "40",
+        "x-ratelimit-conn-remaining": "39"
+      }
+    },
+    {
+      "method": "getAccountInfo",
+      "status": 200,
+      "headers": {
+        "access-control-allow-origin": "backend_traffic",
+        "x-ratelimit-method-limit": "50",
+        "x-ratelimit-method-remaining": "48",
+        "x-ratelimit-rps-limit": "250",
+        "x-ratelimit-rps-remaining": "248",
+        "x-ratelimit-conn-limit": "40",
+        "x-ratelimit-conn-remaining": "39"
+      }
+    },
+    {
+      "method": "getMultipleAccounts",
+      "status": 200,
+      "headers": {
+        "access-control-allow-origin": "backend_traffic",
+        "x-ratelimit-method-limit": "50",
+        "x-ratelimit-method-remaining": "49",
+        "x-ratelimit-rps-limit": "250",
+        "x-ratelimit-rps-remaining": "247",
+        "x-ratelimit-conn-limit": "40",
+        "x-ratelimit-conn-remaining": "39"
+      }
+    }
+  ],
+  "global_account": {
+    "address": "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf",
+    "decoded": {
+      "initialized": true,
+      "authority": "FFWtrEQ4B4PKQoVuHYzZq8FabGkVatYzDpEVHsK5rrhF",
+      "fee_recipient": "62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV",
+      "initial_virtual_token_reserves": "1073000000000000",
+      "initial_virtual_sol_reserves": "30000000000",
+      "initial_real_token_reserves": "793100000000000",
+      "token_total_supply": "1000000000000000",
+      "fee_basis_points": "95",
+      "withdraw_authority": "39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg",
+      "enable_migrate": true,
+      "pool_migration_fee": "15000001",
+      "creator_fee_basis_points": "5",
+      "fee_recipients_count": 7,
+      "set_creator_authority": "39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg",
+      "admin_set_creator_authority": "UqN2p5bAzBqYdHXcgB6WLtuVrdvmy9JSAtgqZb3CMKw",
+      "create_v2_enabled": true,
+      "whitelist_pda": "BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s",
+      "reserved_fee_recipient": "GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS",
+      "mayhem_mode_enabled": true,
+      "reserved_fee_recipients_count": 7,
+      "is_cashback_enabled": true,
+      "buyback_fee_recipients_count": 8,
+      "buyback_basis_points": "5000",
+      "initial_virtual_quote_reserves": "4292000000",
+      "_account_data_len": 1087
+    }
+  },
+  "primary_raw_getAccountInfo_value": {
+    "data": [
+      "F7f4N2DYrGDG3hbOyMsDAK+bsAMHAAAAxkYEgjfNAgCv74wHAAAAAACAxqR+jQMAAHdw+qox4FW/EN3OI5LIJaMb8xGLXWRSyS3vaZ8BHc7OAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "base64"
+    ],
+    "executable": false,
+    "lamports": 128094231,
+    "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "rentEpoch": 18446744073709552000,
+    "space": 151
+  },
+  "bonding_curves": [
+    {
+      "mint": "dB98iqo6YQ2p1X1KtvmLRDFmtQauEiA2CtxL8cvpump",
+      "bonding_curve_pda": "ASfF49Aspn4tnY4seRQaFCjtzAScEdpkjA1Xar2aXXQV",
+      "stream_bondingCurveKey": "ASfF49Aspn4tnY4seRQaFCjtzAScEdpkjA1Xar2aXXQV",
+      "pda_matches_stream": true,
+      "account_owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "account_lamports": 128094231,
+      "decoded": {
+        "virtual_token_reserves": "1068488241635014",
+        "virtual_quote_reserves": "30126676911",
+        "real_token_reserves": "788588241635014",
+        "real_quote_reserves": "126676911",
+        "token_total_supply": "1000000000000000",
+        "complete": false,
+        "creator": "93FSFbswci2hoa4yZT2X9NeZk4jJBZ2GP47mVhz1gZjK",
+        "is_mayhem_mode": false,
+        "is_cashback_coin": false,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": "0",
+        "can_edit_creator_fee": false,
+        "is_holder_reward": false,
+        "_account_data_len": 151,
+        "_decoded_bytes": 125
+      },
+      "derived": {
+        "price_sol_per_token": 2.81956092140984e-8,
+        "market_cap_sol": 28.195609214,
+        "real_sol_in_curve": 0.126676911,
+        "tokens_left_for_sale_ui": 788588241.635014,
+        "bonding_progress_pct": 0.56
+      },
+      "stream_at_create": {
+        "vTokensInBondingCurve": 1038800796.879382,
+        "vSolInBondingCurve": 30.987654318999976,
+        "marketCapSol": 29.83021808617079,
+        "is_mayhem_mode": false
+      },
+      "onchain_ui_now": {
+        "vTokens_ui": 1068488241.635014,
+        "vSol_ui": 30.126676911
+      },
+      "stream_marketCapSol_formula_check": 29.83021808617079
+    },
+    {
+      "mint": "GJNVxxuSGZ4FQYVBrYYEQe4DFDithm9LopFno2XKpump",
+      "bonding_curve_pda": "DHWsRWXasrurtXbLx7uMWSBrgc85vtcJw9B3CfmnPFxJ",
+      "stream_bondingCurveKey": "DHWsRWXasrurtXbLx7uMWSBrgc85vtcJw9B3CfmnPFxJ",
+      "pda_matches_stream": true,
+      "account_owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "account_lamports": 5138369,
+      "decoded": {
+        "virtual_token_reserves": "1017443926749011",
+        "virtual_quote_reserves": "3705530380",
+        "real_token_reserves": "737543926749011",
+        "real_quote_reserves": "3721049",
+        "token_total_supply": "1000000000000000",
+        "complete": false,
+        "creator": "2tQfWLtowrLFLNr5DKAqer3a28ytMjyrKkRsxYtVDNHb",
+        "is_mayhem_mode": true,
+        "is_cashback_coin": false,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": "0",
+        "can_edit_creator_fee": false,
+        "is_holder_reward": false,
+        "_account_data_len": 151,
+        "_decoded_bytes": 125
+      },
+      "derived": {
+        "price_sol_per_token": 3.641999605658958e-9,
+        "market_cap_sol": 3.641999605,
+        "real_sol_in_curve": 0.003721049,
+        "tokens_left_for_sale_ui": 737543926.749011,
+        "bonding_progress_pct": 7
+      },
+      "stream_at_create": {
+        "vTokensInBondingCurve": 1070884672.297204,
+        "vSolInBondingCurve": 30.059259257999976,
+        "marketCapSol": 28.069557848389476,
+        "is_mayhem_mode": true
+      },
+      "onchain_ui_now": {
+        "vTokens_ui": 1017443926.749011,
+        "vSol_ui": 3.70553038
+      },
+      "stream_marketCapSol_formula_check": 28.069557848389476
+    },
+    {
+      "mint": "GJJ6TADXU6TdvBR8siNxLqYzbcwc6ixgxFCg7Ystpump",
+      "bonding_curve_pda": "DBK6koU2BBPoTU1ARHLS916fVCvPqsT3pJuMdtLaX5bF",
+      "stream_bondingCurveKey": null,
+      "pda_matches_stream": null,
+      "account_owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "account_lamports": 1417320,
+      "decoded": {
+        "virtual_token_reserves": "0",
+        "virtual_quote_reserves": "0",
+        "real_token_reserves": "0",
+        "real_quote_reserves": "0",
+        "token_total_supply": "1000000000000000",
+        "complete": true,
+        "creator": "8zp75jBnxbA6rSLV9MrzEPhxT96RCU6W6n7Zrg8uwm9R",
+        "is_mayhem_mode": true,
+        "is_cashback_coin": false,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": "0",
+        "can_edit_creator_fee": false,
+        "is_holder_reward": false,
+        "_account_data_len": 151,
+        "_decoded_bytes": 125
+      },
+      "derived": {
+        "price_sol_per_token": null,
+        "market_cap_sol": null,
+        "real_sol_in_curve": 0,
+        "tokens_left_for_sale_ui": 0,
+        "bonding_progress_pct": 100
+      }
+    },
+    {
+      "mint": "4ov9rwwS4iBHeTWGCrVaQYW1HzWK51MSfs8csGAApump",
+      "bonding_curve_pda": "9wHQUhvsYH9z5PceXkBxy1gbc6ZTU3vbMBHgA3cE8PqJ",
+      "stream_bondingCurveKey": "9wHQUhvsYH9z5PceXkBxy1gbc6ZTU3vbMBHgA3cE8PqJ",
+      "pda_matches_stream": true,
+      "account_owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "account_lamports": 1285240,
+      "decoded": {
+        "virtual_token_reserves": "0",
+        "virtual_quote_reserves": "0",
+        "real_token_reserves": "0",
+        "real_quote_reserves": "0",
+        "token_total_supply": "1000000000000000",
+        "complete": true,
+        "creator": "8V4qxjK2BS53EKjMra9bzJzH6BLJtf7jQUF4ekYSSNfb",
+        "is_mayhem_mode": false,
+        "is_cashback_coin": false,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": "0",
+        "can_edit_creator_fee": false,
+        "is_holder_reward": false,
+        "_account_data_len": 125,
+        "_decoded_bytes": 125
+      },
+      "derived": {
+        "price_sol_per_token": null,
+        "market_cap_sol": null,
+        "real_sol_in_curve": 0,
+        "tokens_left_for_sale_ui": 0,
+        "bonding_progress_pct": 100
+      },
+      "stream_at_create": {
+        "vTokensInBondingCurve": 279900000,
+        "vSolInBondingCurve": 115.005359056806,
+        "marketCapSol": 410.8801681200643,
+        "is_mayhem_mode": false
+      },
+      "onchain_ui_now": {
+        "vTokens_ui": 0,
+        "vSol_ui": 0
+      },
+      "stream_marketCapSol_formula_check": 410.8801681200643
+    },
+    {
+      "mint": "EVQSX4EQFP8VtS5KDfwkQYJCiVoB3bvJbuooV7Qzpump",
+      "bonding_curve_pda": "9fYSQGMDMnG2KDWU2Vk1chHWXEXSSzArqVNEqBDygtCn",
+      "stream_bondingCurveKey": "9fYSQGMDMnG2KDWU2Vk1chHWXEXSSzArqVNEqBDygtCn",
+      "pda_matches_stream": true,
+      "account_owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "account_lamports": 1285240,
+      "decoded": {
+        "virtual_token_reserves": "1073000000000000",
+        "virtual_quote_reserves": "841456831993",
+        "real_token_reserves": "793100000000000",
+        "real_quote_reserves": "2",
+        "token_total_supply": "1000000000000000",
+        "complete": false,
+        "creator": "EuqnLbrnxJSsBiFEBsQer32pKqXD1goqvucZfzRy46Q9",
+        "is_mayhem_mode": false,
+        "is_cashback_coin": false,
+        "quote_mint": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+        "creator_fee_bps": "300",
+        "can_edit_creator_fee": false,
+        "is_holder_reward": false,
+        "_account_data_len": 125,
+        "_decoded_bytes": 125
+      },
+      "derived": {
+        "price_sol_per_token": 7.842095358741846e-7,
+        "market_cap_sol": 784.209535874,
+        "real_sol_in_curve": 2e-9,
+        "tokens_left_for_sale_ui": 793100000,
+        "bonding_progress_pct": 0
+      },
+      "stream_at_create": {
+        "vTokensInBondingCurve": 1070271797.142363,
+        "vSolInBondingCurve": 30.07647224373065,
+        "marketCapSol": 28.101714278592738,
+        "is_mayhem_mode": false
+      },
+      "onchain_ui_now": {
+        "vTokens_ui": 1073000000,
+        "vSol_ui": 841.456831993
+      },
+      "stream_marketCapSol_formula_check": 28.101714278592738
+    },
+    {
+      "mint": "AF2N5wKk7f34PtFQAyHcXJMGqyS6NQyX1MEK66XGpump",
+      "bonding_curve_pda": "62fS3V2k1MGPvosLvzde5vbrXNQnwN5JAf4Y24mSnJzq",
+      "stream_bondingCurveKey": "BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s",
+      "pda_matches_stream": false,
+      "account_owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "account_lamports": 1285241,
+      "decoded": {
+        "virtual_token_reserves": "1072334709036614",
+        "virtual_quote_reserves": "7088086457",
+        "real_token_reserves": "792434709036614",
+        "real_quote_reserves": "1",
+        "token_total_supply": "1000000000000000",
+        "complete": false,
+        "creator": "KSjjBuNM42ySunBw6iNFmfgDWytVnbwYehnM7Q9TrN1",
+        "is_mayhem_mode": true,
+        "is_cashback_coin": false,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": "0",
+        "can_edit_creator_fee": false,
+        "is_holder_reward": false,
+        "_account_data_len": 125,
+        "_decoded_bytes": 125
+      },
+      "derived": {
+        "price_sol_per_token": 6.6099571311721696e-9,
+        "market_cap_sol": 6.609957131,
+        "real_sol_in_curve": 1e-9,
+        "tokens_left_for_sale_ui": 792434709.036614,
+        "bonding_progress_pct": 0.08
+      },
+      "stream_at_create": {
+        "vTokensInBondingCurve": 1070870992.630315,
+        "vSolInBondingCurve": 30.059643245106184,
+        "marketCapSol": 28.070274992949916,
+        "is_mayhem_mode": true
+      },
+      "onchain_ui_now": {
+        "vTokens_ui": 1072334709.036614,
+        "vSol_ui": 7.088086457
+      },
+      "stream_marketCapSol_formula_check": 28.070274992949916
+    }
+  ]
+}

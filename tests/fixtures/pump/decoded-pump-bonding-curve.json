@@ -1,0 +1,14 @@
+{
+  "mint": "2qEHjDLDLbuBgRYvsxhc5D6uDWAivNFZGan56P1tpump",
+  "pda": "2JUXSuq1A1EdBzZj757cXFYuALPxv6vee4X981ajpzo8",
+  "bump": 254,
+  "discriminator": "17b7f83760d8ac60",
+  "virtualTokenReserves": "0",
+  "virtualSolReserves": "0",
+  "realTokenReserves": "0",
+  "realSolReserves": "0",
+  "tokenTotalSupply": "1000000000000000",
+  "complete": true,
+  "creator": "11111111111111111111111111111111",
+  "byteLength": 150
+}

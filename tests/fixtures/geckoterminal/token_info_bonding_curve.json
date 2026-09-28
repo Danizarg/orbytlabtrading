@@ -1,0 +1,82 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/networks/solana/tokens/62zeow8T5HL7nsUCqJPmc9c6vViwnPqhxa5Dd2pgpump/info",
+    "http_status": 200,
+    "fetched_at": "2026-09-28T20:54:17.237Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "MISS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:54:17 GMT",
+      "etag": "W/\"9513eabdd0def879c7aa3875bc7570b0\"",
+      "vary": "Accept-Encoding, Accept, Origin",
+      "x-runtime": "0.084243"
+    },
+    "trimmed": "untrimmed; holders null for very new token"
+  },
+  "data": {
+    "id": "solana_62zeow8T5HL7nsUCqJPmc9c6vViwnPqhxa5Dd2pgpump",
+    "type": "token",
+    "attributes": {
+      "address": "62zeow8T5HL7nsUCqJPmc9c6vViwnPqhxa5Dd2pgpump",
+      "name": "xmrpad",
+      "symbol": "xmrpad",
+      "decimals": 6,
+      "image_url": "https://assets.geckoterminal.com/xn7xh2wv7r2tjrnw3mvh18jkubfl",
+      "image": {
+        "thumb": "https://assets.geckoterminal.com/2xo32jlvskt90iumaltlk5rjqa03",
+        "small": "https://assets.geckoterminal.com/a55uh0ny0uqfovuicwiieq5xvmx0",
+        "large": "https://assets.geckoterminal.com/xn7xh2wv7r2tjrnw3mvh18jkubfl"
+      },
+      "banner_image_url": null,
+      "coingecko_coin_id": null,
+      "websites": [
+        "https://xmrpad.com"
+      ],
+      "discord_url": null,
+      "farcaster_url": null,
+      "zora_url": null,
+      "telegram_handle": null,
+      "twitter_handle": "thexmrpad",
+      "description": "launch a coin. keep the keys.",
+      "gt_score": 25.807792207792208,
+      "gt_score_details": {
+        "pool": 28.571,
+        "transaction": 32,
+        "creation": 0,
+        "info": 60,
+        "holders": 31.25
+      },
+      "gt_verified": false,
+      "categories": [
+        "Pump Fun"
+      ],
+      "gt_category_ids": [
+        "pump-fun"
+      ],
+      "holders": {
+        "count": null,
+        "distribution_percentage": null,
+        "last_updated": null
+      },
+      "mint_authority": "no",
+      "freeze_authority": "no",
+      "is_honeypot": "unknown",
+      "developer_address": "6hPJt2QQXjog1Wxj3JTKuNs3fFoSrYcaKCQqjKR4P85e",
+      "developer_holding_percentage": "0.0",
+      "launchpad_details": {
+        "graduation_percentage": 1.61,
+        "completed": false,
+        "completed_at": null,
+        "migrated_destination_pool_address": null
+      }
+    }
+  }
+}

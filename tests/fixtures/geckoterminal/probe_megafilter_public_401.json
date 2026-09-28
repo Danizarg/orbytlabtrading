@@ -1,0 +1,32 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/pools/megafilter?networks=solana&sort=pool_created_at_desc",
+    "http_status": 401,
+    "fetched_at": "2026-09-28T20:53:15.253Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "BYPASS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:53:15 GMT",
+      "vary": "Accept, Origin, accept-encoding",
+      "x-runtime": "0.008331"
+    },
+    "trimmed": "untrimmed error body"
+  },
+  "errors": [
+    {
+      "status": "401",
+      "title": "Unauthorized"
+    }
+  ],
+  "meta": {
+    "ref_id": "40ee5c10-2dc5-43e1-a973-788fc0847d1e"
+  }
+}

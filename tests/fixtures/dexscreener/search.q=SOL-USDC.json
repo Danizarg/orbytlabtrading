@@ -1,0 +1,243 @@
+{
+  "schemaVersion": "1.0.0",
+  "pairs": [
+    {
+      "chainId": "solana",
+      "dexId": "pumpswap",
+      "url": "https://dexscreener.com/solana/ak7hdcxdsocd2zgjbca1zwlcudqz5f6n747a7rqtpxe3",
+      "pairAddress": "Ak7hDCxDSocD2ZgJBCa1ZwLcuDQz5F6n747a7rQtpXE3",
+      "baseToken": {
+        "address": "8wxkvAfEns76yBzu4MnbV7VnXWjg3iDPA9uwAQ6cpump",
+        "name": "SolAngeles",
+        "symbol": "SOLANGELES"
+      },
+      "quoteToken": {
+        "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "name": "USD Coin",
+        "symbol": "USDC"
+      },
+      "priceNative": "0.001229",
+      "priceUsd": "0.001229",
+      "txns": {
+        "m5": {
+          "buys": 0,
+          "sells": 0
+        },
+        "h1": {
+          "buys": 6,
+          "sells": 19
+        },
+        "h6": {
+          "buys": 73,
+          "sells": 50
+        },
+        "h24": {
+          "buys": 157,
+          "sells": 193
+        }
+      },
+      "volume": {
+        "h24": 17323.83,
+        "h6": 7049.32,
+        "h1": 581.66,
+        "m5": 0
+      },
+      "priceChange": {
+        "h1": -0.74,
+        "h6": -7.56,
+        "h24": -8.96
+      },
+      "liquidity": {
+        "usd": 162790.76,
+        "base": 65886287,
+        "quote": 81804
+      },
+      "fdv": 1227701,
+      "marketCap": 1227701,
+      "pairCreatedAt": 1779397336000,
+      "info": {
+        "imageUrl": "https://cdn.dexscreener.com/cms/images/pi8udfIf51qcX95D?width=800&height=800&quality=95&format=auto",
+        "header": "https://cdn.dexscreener.com/cms/images/p_XpQAIaJT3sGAPo?width=1500&height=500&quality=95&format=auto",
+        "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/8wxkvAfEns76yBzu4MnbV7VnXWjg3iDPA9uwAQ6cpump?timestamp=1790628300000",
+        "websites": [
+          {
+            "url": "https://solangeles.fun",
+            "label": "Website"
+          }
+        ],
+        "socials": [
+          {
+            "url": "https://x.com/solangelestv",
+            "type": "twitter"
+          }
+        ]
+      }
+    },
+    {
+      "chainId": "solana",
+      "dexId": "metadao",
+      "url": "https://dexscreener.com/solana/dzytzonvpbyfczwza6csm9edeemxeb9f8agkjxuxgnsa",
+      "pairAddress": "DzYtzoNvPbyFCzwZA6cSm9eDEEmxEB9f8AGkJXUXgnSA",
+      "baseToken": {
+        "address": "SoLo9oxzLDpcq1dpqAgMwgce5WqkRDtNXK7EPnbmeta",
+        "name": "Solomon",
+        "symbol": "SOLO"
+      },
+      "quoteToken": {
+        "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "name": "USD Coin",
+        "symbol": "USDC"
+      },
+      "priceNative": "0.7698",
+      "priceUsd": "0.7698",
+      "txns": {
+        "m5": {
+          "buys": 0,
+          "sells": 0
+        },
+        "h1": {
+          "buys": 7,
+          "sells": 2
+        },
+        "h6": {
+          "buys": 41,
+          "sells": 17
+        },
+        "h24": {
+          "buys": 137,
+          "sells": 202
+        }
+      },
+      "volume": {
+        "h24": 131867.12,
+        "h6": 33700,
+        "h1": 1941.97,
+        "m5": 0
+      },
+      "priceChange": {
+        "h1": -1.11,
+        "h6": -4.57,
+        "h24": -12.14
+      },
+      "liquidity": {
+        "usd": 3139118.98,
+        "base": 2034856,
+        "quote": 1572614
+      },
+      "fdv": 19861721,
+      "marketCap": 8101978,
+      "pairCreatedAt": 1763494224000,
+      "info": {
+        "imageUrl": "https://cdn.dexscreener.com/cms/images/IqM55mR14z7ZTwOC?width=800&height=800&quality=95&format=auto",
+        "header": "https://cdn.dexscreener.com/cms/images/ApILd3fkq3JTXXKh?width=1500&height=500&quality=95&format=auto",
+        "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/SoLo9oxzLDpcq1dpqAgMwgce5WqkRDtNXK7EPnbmeta?timestamp=1790628300000",
+        "websites": [
+          {
+            "url": "https://solomonlabs.org",
+            "label": "Website"
+          },
+          {
+            "url": "https://docs.solomonlabs.org",
+            "label": "Docs"
+          }
+        ],
+        "socials": [
+          {
+            "url": "https://x.com/solomon_labs",
+            "type": "twitter"
+          },
+          {
+            "url": "https://t.me/solomonlabs",
+            "type": "telegram"
+          }
+        ]
+      }
+    },
+    {
+      "chainId": "solana",
+      "dexId": "raydium",
+      "url": "https://dexscreener.com/solana/5lrrfergv885eugjnxqq9di5neratuwyrb5rsj6rjafk",
+      "pairAddress": "5LrRfERGV885eUGjNXQQ9Di5nErATUwyRB5rSJ6rjafK",
+      "labels": [
+        "CLMM"
+      ],
+      "baseToken": {
+        "address": "PLAYs3GSSadH2q2JLS7djp7yzeT75NK78XgrE5YLrfq",
+        "name": "Play Solana",
+        "symbol": "PLAY"
+      },
+      "quoteToken": {
+        "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "name": "USD Coin",
+        "symbol": "USDC"
+      },
+      "priceNative": "0.0006419",
+      "priceUsd": "0.0006419",
+      "txns": {
+        "m5": {
+          "buys": 0,
+          "sells": 0
+        },
+        "h1": {
+          "buys": 0,
+          "sells": 0
+        },
+        "h6": {
+          "buys": 6,
+          "sells": 8
+        },
+        "h24": {
+          "buys": 25,
+          "sells": 30
+        }
+      },
+      "volume": {
+        "h24": 179.84,
+        "h6": 62.82,
+        "h1": 0,
+        "m5": 0
+      },
+      "priceChange": {
+        "h6": 2.25,
+        "h24": 1.54
+      },
+      "liquidity": {
+        "usd": 115647.78,
+        "base": 176106921,
+        "quote": 2597.6633
+      },
+      "fdv": 3209701,
+      "marketCap": 889083,
+      "pairCreatedAt": 1763120098000,
+      "info": {
+        "imageUrl": "https://cdn.dexscreener.com/cms/images/e0e7ef3de7e113bb1ef430f909e8f9ed0f4ace2178c0e5a1b06df31ca95fbd66?width=800&height=800&quality=95&format=auto",
+        "header": "https://cdn.dexscreener.com/cms/images/8e8970251c3ee2aee5703c084d5d897cdfebedcd562aee0bb6dc5388b48e98f7?width=1500&height=500&quality=95&format=auto",
+        "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/PLAYs3GSSadH2q2JLS7djp7yzeT75NK78XgrE5YLrfq?timestamp=1790628300000",
+        "websites": [
+          {
+            "url": "https://playsolana.com",
+            "label": "Website"
+          },
+          {
+            "url": "https://playsolana.com/litepaper",
+            "label": "Docs"
+          }
+        ],
+        "socials": [
+          {
+            "url": "https://x.com/playsolana",
+            "type": "twitter"
+          },
+          {
+            "url": "https://t.me/playsolanaofficial",
+            "type": "telegram"
+          },
+          {
+            "url": "https://discord.gg/qEypv5f8ak",
+            "type": "discord"
+          }
+        ]
+      }
+    }
+  ]
+}
