@@ -1,0 +1,7 @@
+.git/
+.env*
+node_modules/
+work/
+PROGRESS.md
+AGENTS.md
+README.md

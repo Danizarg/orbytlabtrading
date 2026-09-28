@@ -1,0 +1,13 @@
+{
+  "name": "orbyt-ai-trading",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Live Solana market dashboard for Orbyt AI Trading",
+  "scripts": {
+    "dev": "node scripts/serve.cjs",
+    "start": "node scripts/serve.cjs",
+    "check": "node --check dist/app.js && node --check dist/config.js && node --check scripts/serve.cjs",
+    "build": "npm run check"
+  },
+  "engines": { "node": ">=20" }
+}
