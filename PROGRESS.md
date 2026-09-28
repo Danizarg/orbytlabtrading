@@ -53,7 +53,8 @@ Per-IP rate limits drive where each call runs.
 | --- | --- |
 | `src/lib/core/` | Models, provider interfaces, failover chain, DEX normalization, Solana helpers, formatters, API envelope and routes |
 | `src/lib/net/` | Isomorphic `JsonFetcher` types, `ProviderError`, browser transport |
-| `src/lib/server/` | Server transport, TTL cache, response helpers (`okSourced`, `upstreamFailure`, CDN cache policies), env and capabilities, *(todo)* `registry.ts` |
+| `src/lib/server/` | Server transport, TTL cache, response helpers (`okSourced`, `upstreamFailure`, CDN cache policies), env and capabilities, `registry.ts` (lazy server providers + SOL price + mint info) |
+| `src/data/` | Client data layer: `sources.ts` (keyless browser adapters + server proxies over /api/v1), `query.ts` (poll cadences), `hooks/` (React Query hooks per feature) |
 | `src/lib/providers/geckoterminal` | Keyless GT plus CoinGecko Demo/Pro: discovery, search, markets, pools, OHLCV, trades, token info/risk/holder summary, launchpad graduation % |
 | `src/lib/providers/dexscreener` | Secondary enrichment: pairs, token rows, search, migration detection |
 | `src/lib/providers/jupiter` | Tokens V2 discovery/rows/search, Price V3, Ultra search (bonding %, snipers/insiders/bundlers), holdings, read-only quotes (Metis / Jupiter Ultra labels) |
@@ -92,7 +93,7 @@ Per-IP rate limits drive where each call runs.
 - **Stage 0 (done, 2026-09-28).** Research workflow: 7 agents, live-tested providers, saved fixtures. Foundation committed (`9f26f50`, `46871a8`). Deposit address rule added (`7a05529`).
 - **Stage 1 (implemented, 2026-09-28/29).** Provider adapters, on-chain decoders, streams and analytics were written by 8 parallel agents (`docs/build/stage1-providers.workflow.js`). The session was interrupted before the per-module review passes ran. State at interruption: 27 test files, 640 tests passing, lint clean, one type error in `src/lib/providers/birdeye/adapter.ts`. Missing tests: `src/lib/analytics/swaps.test.ts` (swap parser) and `src/lib/providers/solanatracker`. The `formatPrice` rounding-carry bug found by tests has been fixed (2026-09-29).
 - **Stage 1 review (next).** An independent adversarial review-and-fix pass per module. It completes the missing tests and fixes the Birdeye type error. Reviewers must keep exported APIs stable.
-- **Glue (next, lead).** `src/lib/server/registry.ts` (lazy server provider instances from env, SOL/USD price helper), `src/data/sources.ts` (browser adapter singletons + server-proxy adapters implementing the same interfaces via `/api/v1/*`), `src/data/query.ts`, `src/data/hooks/useSolPrice.ts`, `src/components/ui/ErrorBoundary.tsx`.
+- **Glue (done 2026-09-29).** `src/lib/server/registry.ts` (lazy server provider instances from env, SOL/USD price helper), `src/data/sources.ts` (browser adapter singletons + server-proxy adapters implementing the same interfaces via `/api/v1/*`), `src/data/query.ts`, `src/data/hooks/useSolPrice.ts`, `src/components/ui/ErrorBoundary.tsx`.
 - **Stage 2 (then).** Six vertical slices with reviewers, per `docs/build/stage2-features.workflow.js`: api-routes, shell, discover, pulse, trade, wallet-tracker.
 - **Integration (then).**
   - `npm run check` and `npm run build`.
@@ -129,4 +130,14 @@ Per-IP rate limits drive where each call runs.
 
 ## Next concrete step
 
-Run the stage-1 review workflow, then write the glue files, then run stage 2.
+Stage 2 is launched from `docs/build/stage2-features.workflow.js` (2026-09-29 ~00:20). It has 8 slices, each followed by an adversarial reviewer:
+- stage1-swaps: swap parser tests and review
+- stage1-keyed: Birdeye fix, Solana Tracker tests, keyed review
+- api-routes
+- shell
+- discover
+- pulse
+- trade
+- wallet-tracker
+
+If a session ends mid-run, check which slices left files with `git status`. Re-run only the unfinished slices by editing SLICES in a copy of the script, then continue with Integration (see the build log).
