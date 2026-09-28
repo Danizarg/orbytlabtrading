@@ -1,0 +1,15 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://pro-api.coingecko.com/api/v3/onchain/networks/solana/new_pools",
+    "http_status": 401,
+    "fetched_at": "2026-09-28T21:00:30Z",
+    "response_headers": {
+      "cache-control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0"
+    },
+    "note": "No access-control-allow-origin on this 401. OPTIONS preflight to the same URL returned 200 with access-control-allow-origin:*, access-control-allow-headers: x-cg-pro-api-key, access-control-max-age: 7200."
+  },
+  "status": {
+    "error_code": 10002,
+    "error_message": "API Key Missing"
+  }
+}

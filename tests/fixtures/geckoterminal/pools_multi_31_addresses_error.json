@@ -1,0 +1,32 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/networks/solana/pools/multi/99C6TUp7WgTvnwQVVhAbD8HbxPdo5LJCXr7VFCvTmJf1,4JAnKFddd5fFTk5PxDj3PpTWJuTEfSWQEjZJcgKQ9KwW,4R8CiMnJWDNoes3fQi1ccPFJygPXazaHaWpHrN3rZeNj,HnhpJPJgBG2KwniMTNW8cVBHvk1hFog3RC3kjnyc23tD,F3DAAusn8mob9swWaX4ehaRrhi2Q3XJScKkuUpXdvn2i,DVa7Qmb5ct9RCpaU7UTpSaf3GVMYz17vNVU67XpdCRut,B4VFURUHHzyt8YzBGBV9jiarBvjh1EbMAbRNBnNqaxUD,Ax9GpoBxTKb19NMj4eJhNsy163xuUGmFKrLpELeQK7LX,EzSM4dpmKRBTu5sWmUG1BpJ2HgcuaDvCk9bZGppYwDKt,DLZhgwhLVCQWucBVSmY7QwKgcDCQaVvNwQ3DnAoatYzy,JCWhn7o8Lrj8Sf5c6caWngksVD2zb9eMEbQS4z619kFB,C7r9jXWiVYmBYR2Jj5YSLiEitUGJPjQXWeg7HPU8NwUk,2N1KNuLSt167P6p9P8HYcisTvTTv4vYTM8QJBbtv1xYU,BchuP8BdKGPJari4WryuXFZfLvPhiWAVVWGUp7Pj2FoR,5t7geAPhmMe49wjP7fMF5CSKpt9D2BP5T7zGkSwMCixo,CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs,5UUdSTWM1gv4emMEfARYYS7DTb3RPm9P5WUoYrcBimJP,AvF6mHTXDcSLuq7NUWyTffaRopRkM9Sjh7ruFPNGnZqs,3hAJsk3dyaGApDYz2UHLRoRAXmVmqaw4xunBoDDoCWnn,DTztPoRvvb3d9khWmZrYX8EVYnJiNd2RnU4kuFHPvGUA,9Tn6b3sGJPkSCrRxeVjhEWsfSUbVfyTnaYt9szy6cpxs,Bn4kr52BkjKKtFvtD9rPuCCjXueQTBNYjecFjMnc7nQN,Hp6SE5vy9suR1VezfrogECmLP9zmkJTUWHtdo9q8YMib,AzSi1juPd1KdPp3NJFt3JfGpgW7oLP3o6cc1b3AQSMop,HjLw6bdVRZvWMgeZqP1UBqX4CSDPGxmvLHgUM2W4HAEV,37yEq8oxU659vFVpCVKKpE1y9iVAsLeQHCwoEfRecJbK,4YRuES6c4zMkcgiZRUzdMbDbJ9MdJ1dKoQjgx2Q3kXMw,6w8BKCENe5UyDqzrGWnvgUkFiqNU4uULLQ2xGki6bSy8,GRaRNQN8VW2izhUBY2HMmkvUY41UBoxgja2nvSqBbrdp,5xsRos6My3WGrGz2qZ8A92thEBDVQjaiP1gZ7UZFrURu,12mZBd9KrSFZDHZTf25p6fjzpMTwpeFRaivThrChousu",
+    "http_status": 400,
+    "fetched_at": "2026-09-28T20:48:55.581Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "BYPASS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:48:55 GMT",
+      "vary": "Accept, Origin, accept-encoding",
+      "x-runtime": "0.018560"
+    },
+    "trimmed": "untrimmed error body"
+  },
+  "errors": [
+    {
+      "status": "400",
+      "title": "maximum 30 addresses allowed"
+    }
+  ],
+  "meta": {
+    "ref_id": "38fcd810-5562-4a83-a094-1c977e0daa04"
+  }
+}

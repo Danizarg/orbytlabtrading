@@ -1,0 +1,42 @@
+{
+  "_note": "Live 2026-09-28T21:00:55.291Z. No API key available, so only unauthenticated behaviour could be verified: every Helius host answers 401 with Access-Control-Allow-Origin:* (CORS open; auth is the key).",
+  "rpc_post_no_key": {
+    "request": {
+      "url": "https://mainnet.helius-rpc.com/",
+      "method": "POST",
+      "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getHealth\"}"
+    },
+    "status": 401,
+    "headers": {
+      "access-control-allow-headers": "*",
+      "access-control-allow-methods": "GET, HEAD, POST, PUT, OPTIONS",
+      "access-control-allow-origin": "*",
+      "access-control-expose-headers": "zid, x-zone-id",
+      "server": "cloudflare",
+      "zid": "IL3eASw-Ha2R"
+    },
+    "body": "Unauthorized"
+  },
+  "parsed_events_no_key": {
+    "request": {
+      "url": "https://mainnet.helius-rpc.com/v1/parsed-events/transaction-history",
+      "method": "POST",
+      "body": "{\"address\":\"DHpRzLRuACd8i1BVGZh8rGQWaQsP7b4spBZFWbzW5WSb\",\"limit\":1}"
+    },
+    "status": 401,
+    "headers": {
+      "access-control-allow-headers": "*",
+      "access-control-allow-methods": "GET, HEAD, POST, PUT, OPTIONS",
+      "access-control-allow-origin": "*",
+      "access-control-expose-headers": "zid, x-zone-id",
+      "server": "cloudflare",
+      "zid": "rB2uKxY68dWQ"
+    },
+    "body": "Unauthorized"
+  },
+  "ws_upgrade_no_key": {
+    "note": "WebSocket upgrade to wss://mainnet.helius-rpc.com/ without api-key (captured via curl earlier: HTTP 401, body below)",
+    "status": 401,
+    "body": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32401,\"message\":\"missing api key\"}}"
+  }
+}

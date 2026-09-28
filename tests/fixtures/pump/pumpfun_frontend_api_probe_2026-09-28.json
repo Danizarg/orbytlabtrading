@@ -1,0 +1,52 @@
+{
+  "_note": "REAL responses 2026-09-28 from undocumented pump.fun internal APIs (probe only, 5 requests). These are NOT a public API.",
+  "probes": [
+    {
+      "request": "GET https://frontend-api-v3.pump.fun/coins/dB98iqo6YQ2p1X1KtvmLRDFmtQauEiA2CtxL8cvpump  (Origin: https://www.orbytai.org)",
+      "http_status": 403,
+      "body": {
+        "statusCode": 403,
+        "timestamp": "2026-09-28T20:52:43.673Z",
+        "path": "/coins/dB98iqo6YQ2p1X1KtvmLRDFmtQauEiA2CtxL8cvpump",
+        "message": "Not allowed by CORS",
+        "error": "Forbidden"
+      }
+    },
+    {
+      "request": "GET https://frontend-api-v3.pump.fun/coins?offset=0&limit=2&sort=created_timestamp&order=DESC&includeNsfw=false  (Origin: https://www.orbytai.org)",
+      "http_status": 403,
+      "body": {
+        "statusCode": 403,
+        "timestamp": "2026-09-28T20:52:45.526Z",
+        "path": "/coins?offset=0&limit=2&sort=created_timestamp&order=DESC&includeNsfw=false",
+        "message": "Not allowed by CORS",
+        "error": "Forbidden"
+      }
+    },
+    {
+      "request": "GET https://frontend-api.pump.fun/coins/<mint>",
+      "http_status": 530,
+      "body_text": "error code: 1016"
+    },
+    {
+      "request": "GET https://advanced-api-v2.pump.fun/coins/list?sortBy=creationTime&limit=2",
+      "http_status": 530,
+      "body_text": "error code: 1016"
+    },
+    {
+      "request": "GET https://frontend-api-v3.pump.fun/coins/dB98iqo6YQ2p1X1KtvmLRDFmtQauEiA2CtxL8cvpump (no Origin)",
+      "http_status": 404,
+      "headers": {
+        "access-control-allow-credentials": "true",
+        "access-control-expose-headers": "X-Degraded"
+      },
+      "body": {
+        "statusCode": 404,
+        "timestamp": "2026-09-28T20:52:58.523Z",
+        "path": "/coins/dB98iqo6YQ2p1X1KtvmLRDFmtQauEiA2CtxL8cvpump",
+        "message": "Cannot GET /coins/dB98iqo6YQ2p1X1KtvmLRDFmtQauEiA2CtxL8cvpump",
+        "error": "Not Found"
+      }
+    }
+  ]
+}

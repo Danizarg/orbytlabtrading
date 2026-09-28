@@ -1,0 +1,34 @@
+{
+  "_note": "REAL subscribeMigration events (txType=migrate, pool=pump-amm = PumpSwap). Migration payload has only signature,mint,txType,pool. createEventOfSecondMint = the create event (same session) whose creator bought the full curve (initialBuy 793,100,000) and was migrated ~80 ms later.",
+  "events": [
+    {
+      "signature": "3kNYYYzipdWUwX7ZrgvWEwzLwNpvcLGgBy1P6JNgZWqXUpaAQ8eRGkzzvbgukDeyFwwrMbQGeorUj8gFf3Hubp6x",
+      "mint": "GJJ6TADXU6TdvBR8siNxLqYzbcwc6ixgxFCg7Ystpump",
+      "txType": "migrate",
+      "pool": "pump-amm"
+    },
+    {
+      "signature": "2nLGhzNKBCJH9U3ZUKS4kjdQWufDhYrw4BKrSWT4m5Lir4zSWxSzKDZ4KJdgcAQAihqwgycvqseVMbyGup8TzVZj",
+      "mint": "4ov9rwwS4iBHeTWGCrVaQYW1HzWK51MSfs8csGAApump",
+      "txType": "migrate",
+      "pool": "pump-amm"
+    }
+  ],
+  "createEventOfSecondMint": {
+    "signature": "3iNBynE3XTxJoPGPjRG3Jfc7nA8bYiVSjJ4dgdTpc3VuMweu5v8m3qra3kf3n3MhciTR55yxi6mLMyXT2ZUmk5Rk",
+    "mint": "4ov9rwwS4iBHeTWGCrVaQYW1HzWK51MSfs8csGAApump",
+    "traderPublicKey": "8V4qxjK2BS53EKjMra9bzJzH6BLJtf7jQUF4ekYSSNfb",
+    "txType": "create",
+    "initialBuy": 793100000,
+    "solAmount": 85.005359057,
+    "bondingCurveKey": "9wHQUhvsYH9z5PceXkBxy1gbc6ZTU3vbMBHgA3cE8PqJ",
+    "vTokensInBondingCurve": 279900000,
+    "vSolInBondingCurve": 115.005359056806,
+    "marketCapSol": 410.8801681200643,
+    "name": "Claude",
+    "symbol": "Claude",
+    "uri": "https://ipfs.io/ipfs/bafkreih7vgfsmnmna56h4fjpni4mo2igdnh2l54cpz7gfuwshatnkqigoe",
+    "is_mayhem_mode": false,
+    "pool": "pump"
+  }
+}

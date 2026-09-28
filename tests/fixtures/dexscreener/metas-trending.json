@@ -1,0 +1,77 @@
+[
+  {
+    "description": "pspspspspsp",
+    "icon": {
+      "type": "emoji",
+      "value": "🐈"
+    },
+    "name": "Cat",
+    "slug": "cat",
+    "marketCap": 752495191,
+    "liquidity": 61952996.12,
+    "volume": 60686843.78,
+    "tokenCount": 97,
+    "marketCapChange": {
+      "m5": -0.22122944446057294,
+      "h1": -0.5929453894744725,
+      "h6": -1.0145106980243959,
+      "h24": -5.666449136047288
+    },
+    "marketCapDelta": {
+      "m5": -1664740.9306418274,
+      "h1": -4461885.541051626,
+      "h6": -7634144.214814111,
+      "h24": -42639757.24921689
+    }
+  },
+  {
+    "description": "Furry friends and funny memes",
+    "icon": {
+      "type": "emoji",
+      "value": "🐶"
+    },
+    "name": "Dog",
+    "slug": "dog",
+    "marketCap": 1198785622,
+    "liquidity": 60671864.22,
+    "volume": 22508825.85,
+    "tokenCount": 73,
+    "marketCapChange": {
+      "m5": -0.5725163636502517,
+      "h1": -1.809654227917362,
+      "h6": 0.05300739858333477,
+      "h24": -6.354689562242547
+    },
+    "marketCapDelta": {
+      "m5": -6863243.851036451,
+      "h1": -21693874.692188445,
+      "h6": 635445.0728132488,
+      "h24": -76179104.7948984
+    }
+  },
+  {
+    "description": "Crypto native characters and mascots",
+    "icon": {
+      "type": "emoji",
+      "value": "🐻‍❄️"
+    },
+    "name": "Character",
+    "slug": "character",
+    "marketCap": 2762583951,
+    "liquidity": 77128738.35,
+    "volume": 25039908.71,
+    "tokenCount": 39,
+    "marketCapChange": {
+      "m5": -0.11195612803309984,
+      "h1": 0.6629996342311885,
+      "h6": -0.13189693113579315,
+      "h24": -4.744191961338353
+    },
+    "marketCapDelta": {
+      "m5": -3092882.025203428,
+      "h1": 18315921.490459513,
+      "h6": -3643763.4514189437,
+      "h24": -131062285.72856545
+    }
+  }
+]

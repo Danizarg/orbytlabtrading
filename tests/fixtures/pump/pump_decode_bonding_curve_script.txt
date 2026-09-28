@@ -1,0 +1,165 @@
+// Decode pump.fun BondingCurve + Global accounts from a public Solana RPC and cross-check
+// against PumpPortal subscribeNewToken events.
+// Usage: node decode_bonding_curve.mjs <ws_log.jsonl> <out.json> [extraMint ...]
+// Layout source: github.com/pump-fun/pump-public-docs idl/pump.json (refreshed 2026-09-12).
+import { readFileSync, writeFileSync } from 'node:fs';
+import { PublicKey } from '@solana/web3.js';
+
+const RPC = 'https://api.mainnet-beta.solana.com';
+const PUMP_PROGRAM = new PublicKey('6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P');
+const GLOBAL = new PublicKey('4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf');
+const BC_DISC = [23, 183, 248, 55, 96, 216, 172, 96]; // anchor discriminator "account:BondingCurve"
+const GLOBAL_DISC = [167, 232, 232, 177, 200, 108, 114, 127];
+const TOKEN_DECIMALS = 6; // pump.fun mints always use 6 decimals
+const LAMPORTS = 1e9;
+
+const [logPath, outPath, ...extraMints] = process.argv.slice(2);
+
+// ---------- helpers ----------
+const headersSeen = [];
+async function rpc(method, params) {
+  const res = await fetch(RPC, {
+    method: 'POST',
+    // NOTE: no Origin header. The public endpoint answers HTTP 403 {"code":403,"message":"Access forbidden"}
+    // when a browser Origin (e.g. https://www.orbytai.org) is sent -> call it server-side only.
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+  });
+  const h = {};
+  for (const k of ['access-control-allow-origin', 'x-ratelimit-method-limit', 'x-ratelimit-method-remaining',
+    'x-ratelimit-rps-limit', 'x-ratelimit-rps-remaining', 'x-ratelimit-conn-limit', 'x-ratelimit-conn-remaining',
+    'retry-after', 'cache-control']) if (res.headers.get(k) != null) h[k] = res.headers.get(k);
+  headersSeen.push({ method, status: res.status, headers: h });
+  const j = await res.json();
+  if (j.error) throw new Error(method + ' ' + JSON.stringify(j.error));
+  return j.result;
+}
+
+class Reader {
+  constructor(buf) { this.b = buf; this.o = 0; }
+  left() { return this.b.length - this.o; }
+  u8() { return this.b.readUInt8(this.o++); }
+  bool() { return this.u8() !== 0; }
+  u16() { const v = this.b.readUInt16LE(this.o); this.o += 2; return v; }
+  u64() { const v = this.b.readBigUInt64LE(this.o); this.o += 8; return v; }
+  i128() { const lo = this.b.readBigUInt64LE(this.o); const hi = this.b.readBigInt64LE(this.o + 8); this.o += 16; return (hi << 64n) + lo; }
+  pk() { const v = new PublicKey(this.b.subarray(this.o, this.o + 32)).toBase58(); this.o += 32; return v; }
+}
+
+// Appended fields: accounts written before an upgrade are shorter -> missing trailing fields read as default.
+function decodeBondingCurve(buf) {
+  const disc = [...buf.subarray(0, 8)];
+  if (disc.join() !== BC_DISC.join()) throw new Error('not a BondingCurve account: ' + disc);
+  const r = new Reader(buf); r.o = 8;
+  const out = {
+    virtual_token_reserves: r.u64(),
+    virtual_quote_reserves: r.u64(), // formerly virtual_sol_reserves (lamports for SOL-paired coins)
+    real_token_reserves: r.u64(),
+    real_quote_reserves: r.u64(),    // formerly real_sol_reserves
+    token_total_supply: r.u64(),
+    complete: r.bool(),
+  };
+  const opt = [
+    ['creator', 'pk', 32], ['is_mayhem_mode', 'bool', 1], ['is_cashback_coin', 'bool', 1],
+    ['quote_mint', 'pk', 32], ['creator_fee_bps', 'u64', 8], ['can_edit_creator_fee', 'bool', 1],
+    ['is_holder_reward', 'bool', 1],
+  ];
+  for (const [name, type, size] of opt) {
+    if (r.left() < size) { out[name] = null; continue; } // field not present on this (older/shorter) account
+    out[name] = r[type]();
+  }
+  out._account_data_len = buf.length;
+  out._decoded_bytes = r.o;
+  return out;
+}
+
+function decodeGlobal(buf) {
+  const disc = [...buf.subarray(0, 8)];
+  if (disc.join() !== GLOBAL_DISC.join()) throw new Error('not Global');
+  const r = new Reader(buf); r.o = 8;
+  return {
+    initialized: r.bool(), authority: r.pk(), fee_recipient: r.pk(),
+    initial_virtual_token_reserves: r.u64(), initial_virtual_sol_reserves: r.u64(),
+    initial_real_token_reserves: r.u64(), token_total_supply: r.u64(), fee_basis_points: r.u64(),
+    withdraw_authority: r.pk(), enable_migrate: r.bool(), pool_migration_fee: r.u64(),
+    creator_fee_basis_points: r.u64(),
+    fee_recipients_count: (r.o += 32 * 7, 7),
+    set_creator_authority: r.pk(), admin_set_creator_authority: r.pk(), create_v2_enabled: r.bool(),
+    whitelist_pda: r.pk(), reserved_fee_recipient: r.pk(), mayhem_mode_enabled: r.bool(),
+    reserved_fee_recipients_count: (r.o += 32 * 7, 7), is_cashback_enabled: r.bool(),
+    buyback_fee_recipients_count: (r.o += 32 * 8, 8), buyback_basis_points: r.u64(),
+    initial_virtual_quote_reserves: r.u64(),
+    _account_data_len: buf.length,
+  };
+}
+
+// Derived metrics (all math in BigInt until the final display conversion).
+function derive(bc, initialRealTokenReserves) {
+  const vT = bc.virtual_token_reserves, vQ = bc.virtual_quote_reserves;
+  const priceSolPerToken = (Number(vQ) / LAMPORTS) / (Number(vT) / 10 ** TOKEN_DECIMALS);
+  // pump SDK bondingCurveMarketCap(): virtualSolReserves * mintSupply / virtualTokenReserves (lamports)
+  const mcapLamports = vT === 0n ? null : (vQ * bc.token_total_supply) / vT;
+  // Bonding progress used by pump.fun-style UIs: share of the initial REAL token reserves already sold.
+  const sold = initialRealTokenReserves - bc.real_token_reserves;
+  const progressBps = bc.complete ? 10000n : (sold * 10000n) / initialRealTokenReserves;
+  return {
+    price_sol_per_token: priceSolPerToken,
+    market_cap_sol: mcapLamports == null ? null : Number(mcapLamports) / LAMPORTS,
+    real_sol_in_curve: Number(bc.real_quote_reserves) / LAMPORTS,
+    tokens_left_for_sale_ui: Number(bc.real_token_reserves) / 10 ** TOKEN_DECIMALS,
+    bonding_progress_pct: Number(progressBps) / 100,
+  };
+}
+
+const jsonSafe = (o) => JSON.parse(JSON.stringify(o, (_, v) => (typeof v === 'bigint' ? v.toString() : v)));
+
+// ---------- main ----------
+const log = readFileSync(logPath, 'utf8').split('\n').filter(Boolean).map(JSON.parse);
+const creates = log.filter((e) => e.dir === 'in' && e.data?.txType === 'create' && e.data.pool === 'pump').map((e) => e.data);
+const migrates = log.filter((e) => e.dir === 'in' && e.data?.txType === 'migrate').map((e) => e.data);
+const byMint = Object.fromEntries(creates.map((c) => [c.mint, c]));
+
+// primary: most recent regular create with a name; plus a mayhem coin, plus migrated mints
+const primary = [...creates].reverse().find((c) => c.name && !c.is_mayhem_mode);
+const mayhem = [...creates].reverse().find((c) => c.is_mayhem_mode);
+const mints = [...new Set([primary?.mint, mayhem?.mint, ...migrates.map((m) => m.mint), ...extraMints].filter(Boolean))];
+
+const globalInfo = await rpc('getAccountInfo', [GLOBAL.toBase58(), { encoding: 'base64', commitment: 'confirmed' }]);
+const global = decodeGlobal(Buffer.from(globalInfo.value.data[0], 'base64'));
+await new Promise((r) => setTimeout(r, 400));
+
+const pdas = mints.map((m) => PublicKey.findProgramAddressSync([Buffer.from('bonding-curve'), new PublicKey(m).toBuffer()], PUMP_PROGRAM)[0]);
+
+// single getAccountInfo for the primary (as a raw sample), getMultipleAccounts for the rest
+const primaryRaw = await rpc('getAccountInfo', [pdas[0].toBase58(), { encoding: 'base64', commitment: 'confirmed' }]);
+await new Promise((r) => setTimeout(r, 400));
+const multi = await rpc('getMultipleAccounts', [pdas.map((p) => p.toBase58()), { encoding: 'base64', commitment: 'confirmed' }]);
+
+const results = mints.map((mint, i) => {
+  const acc = i === 0 ? primaryRaw.value : multi.value[i];
+  const stream = byMint[mint] || null;
+  const res = { mint, bonding_curve_pda: pdas[i].toBase58(), stream_bondingCurveKey: stream?.bondingCurveKey ?? null,
+    pda_matches_stream: stream ? stream.bondingCurveKey === pdas[i].toBase58() : null };
+  if (!acc) { res.account = null; return res; }
+  res.account_owner = acc.owner; res.account_lamports = acc.lamports;
+  const bc = decodeBondingCurve(Buffer.from(acc.data[0], 'base64'));
+  res.decoded = bc;
+  res.derived = derive(bc, global.initial_real_token_reserves);
+  if (stream) {
+    res.stream_at_create = { vTokensInBondingCurve: stream.vTokensInBondingCurve, vSolInBondingCurve: stream.vSolInBondingCurve,
+      marketCapSol: stream.marketCapSol, is_mayhem_mode: stream.is_mayhem_mode };
+    res.onchain_ui_now = { vTokens_ui: Number(bc.virtual_token_reserves) / 1e6, vSol_ui: Number(bc.virtual_quote_reserves) / 1e9 };
+    res.stream_marketCapSol_formula_check = stream.vSolInBondingCurve / stream.vTokensInBondingCurve * (Number(bc.token_total_supply) / 1e6);
+  }
+  return res;
+});
+
+const out = jsonSafe({
+  _note: 'REAL mainnet data fetched ' + new Date().toISOString() + ' from ' + RPC + ' (getAccountInfo/getMultipleAccounts, base64, commitment confirmed). Decoded with pump IDL layout. u64 values are raw integers as strings: token amounts have 6 decimals, quote (SOL) amounts are lamports (9 decimals).',
+  rpc_response_headers: headersSeen,
+  global_account: { address: GLOBAL.toBase58(), decoded: global },
+  primary_raw_getAccountInfo_value: primaryRaw.value,
+  bonding_curves: results,
+});
+writeFileSync(outPath, JSON.stringify(out, null, 2));
+console.log(JSON.stringify(out, null, 2).slice(0, 9000));

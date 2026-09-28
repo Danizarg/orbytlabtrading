@@ -1,0 +1,359 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/networks/solana/dexes/pump-fun/pools?include=base_token,quote_token,dex&sort=h24_tx_count_desc&page=1",
+    "http_status": 200,
+    "fetched_at": "2026-09-28T20:49:08.167Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "MISS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:49:08 GMT",
+      "etag": "W/\"b50244dd1e6255dbf32300b03a9dae6e\"",
+      "vary": "Accept-Encoding, Accept, Origin",
+      "x-runtime": "0.172397"
+    },
+    "trimmed": "arrays trimmed to <=3 items; included[] filtered to referenced ids"
+  },
+  "data": [
+    {
+      "id": "solana_HWGadsqBpzSr323ix615PNNZLkfBFvv6LXDBChDsDcNv",
+      "type": "pool",
+      "attributes": {
+        "base_token_price_usd": "0.000046733714857728233261312128798633900652024547500424840201242022",
+        "base_token_price_native_currency": "0.000000390285298170705",
+        "quote_token_price_usd": "119.557658903972980633809039127926072792057547452",
+        "quote_token_price_native_currency": "1.0",
+        "base_token_price_quote_token": "0.0000003902852982",
+        "quote_token_price_base_token": "2562228.20763957",
+        "address": "HWGadsqBpzSr323ix615PNNZLkfBFvv6LXDBChDsDcNv",
+        "name": "DIAMOND / SOL",
+        "pool_created_at": "2026-09-28T02:39:02Z",
+        "fdv_usd": "46733.41286",
+        "market_cap_usd": null,
+        "price_change_percentage": {
+          "m5": "0",
+          "m15": "0",
+          "m30": "0",
+          "h1": "0",
+          "h6": "0",
+          "h24": "479.699"
+        },
+        "transactions": {
+          "m5": {
+            "buys": 0,
+            "sells": 0,
+            "buyers": 0,
+            "sellers": 0
+          },
+          "m15": {
+            "buys": 0,
+            "sells": 0,
+            "buyers": 0,
+            "sellers": 0
+          },
+          "m30": {
+            "buys": 0,
+            "sells": 0,
+            "buyers": 0,
+            "sellers": 0
+          },
+          "h1": {
+            "buys": 0,
+            "sells": 0,
+            "buyers": 0,
+            "sellers": 0
+          },
+          "h6": {
+            "buys": 0,
+            "sells": 0,
+            "buyers": 0,
+            "sellers": 0
+          },
+          "h24": {
+            "buys": 4438,
+            "sells": 7007,
+            "buyers": 540,
+            "sellers": 295
+          }
+        },
+        "volume_usd": {
+          "m5": "0.0",
+          "m15": "0.0",
+          "m30": "0.0",
+          "h1": "0.0",
+          "h6": "0.0",
+          "h24": "73106.3163271258"
+        },
+        "reserve_in_usd": "10096.6977"
+      },
+      "relationships": {
+        "base_token": {
+          "data": {
+            "id": "solana_8xzeMhd2Uy2AWQeTGaMonjvsmfWGnkiuYkzcuuzSpump",
+            "type": "token"
+          }
+        },
+        "quote_token": {
+          "data": {
+            "id": "solana_So11111111111111111111111111111111111111112",
+            "type": "token"
+          }
+        },
+        "dex": {
+          "data": {
+            "id": "pump-fun",
+            "type": "dex"
+          }
+        }
+      }
+    },
+    {
+      "id": "solana_BtLVeo9sgcvcFdFYge9C89thNRbuH7tCnzCofUPocsUm",
+      "type": "pool",
+      "attributes": {
+        "base_token_price_usd": "0.000049572392691991133797459602818635537878748307448804557180467285",
+        "base_token_price_native_currency": "0.000000364566201238624",
+        "quote_token_price_usd": "121.79654715741095465554435886535225918531004415",
+        "quote_token_price_native_currency": "1.0",
+        "base_token_price_quote_token": "0.0000003645662012",
+        "quote_token_price_base_token": "2742986.0382078",
+        "address": "BtLVeo9sgcvcFdFYge9C89thNRbuH7tCnzCofUPocsUm",
+        "name": "BUNS / SOL",
+        "pool_created_at": "2026-09-27T23:07:41Z",
+        "fdv_usd": "49572.39269",
+        "market_cap_usd": null,
+        "price_change_percentage": {
+          "m5": "0",
+          "m15": "0",
+          "m30": "0",
+          "h1": "0",
+          "h6": "0",
+          "h24": "1340.806"
+        },
+        "transactions": {
+          "m5": {
+            "buys": 0,
+            "sells": 0,
+            "buyers": 0,
+            "sellers": 0
+          },
+          "m15": {
+            "buys": 0,
+            "sells": 0,
+            "buyers": 0,
+            "sellers": 0
+          },
+          "m30": {
+            "buys": 0,
+            "sells": 0,
+            "buyers": 0,
+            "sellers": 0
+          },
+          "h1": {
+            "buys": 0,
+            "sells": 0,
+            "buyers": 0,
+            "sellers": 0
+          },
+          "h6": {
+            "buys": 0,
+            "sells": 0,
+            "buyers": 0,
+            "sellers": 0
+          },
+          "h24": {
+            "buys": 4358,
+            "sells": 5926,
+            "buyers": 573,
+            "sellers": 458
+          }
+        },
+        "volume_usd": {
+          "m5": "0.0",
+          "m15": "0.0",
+          "m30": "0.0",
+          "h1": "0.0",
+          "h6": "0.0",
+          "h24": "117630.391006716"
+        },
+        "reserve_in_usd": "0.0"
+      },
+      "relationships": {
+        "base_token": {
+          "data": {
+            "id": "solana_36ef5aQyrEFRDMyRk3fBdcvDPHNjARi5bDG9ryPoWRWX",
+            "type": "token"
+          }
+        },
+        "quote_token": {
+          "data": {
+            "id": "solana_So11111111111111111111111111111111111111112",
+            "type": "token"
+          }
+        },
+        "dex": {
+          "data": {
+            "id": "pump-fun",
+            "type": "dex"
+          }
+        }
+      }
+    },
+    {
+      "id": "solana_DmbshQGYgnRnC7XQtQeZ5doBfR2opB15FWKWNUEpyUbo",
+      "type": "pool",
+      "attributes": {
+        "base_token_price_usd": "0.00000533130741502088545040647698639393026817356114504952872568818779",
+        "base_token_price_native_currency": "0.0000000449508487499922",
+        "quote_token_price_usd": "118.603042284531042767148495348868943324509057999",
+        "quote_token_price_native_currency": "1.0",
+        "base_token_price_quote_token": "0.00000004495084875",
+        "quote_token_price_base_token": "22246520.9847717",
+        "address": "DmbshQGYgnRnC7XQtQeZ5doBfR2opB15FWKWNUEpyUbo",
+        "name": "BAYOU / SOL",
+        "pool_created_at": "2026-09-22T00:10:10Z",
+        "fdv_usd": "5331.307415",
+        "market_cap_usd": null,
+        "price_change_percentage": {
+          "m5": "0",
+          "m15": "0.944",
+          "m30": "0.944",
+          "h1": "0.944",
+          "h6": "-12.066",
+          "h24": "-23.61"
+        },
+        "transactions": {
+          "m5": {
+            "buys": 0,
+            "sells": 0,
+            "buyers": 0,
+            "sellers": 0
+          },
+          "m15": {
+            "buys": 3,
+            "sells": 1,
+            "buyers": 3,
+            "sellers": 1
+          },
+          "m30": {
+            "buys": 3,
+            "sells": 1,
+            "buyers": 3,
+            "sellers": 1
+          },
+          "h1": {
+            "buys": 3,
+            "sells": 1,
+            "buyers": 3,
+            "sellers": 1
+          },
+          "h6": {
+            "buys": 3,
+            "sells": 4,
+            "buyers": 3,
+            "sellers": 4
+          },
+          "h24": {
+            "buys": 6666,
+            "sells": 179,
+            "buyers": 69,
+            "sellers": 72
+          }
+        },
+        "volume_usd": {
+          "m5": "0.0",
+          "m15": "43.4254723716",
+          "m30": "43.4254723716",
+          "h1": "43.4254723716",
+          "h6": "383.2198743327",
+          "h24": "1509.1262877022"
+        },
+        "reserve_in_usd": "3977.3662"
+      },
+      "relationships": {
+        "base_token": {
+          "data": {
+            "id": "solana_9sVJwhNTEtoq8PWeZJigJKNbRMZW7CoByosnxV2Cpump",
+            "type": "token"
+          }
+        },
+        "quote_token": {
+          "data": {
+            "id": "solana_So11111111111111111111111111111111111111112",
+            "type": "token"
+          }
+        },
+        "dex": {
+          "data": {
+            "id": "pump-fun",
+            "type": "dex"
+          }
+        }
+      }
+    }
+  ],
+  "included": [
+    {
+      "id": "solana_8xzeMhd2Uy2AWQeTGaMonjvsmfWGnkiuYkzcuuzSpump",
+      "type": "token",
+      "attributes": {
+        "address": "8xzeMhd2Uy2AWQeTGaMonjvsmfWGnkiuYkzcuuzSpump",
+        "name": "Diamond Hands",
+        "symbol": "DIAMOND",
+        "decimals": 6,
+        "image_url": "https://assets.geckoterminal.com/640wi5tr0ze8kubpukestlz33l8l",
+        "coingecko_coin_id": null
+      }
+    },
+    {
+      "id": "solana_So11111111111111111111111111111111111111112",
+      "type": "token",
+      "attributes": {
+        "address": "So11111111111111111111111111111111111111112",
+        "name": "Wrapped SOL",
+        "symbol": "SOL",
+        "decimals": 9,
+        "image_url": "https://coin-images.coingecko.com/coins/images/21629/large/solana.jpg?1696520989",
+        "coingecko_coin_id": "wrapped-solana"
+      }
+    },
+    {
+      "id": "pump-fun",
+      "type": "dex",
+      "attributes": {
+        "name": "Pump.fun"
+      }
+    },
+    {
+      "id": "solana_36ef5aQyrEFRDMyRk3fBdcvDPHNjARi5bDG9ryPoWRWX",
+      "type": "token",
+      "attributes": {
+        "address": "36ef5aQyrEFRDMyRk3fBdcvDPHNjARi5bDG9ryPoWRWX",
+        "name": "Inscription Bunnies",
+        "symbol": "BUNS",
+        "decimals": 6,
+        "image_url": "https://assets.geckoterminal.com/r6q2h8y73uqz9onogli51j8h6pea",
+        "coingecko_coin_id": null
+      }
+    },
+    {
+      "id": "solana_9sVJwhNTEtoq8PWeZJigJKNbRMZW7CoByosnxV2Cpump",
+      "type": "token",
+      "attributes": {
+        "address": "9sVJwhNTEtoq8PWeZJigJKNbRMZW7CoByosnxV2Cpump",
+        "name": "Bayou Dog",
+        "symbol": "BAYOU",
+        "decimals": 6,
+        "image_url": "https://assets.geckoterminal.com/roq5curwk7f75dw1jh3uxz7qtwht",
+        "coingecko_coin_id": null
+      }
+    }
+  ]
+}

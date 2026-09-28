@@ -1,0 +1,267 @@
+[
+  {
+    "id": "DKxXdaMC1so182urvrrnhs6V6fGTrttPS8br6JuEpump",
+    "name": "AI6 Agent",
+    "symbol": "AI6",
+    "icon": "https://gatewaypinata.online/api/meta/ff84e18ed1723235b40a4ac4.jpg",
+    "decimals": 6,
+    "twitter": "https://x.com/ai6agent",
+    "website": "https://ai6agent.bot/",
+    "dev": "FBVsacNxQFhD1m79dJMTsLVqRYcoxFsMpyYcyYTmjrsy",
+    "circSupply": 997160277.712369,
+    "totalSupply": 997160277.712369,
+    "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "launchpad": "pump.fun",
+    "firstPool": {
+      "id": "DKxXdaMC1so182urvrrnhs6V6fGTrttPS8br6JuEpump",
+      "createdAt": "2026-09-28T20:44:09Z"
+    },
+    "graduatedPool": "A8mMNioRKoRXcb8nVVRy9KV7ZSPyfTTm13ye4bSgHw7F",
+    "graduatedAt": "2026-09-28T20:45:34Z",
+    "holderCount": 987,
+    "audit": {
+      "mintAuthorityDisabled": true,
+      "freezeAuthorityDisabled": true,
+      "topHoldersPercentage": 24.069053715804458,
+      "devBalancePercentage": 1.0028478092751004e-13,
+      "devMigrations": 1,
+      "devMints": 1,
+      "botHoldersCount": 792,
+      "botHoldersPercentage": 73.95842245996668,
+      "devFundedAt": "2026-09-28T02:11:01Z",
+      "bundlerStats": {
+        "totalBundles": 7,
+        "totalNativeVol": 11.781804,
+        "holdingPct": 2.734,
+        "holdingPctATH": 2.815
+      }
+    },
+    "dexBanner": "https://static.datapi.jup.ag/images/dex-profile//DKxXdaMC1so182urvrrnhs6V6fGTrttPS8br6JuEpump",
+    "dexPaidAt": "2026-09-28T20:47:07.958Z",
+    "primaryTwitter": {
+      "handle": "ai6agent",
+      "followerCount": 126,
+      "followingCount": 4,
+      "type": "user"
+    },
+    "organicScore": 0,
+    "organicScoreLabel": "low",
+    "tags": [
+      "unknown",
+      "token-2022"
+    ],
+    "createdAt": "2026-09-28T20:44:09Z",
+    "fdv": 182222.2022243134,
+    "mcap": 182222.2022243134,
+    "usdPrice": 0.00018274113630193704,
+    "priceBlockId": 451430673,
+    "liquidity": 20955.447907395952,
+    "stats5m": {
+      "priceChange": 2526.188527383015,
+      "holderChange": 1008.9887640449439,
+      "liquidityChange": 150.12760889094488,
+      "buyVolume": 155846.1899685273,
+      "sellVolume": 135232.87095572488,
+      "buyOrganicVolume": 2681.856869784229,
+      "sellOrganicVolume": 196.34029127263454,
+      "numBuys": 2372,
+      "numSells": 1774,
+      "numTraders": 1339,
+      "numNetBuyers": 925
+    },
+    "stats1h": {
+      "priceChange": 2526.188527383015,
+      "holderChange": 1008.9887640449439,
+      "liquidityChange": 150.12760889094488,
+      "buyVolume": 155846.1899685273,
+      "sellVolume": 135232.87095572488,
+      "buyOrganicVolume": 2681.856869784229,
+      "sellOrganicVolume": 196.34029127263454,
+      "numBuys": 2372,
+      "numSells": 1774,
+      "numTraders": 1339,
+      "numNetBuyers": 925
+    },
+    "stats6h": {
+      "priceChange": 2526.188527383015,
+      "holderChange": 1008.9887640449439,
+      "liquidityChange": 150.12760889094488,
+      "buyVolume": 155846.1899685273,
+      "sellVolume": 135232.87095572488,
+      "buyOrganicVolume": 2681.856869784229,
+      "sellOrganicVolume": 196.34029127263454,
+      "numBuys": 2372,
+      "numSells": 1774,
+      "numTraders": 1339,
+      "numNetBuyers": 925
+    },
+    "stats24h": {
+      "priceChange": 2526.188527383015,
+      "holderChange": 1008.9887640449439,
+      "liquidityChange": 150.12760889094488,
+      "buyVolume": 155846.1899685273,
+      "sellVolume": 135232.87095572488,
+      "buyOrganicVolume": 2681.856869784229,
+      "sellOrganicVolume": 196.34029127263454,
+      "numBuys": 2372,
+      "numSells": 1774,
+      "numTraders": 1339,
+      "numNetBuyers": 925
+    },
+    "fees": 19.020213255000005,
+    "bondingCurve": 100,
+    "updatedAt": "2026-09-28T20:47:22.260755956Z"
+  },
+  {
+    "id": "2mHmzEfpKqMHotP1aAEPu89qtpTqpt5FgPy826NEpump",
+    "name": "ai6agent",
+    "symbol": "AI6",
+    "icon": "https://gatewaypinata.online/api/meta/74935f0d711808ab40f18066.jpg",
+    "decimals": 6,
+    "twitter": "https://x.com/ai6agent",
+    "website": "https://ai6agent.bot/",
+    "dev": "BuqodeuQwZCCFdVKxB3qAG8SmqhHD5q8rSeXjovMZxEt",
+    "circSupply": 1000000000,
+    "totalSupply": 1000000000,
+    "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "launchpad": "pump.fun",
+    "firstPool": {
+      "id": "2mHmzEfpKqMHotP1aAEPu89qtpTqpt5FgPy826NEpump",
+      "createdAt": "2026-09-28T20:09:32Z"
+    },
+    "holderCount": 5,
+    "audit": {
+      "mintAuthorityDisabled": true,
+      "freezeAuthorityDisabled": true,
+      "topHoldersPercentage": 2.2736899055085003,
+      "devMints": 1,
+      "botHoldersCount": 1,
+      "devFundedAt": "2026-09-27T07:17:03Z",
+      "bundlerStats": {
+        "totalBundles": 1,
+        "totalNativeVol": 8.207407,
+        "holdingPctATH": 3.812
+      },
+      "iconReused": true
+    },
+    "primaryTwitter": {
+      "handle": "ai6agent",
+      "followerCount": 126,
+      "followingCount": 4,
+      "type": "user"
+    },
+    "organicScore": 0,
+    "organicScoreLabel": "low",
+    "tags": [
+      "unknown",
+      "token-2022"
+    ],
+    "createdAt": "2026-09-28T20:09:32Z",
+    "fdv": 3435.5017743904846,
+    "mcap": 3435.5017743904846,
+    "usdPrice": 0.0000034355017743904846,
+    "priceBlockId": 451430393,
+    "liquidity": 3608.349080932671,
+    "stats5m": {
+      "priceChange": -1.1952037316538784,
+      "holderChange": -16.666666666666664,
+      "liquidityChange": -0.9506997153678552,
+      "volumeChange": 133.30379326068478,
+      "sellVolume": 31.96797365724172,
+      "numSells": 1,
+      "numTraders": 1
+    },
+    "stats1h": {
+      "priceChange": -44.62126010889006,
+      "holderChange": -83.33333333333334,
+      "liquidityChange": -33.529302555860404,
+      "buyVolume": 15685.533168671333,
+      "sellVolume": 15636.763384670829,
+      "buyOrganicVolume": 207.98433430634924,
+      "sellOrganicVolume": 155.04411416595008,
+      "numBuys": 295,
+      "numSells": 290,
+      "numTraders": 216,
+      "numNetBuyers": 14
+    },
+    "stats6h": {
+      "priceChange": -44.62126010889006,
+      "holderChange": -83.33333333333334,
+      "liquidityChange": -33.529302555860404,
+      "buyVolume": 15685.533168671333,
+      "sellVolume": 15636.763384670829,
+      "buyOrganicVolume": 207.98433430634924,
+      "sellOrganicVolume": 155.04411416595008,
+      "numBuys": 295,
+      "numSells": 290,
+      "numTraders": 216,
+      "numNetBuyers": 14
+    },
+    "stats24h": {
+      "priceChange": -44.62126010889006,
+      "holderChange": -83.33333333333334,
+      "liquidityChange": -33.529302555860404,
+      "buyVolume": 15685.533168671333,
+      "sellVolume": 15636.763384670829,
+      "buyOrganicVolume": 207.98433430634924,
+      "sellOrganicVolume": 155.04411416595008,
+      "numBuys": 295,
+      "numSells": 290,
+      "numTraders": 216,
+      "numNetBuyers": 14
+    },
+    "fees": 2.0413380789999995,
+    "bondingCurve": 1.693571526748705,
+    "updatedAt": "2026-09-28T20:46:17.745587791Z"
+  },
+  {
+    "id": "HcKBvtPXcBK4mY35pQT1SAr6jueEhp3bhc8Be25qpump",
+    "name": "AI6 agent",
+    "symbol": "Ai6",
+    "icon": "https://gmgn.ai/external-res/24faceba7755754916c2761cb93ab05c_v2.webp",
+    "decimals": 6,
+    "dev": "BKbQ2tW51xZ6wx4U4xQvLc1MbWhuDrCh97chbm4JLz96",
+    "circSupply": 1000000000,
+    "totalSupply": 1000000000,
+    "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "launchpad": "pump.fun",
+    "firstPool": {
+      "id": "HcKBvtPXcBK4mY35pQT1SAr6jueEhp3bhc8Be25qpump",
+      "createdAt": "2026-09-26T14:13:40Z"
+    },
+    "holderCount": 1,
+    "audit": {
+      "mintAuthorityDisabled": true,
+      "freezeAuthorityDisabled": true,
+      "devMints": 1
+    },
+    "organicScore": 0,
+    "organicScoreLabel": "low",
+    "tags": [
+      "unknown",
+      "token-2022"
+    ],
+    "createdAt": "2026-09-26T14:13:40Z",
+    "fdv": 3392.9010137457662,
+    "mcap": 3392.9010137457662,
+    "usdPrice": 0.0000033929010137457663,
+    "priceBlockId": 450699660,
+    "liquidity": 3628.8678327844773,
+    "stats24h": {
+      "priceChange": -46.4066889304912,
+      "holderChange": -98.68421052631578,
+      "liquidityChange": -40.37049579849991,
+      "buyVolume": 4888.585359766141,
+      "sellVolume": 4889.198331881489,
+      "buyOrganicVolume": 145.82442994010813,
+      "sellOrganicVolume": 77.80450052168202,
+      "numBuys": 152,
+      "numSells": 184,
+      "numTraders": 150,
+      "numNetBuyers": 8
+    },
+    "fees": 0.25511692,
+    "bondingCurve": 0,
+    "updatedAt": "2026-09-27T04:03:49.738294986Z"
+  }
+]

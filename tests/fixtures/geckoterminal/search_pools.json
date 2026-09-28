@@ -1,0 +1,359 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/search/pools?query=CLONES&network=solana&include=base_token,quote_token,dex&page=1",
+    "http_status": 200,
+    "fetched_at": "2026-09-28T20:48:08.534Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "MISS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:48:08 GMT",
+      "etag": "W/\"576b5fae2b65618937a98984f3750ba9\"",
+      "vary": "Accept, Origin, accept-encoding",
+      "x-runtime": "0.214433"
+    },
+    "trimmed": "arrays trimmed to <=3 items; included[] filtered to referenced ids"
+  },
+  "data": [
+    {
+      "id": "solana_CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs",
+      "type": "pool",
+      "attributes": {
+        "base_token_price_usd": "0.000966164171756035297348513131780882811138630714719635554986319872",
+        "base_token_price_native_currency": "0.00000864808691843979",
+        "quote_token_price_usd": "118.668099019919976877545137743911444881230746624",
+        "quote_token_price_native_currency": "1.0",
+        "base_token_price_quote_token": "0.000008648086918",
+        "quote_token_price_base_token": "115632.510337952",
+        "address": "CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs",
+        "name": "CLONES / SOL",
+        "pool_created_at": "2026-09-28T19:58:37Z",
+        "fdv_usd": "966164.1718",
+        "market_cap_usd": null,
+        "price_change_percentage": {
+          "m5": "6.24",
+          "m15": "-8.703",
+          "m30": "47.6",
+          "h1": "2661.06",
+          "h6": "2661.06",
+          "h24": "2661.06"
+        },
+        "transactions": {
+          "m5": {
+            "buys": 630,
+            "sells": 472,
+            "buyers": 85,
+            "sellers": 80
+          },
+          "m15": {
+            "buys": 2650,
+            "sells": 2051,
+            "buyers": 101,
+            "sellers": 97
+          },
+          "m30": {
+            "buys": 5114,
+            "sells": 4116,
+            "buyers": 110,
+            "sellers": 104
+          },
+          "h1": {
+            "buys": 10299,
+            "sells": 6809,
+            "buyers": 2125,
+            "sellers": 115
+          },
+          "h6": {
+            "buys": 10299,
+            "sells": 6809,
+            "buyers": 2125,
+            "sellers": 115
+          },
+          "h24": {
+            "buys": 10299,
+            "sells": 6809,
+            "buyers": 2125,
+            "sellers": 115
+          }
+        },
+        "volume_usd": {
+          "m5": "347458.166366589",
+          "m15": "1463495.15219207",
+          "m30": "2831175.12426143",
+          "h1": "4366349.15575799",
+          "h6": "4366349.15575799",
+          "h24": "4366349.15575799"
+        },
+        "reserve_in_usd": "90737.0343"
+      },
+      "relationships": {
+        "base_token": {
+          "data": {
+            "id": "solana_5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs",
+            "type": "token"
+          }
+        },
+        "quote_token": {
+          "data": {
+            "id": "solana_So11111111111111111111111111111111111111112",
+            "type": "token"
+          }
+        },
+        "dex": {
+          "data": {
+            "id": "pumpswap",
+            "type": "dex"
+          }
+        }
+      }
+    },
+    {
+      "id": "solana_3hAJsk3dyaGApDYz2UHLRoRAXmVmqaw4xunBoDDoCWnn",
+      "type": "pool",
+      "attributes": {
+        "base_token_price_usd": "0.0000885517539039803127833726341466560379521289307008288036358316032",
+        "base_token_price_native_currency": "0.000000728931482947592",
+        "quote_token_price_usd": "118.668099019919976877545137743911444881230746624",
+        "quote_token_price_native_currency": "1.0",
+        "base_token_price_quote_token": "0.0000007289314829",
+        "quote_token_price_base_token": "1371871.05152364",
+        "address": "3hAJsk3dyaGApDYz2UHLRoRAXmVmqaw4xunBoDDoCWnn",
+        "name": "CLONES / SOL",
+        "pool_created_at": "2026-09-28T19:45:58Z",
+        "fdv_usd": "87928.8617999999",
+        "market_cap_usd": null,
+        "price_change_percentage": {
+          "m5": "20.061",
+          "m15": "-54.582",
+          "m30": "-54.357",
+          "h1": "1.536",
+          "h6": "89.54",
+          "h24": "89.54"
+        },
+        "transactions": {
+          "m5": {
+            "buys": 231,
+            "sells": 168,
+            "buyers": 130,
+            "sellers": 137
+          },
+          "m15": {
+            "buys": 1160,
+            "sells": 1001,
+            "buyers": 552,
+            "sellers": 667
+          },
+          "m30": {
+            "buys": 2616,
+            "sells": 2033,
+            "buyers": 1137,
+            "sellers": 1150
+          },
+          "h1": {
+            "buys": 8734,
+            "sells": 7101,
+            "buyers": 3225,
+            "sellers": 2910
+          },
+          "h6": {
+            "buys": 10489,
+            "sells": 8375,
+            "buyers": 3816,
+            "sellers": 3269
+          },
+          "h24": {
+            "buys": 10489,
+            "sells": 8375,
+            "buyers": 3816,
+            "sellers": 3269
+          }
+        },
+        "volume_usd": {
+          "m5": "16272.8572433338",
+          "m15": "117431.229611353",
+          "m30": "265913.894195064",
+          "h1": "1015467.75060912",
+          "h6": "1196499.33937257",
+          "h24": "1196499.33937257"
+        },
+        "reserve_in_usd": "26716.7432"
+      },
+      "relationships": {
+        "base_token": {
+          "data": {
+            "id": "solana_4akevTN2EaqUKDT2jhcRH4oRk5cppwRdaE5MGoT8pump",
+            "type": "token"
+          }
+        },
+        "quote_token": {
+          "data": {
+            "id": "solana_So11111111111111111111111111111111111111112",
+            "type": "token"
+          }
+        },
+        "dex": {
+          "data": {
+            "id": "pumpswap",
+            "type": "dex"
+          }
+        }
+      }
+    },
+    {
+      "id": "solana_BLiKs8ugA56NGB3zM4QMo2V4Y6nGcaYxgN255MmVR8VS",
+      "type": "pool",
+      "attributes": {
+        "base_token_price_usd": "0.000132097859135928720801802486108273997348145328535335719918839808",
+        "base_token_price_native_currency": "0.00000116855072426668",
+        "quote_token_price_usd": "118.668099019919976877545137743911444881230746624",
+        "quote_token_price_native_currency": "1.0",
+        "base_token_price_quote_token": "0.000001168550724",
+        "quote_token_price_base_token": "855760.883317707",
+        "address": "BLiKs8ugA56NGB3zM4QMo2V4Y6nGcaYxgN255MmVR8VS",
+        "name": "CATCLONES / SOL",
+        "pool_created_at": "2026-09-28T20:43:27Z",
+        "fdv_usd": "134447.508067339",
+        "market_cap_usd": null,
+        "price_change_percentage": {
+          "m5": "-15.722",
+          "m15": "56.563",
+          "m30": "56.563",
+          "h1": "56.563",
+          "h6": "56.563",
+          "h24": "56.563"
+        },
+        "transactions": {
+          "m5": {
+            "buys": 348,
+            "sells": 117,
+            "buyers": 326,
+            "sellers": 25
+          },
+          "m15": {
+            "buys": 515,
+            "sells": 176,
+            "buyers": 455,
+            "sellers": 39
+          },
+          "m30": {
+            "buys": 515,
+            "sells": 176,
+            "buyers": 455,
+            "sellers": 39
+          },
+          "h1": {
+            "buys": 515,
+            "sells": 176,
+            "buyers": 455,
+            "sellers": 39
+          },
+          "h6": {
+            "buys": 515,
+            "sells": 176,
+            "buyers": 455,
+            "sellers": 39
+          },
+          "h24": {
+            "buys": 515,
+            "sells": 176,
+            "buyers": 455,
+            "sellers": 39
+          }
+        },
+        "volume_usd": {
+          "m5": "96178.8567064267",
+          "m15": "142706.302289719",
+          "m30": "142706.302289719",
+          "h1": "142706.302289719",
+          "h6": "142706.302289719",
+          "h24": "142706.302289719"
+        },
+        "reserve_in_usd": "34404.1247"
+      },
+      "relationships": {
+        "base_token": {
+          "data": {
+            "id": "solana_GKokAG4oSBvTjPpKYyktPm5SgdhQ5Y4zJ3AnUEFpump",
+            "type": "token"
+          }
+        },
+        "quote_token": {
+          "data": {
+            "id": "solana_So11111111111111111111111111111111111111112",
+            "type": "token"
+          }
+        },
+        "dex": {
+          "data": {
+            "id": "pumpswap",
+            "type": "dex"
+          }
+        }
+      }
+    }
+  ],
+  "included": [
+    {
+      "id": "solana_5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs",
+      "type": "token",
+      "attributes": {
+        "address": "5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs",
+        "name": "CLONES",
+        "symbol": "CLONES",
+        "decimals": 6,
+        "image_url": "https://assets.geckoterminal.com/m5v6ax92hlhxjon5fog7ak1zwx78",
+        "coingecko_coin_id": null
+      }
+    },
+    {
+      "id": "solana_So11111111111111111111111111111111111111112",
+      "type": "token",
+      "attributes": {
+        "address": "So11111111111111111111111111111111111111112",
+        "name": "Wrapped SOL",
+        "symbol": "SOL",
+        "decimals": 9,
+        "image_url": "https://coin-images.coingecko.com/coins/images/21629/large/solana.jpg?1696520989",
+        "coingecko_coin_id": "wrapped-solana"
+      }
+    },
+    {
+      "id": "pumpswap",
+      "type": "dex",
+      "attributes": {
+        "name": "PumpSwap"
+      }
+    },
+    {
+      "id": "solana_4akevTN2EaqUKDT2jhcRH4oRk5cppwRdaE5MGoT8pump",
+      "type": "token",
+      "attributes": {
+        "address": "4akevTN2EaqUKDT2jhcRH4oRk5cppwRdaE5MGoT8pump",
+        "name": "CLONES",
+        "symbol": "CLONES",
+        "decimals": 6,
+        "image_url": "https://assets.geckoterminal.com/d1b1pkufupwlosnb1b7843b5yu8u",
+        "coingecko_coin_id": null
+      }
+    },
+    {
+      "id": "solana_GKokAG4oSBvTjPpKYyktPm5SgdhQ5Y4zJ3AnUEFpump",
+      "type": "token",
+      "attributes": {
+        "address": "GKokAG4oSBvTjPpKYyktPm5SgdhQ5Y4zJ3AnUEFpump",
+        "name": "CAT CLONES",
+        "symbol": "CATCLONES",
+        "decimals": 6,
+        "image_url": "https://assets.geckoterminal.com/69mh08f5fhyz6468gkz1w6skkl4v",
+        "coingecko_coin_id": null
+      }
+    }
+  ]
+}

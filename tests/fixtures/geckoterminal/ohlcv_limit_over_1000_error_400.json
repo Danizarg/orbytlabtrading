@@ -1,0 +1,32 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/networks/solana/pools/HnhpJPJgBG2KwniMTNW8cVBHvk1hFog3RC3kjnyc23tD/ohlcv/minute?aggregate=1&limit=1001",
+    "http_status": 400,
+    "fetched_at": "2026-09-28T20:49:45.840Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "BYPASS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:49:45 GMT",
+      "vary": "Accept, Origin, accept-encoding",
+      "x-runtime": "0.013657"
+    },
+    "trimmed": "untrimmed error body"
+  },
+  "errors": [
+    {
+      "status": "400",
+      "title": "Invalid limit. must be positive integer less than or equal to 1000"
+    }
+  ],
+  "meta": {
+    "ref_id": "9aba4fd6-26e6-4c73-950b-79774730e64c"
+  }
+}

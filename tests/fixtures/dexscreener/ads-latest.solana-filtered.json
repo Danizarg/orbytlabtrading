@@ -1,0 +1,26 @@
+[
+  {
+    "url": "https://dexscreener.com/solana/vsofhxns5hyy97kczh99stugd6b5ut9qjvahkd3xvr4",
+    "chainId": "solana",
+    "tokenAddress": "VSoFhXns5HYy97KcZH99stUGD6B5UT9QJvAHKd3Xvr4",
+    "date": "2026-09-28T08:52:04.413Z",
+    "type": "tokenAd",
+    "impressions": 100000
+  },
+  {
+    "url": "https://dexscreener.com/solana/g4pzq4ttmjenqfrsymumxn919nteka8hxuezjrmr9btr",
+    "chainId": "solana",
+    "tokenAddress": "G4PZQ4tTMjeNQfrSyMUMXN919NTeKA8hXUEzjRmr9btr",
+    "date": "2026-09-26T03:20:31.725Z",
+    "type": "tokenAd",
+    "impressions": 10000
+  },
+  {
+    "url": "https://dexscreener.com/solana/bdzae3t7uu59pbvdbhzvzh3ywrrpo4oprxdv4npdpump",
+    "chainId": "solana",
+    "tokenAddress": "BdzaE3T7uU59pBVDBHZVZh3yWrrpo4oPrXdv4nPDpump",
+    "date": "2026-09-26T00:38:00.205Z",
+    "type": "tokenAd",
+    "impressions": 10000
+  }
+]

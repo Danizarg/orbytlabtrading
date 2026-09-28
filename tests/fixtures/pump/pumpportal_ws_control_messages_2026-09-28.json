@@ -1,0 +1,94 @@
+{
+  "_note": "REAL messages captured 2026-09-28 from wss://pumpportal.fun/api/data (no api-key, Origin: https://www.orbytai.org). sent = client frames; received = server control/ack/error frames in order.",
+  "sent": [
+    {
+      "t_ms_since_connect": 403,
+      "sent": {
+        "method": "subscribeNewToken"
+      }
+    },
+    {
+      "t_ms_since_connect": 404,
+      "sent": {
+        "method": "subscribeMigration"
+      }
+    },
+    {
+      "t_ms_since_connect": 35057,
+      "sent": {
+        "method": "subscribeTokenTrade",
+        "keys": [
+          "8wUTj3HnaCWx2QAuBVUY1tR32duy86WaowTxevQypump",
+          "CYYeqG2i7h5jbdbzocMrxTj4LSQ6QmGe1aVdawSCpump",
+          "GJJ6TADXU6TdvBR8siNxLqYzbcwc6ixgxFCg7Ystpump",
+          "FFzTy32bZbPA8zRLbbiWoNzW2emGv86tUxaoqhz1pump"
+        ]
+      }
+    },
+    {
+      "t_ms_since_connect": 65070,
+      "sent": {
+        "method": "subscribeAccountTrade",
+        "keys": [
+          "AV7PjXHL5JXZ1YoYRoN9Dsstg1x2UciBupMCXcJP8gUz"
+        ]
+      }
+    },
+    {
+      "t_ms_since_connect": 65071,
+      "sent": {
+        "method": "unsubscribeNewToken"
+      }
+    },
+    {
+      "t_ms_since_connect": 65071,
+      "sent": {
+        "method": "unsubscribeMigration"
+      }
+    }
+  ],
+  "received": [
+    {
+      "t_ms_since_connect": 519,
+      "phase": "p1",
+      "message": {
+        "message": "Successfully subscribed to token creation events."
+      }
+    },
+    {
+      "t_ms_since_connect": 519,
+      "phase": "p1",
+      "message": {
+        "message": "Subscribed to 'migration' events."
+      }
+    },
+    {
+      "t_ms_since_connect": 35167,
+      "phase": "p2",
+      "message": {
+        "message": "'subscribeTokenTrade' and 'subscribeAccountTrade' methods are only available when connecting with an API key funded with at least 0.02 SOL."
+      }
+    },
+    {
+      "t_ms_since_connect": 65180,
+      "phase": "p3",
+      "message": {
+        "message": "'subscribeTokenTrade' and 'subscribeAccountTrade' methods are only available when connecting with an API key funded with at least 0.02 SOL."
+      }
+    },
+    {
+      "t_ms_since_connect": 65184,
+      "phase": "p3",
+      "message": {
+        "message": "Unsubscribed."
+      }
+    },
+    {
+      "t_ms_since_connect": 65184,
+      "phase": "p3",
+      "message": {
+        "errors": "Invalid message. 'method' must be 'subscribeNewToken', 'subscribeTokenTrade', 'subscribeAccountTrade', or 'subscribeMigration'."
+      }
+    }
+  ]
+}

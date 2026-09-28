@@ -1,0 +1,103 @@
+@import 'tailwindcss';
+
+/*
+ * ORBYT design tokens. Dark terminal palette carried over from the original
+ * Orbyt AI Trading site (purple brand, mint/rose market colours).
+ */
+@theme {
+  --color-bg: #0b0c10;
+  --color-panel: #101116;
+  --color-panel-2: #15161d;
+  --color-panel-3: #1b1c25;
+  --color-hover: #1f2029;
+  --color-line: #22232c;
+  --color-line-strong: #30323e;
+  --color-fg: #ececf4;
+  --color-fg-dim: #b4b6c6;
+  --color-muted: #7d8092;
+  --color-faint: #575a69;
+  --color-brand: #a895ff;
+  --color-brand-strong: #c2b3ff;
+  --color-brand-soft: #231e33;
+  --color-up: #69e6b2;
+  --color-up-soft: #12291f;
+  --color-down: #fa788d;
+  --color-down-soft: #2e161c;
+  --color-warn: #f5c26b;
+  --color-warn-soft: #2d2415;
+  --color-info: #7cb4ff;
+
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-dm-sans), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  --animate-flash-up: flash-up 900ms ease-out;
+  --animate-flash-down: flash-down 900ms ease-out;
+  --animate-slide-in: slide-in 350ms ease-out;
+  --animate-pulse-dot: pulse-dot 1.6s ease-in-out infinite;
+
+  @keyframes flash-up {
+    0% { background-color: rgb(105 230 178 / 0.22); }
+    100% { background-color: transparent; }
+  }
+  @keyframes flash-down {
+    0% { background-color: rgb(250 120 141 / 0.22); }
+    100% { background-color: transparent; }
+  }
+  @keyframes slide-in {
+    0% { opacity: 0; transform: translateY(-6px); background-color: rgb(168 149 255 / 0.14); }
+    100% { opacity: 1; transform: translateY(0); background-color: transparent; }
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+  body {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: rgb(168 149 255 / 0.35);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2c2e39 transparent;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}

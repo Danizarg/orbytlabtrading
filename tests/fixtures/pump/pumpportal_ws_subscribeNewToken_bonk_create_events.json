@@ -1,0 +1,17 @@
+{
+  "_note": "REAL subscribeNewToken event with pool=bonk delivered on the SAME free stream (2026-09-28). Different schema: no name/symbol/uri/bondingCurveKey/vTokens/vSol; has tokensInPool,newTokenBalance. WARNING: cross-check with Jupiter tokens/v2/search showed this mint (Xs3oZw...) is SpaceX xStock (SPCXx, 8 decimals, created 2026-06-01, verified) - i.e. NOT a new launch; the event is a pool creation mis-labelled as create. Validate pool=bonk creates before listing them as new pairs.",
+  "events": [
+    {
+      "signature": "5h7BsoZq91g8TXfVErMetWBa2x2VZDVEzgNvvi7b2p5qfpzKXT2iG3jgTRNHBfPiE8SieG3rXonybgtLsxL3q4BY",
+      "traderPublicKey": "AV7PjXHL5JXZ1YoYRoN9Dsstg1x2UciBupMCXcJP8gUz",
+      "txType": "create",
+      "mint": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+      "tokensInPool": 3.4863311,
+      "initialBuy": 999999996.5136689,
+      "solAmount": 0,
+      "newTokenBalance": 0.18462955,
+      "marketCapSol": 6036.297011249067,
+      "pool": "bonk"
+    }
+  ]
+}

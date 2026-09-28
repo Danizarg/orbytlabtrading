@@ -1,0 +1,70 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/networks/solana/pools/HnhpJPJgBG2KwniMTNW8cVBHvk1hFog3RC3kjnyc23tD/ohlcv/hour?aggregate=4&limit=1000&before_timestamp=1788000000&currency=usd&token=base",
+    "http_status": 200,
+    "fetched_at": "2026-09-28T20:49:58.597Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "MISS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:49:58 GMT",
+      "etag": "W/\"6a15b90e8c47945854957520d37476db\"",
+      "vary": "Accept, Origin, accept-encoding",
+      "x-runtime": "0.363288"
+    },
+    "trimmed": "ohlcv_list trimmed to first 3 of 1000 returned candles (newest first)"
+  },
+  "data": {
+    "id": "6f9c7377-e521-44f9-a45f-64dbc983a1fb",
+    "type": "ohlcv_request_response",
+    "attributes": {
+      "ohlcv_list": [
+        [
+          1787990400,
+          0.1751198642905537,
+          0.17693987804124084,
+          0.17086036286327788,
+          0.1725165253380124,
+          149638.26712827824
+        ],
+        [
+          1787976000,
+          0.17295862268830992,
+          0.17685261882918854,
+          0.1708716821715679,
+          0.1751198642905537,
+          112258.58382419801
+        ],
+        [
+          1787961600,
+          0.17137157256534055,
+          0.1746984126631781,
+          0.16965621924733715,
+          0.17295862268830992,
+          91571.76588108258
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "base": {
+      "name": "Collector Crypt",
+      "symbol": "CARDS",
+      "coingecko_coin_id": "collector-crypt",
+      "address": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp"
+    },
+    "quote": {
+      "name": "USD Coin",
+      "symbol": "USDC",
+      "coingecko_coin_id": "usd-coin",
+      "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+    }
+  }
+}

@@ -1,0 +1,234 @@
+[
+  {
+    "chainId": "solana",
+    "dexId": "raydium",
+    "url": "https://dexscreener.com/solana/32vjneqs23a7vhh6g8gcuwem14ffssj1kdzz59hz5nyk",
+    "pairAddress": "32VjnEqs23a7vhH6G8Gcuwem14ffsSj1kdZz59HZ5NYK",
+    "labels": [
+      "CPMM"
+    ],
+    "baseToken": {
+      "address": "5H1jkA7erRxwD8uqH8KimMD74ctjUYBd32rbp2jubonk",
+      "name": "UnicornSheepDog1",
+      "symbol": "USD1"
+    },
+    "quoteToken": {
+      "address": "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB",
+      "name": "World Liberty Financial USD",
+      "symbol": "USD1"
+    },
+    "priceNative": "0.00001680",
+    "priceUsd": "0.00001680",
+    "txns": {
+      "m5": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h1": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h6": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h24": {
+        "buys": 0,
+        "sells": 2
+      }
+    },
+    "volume": {
+      "h24": 0.37,
+      "h6": 0,
+      "h1": 0,
+      "m5": 0
+    },
+    "priceChange": {
+      "h24": -0.01
+    },
+    "liquidity": {
+      "usd": 13232.02,
+      "base": 393698261,
+      "quote": 6616.01125
+    },
+    "fdv": 16805,
+    "marketCap": 16805,
+    "pairCreatedAt": 1758718640000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/88c7efc55f586fe98ede60bdf0663b3d561ab05d9baed9d7e727e6221d7e1544?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/d67b9f14672af470efdd9c4f0b8673cfc71704bb39006441ff5b950422b9bc3c?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/5H1jkA7erRxwD8uqH8KimMD74ctjUYBd32rbp2jubonk?timestamp=1790628300000",
+      "websites": [
+        {
+          "url": "https://www.theunicornsheep.dog/",
+          "label": "Website"
+        }
+      ],
+      "socials": [
+        {
+          "url": "https://x.com/UnicornSheepDog",
+          "type": "twitter"
+        },
+        {
+          "url": "https://t.me/UnicornSheepDog1",
+          "type": "telegram"
+        }
+      ]
+    }
+  },
+  {
+    "chainId": "solana",
+    "dexId": "meteora",
+    "url": "https://dexscreener.com/solana/dxemtgibytzdzbz2q35spi7mzmddfavnrkmbqhr41xzn",
+    "pairAddress": "DXEmTgibytZDZBz2q35sPi7MZmdDfAVnrkmbQHR41XZN",
+    "labels": [
+      "DYN2"
+    ],
+    "baseToken": {
+      "address": "5H1jkA7erRxwD8uqH8KimMD74ctjUYBd32rbp2jubonk",
+      "name": "UnicornSheepDog1",
+      "symbol": "USD1"
+    },
+    "quoteToken": {
+      "address": "5555CWncDKY3Y4g7HACehpkySCPqqNw1UodHDAmT5o7R",
+      "name": "Jörmungandr!",
+      "symbol": "OUROBOROS"
+    },
+    "priceNative": "0.004772",
+    "priceUsd": "0.00001733",
+    "txns": {
+      "m5": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h1": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h6": {
+        "buys": 0,
+        "sells": 1
+      },
+      "h24": {
+        "buys": 0,
+        "sells": 2
+      }
+    },
+    "volume": {
+      "h24": 0.46,
+      "h6": 0.29,
+      "h1": 0,
+      "m5": 0
+    },
+    "priceChange": {
+      "h6": 3.13,
+      "h24": 3.13
+    },
+    "liquidity": {
+      "usd": 96.77,
+      "base": 2799007,
+      "quote": 13276
+    },
+    "fdv": 17329,
+    "marketCap": 17329,
+    "pairCreatedAt": 1773914546000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/88c7efc55f586fe98ede60bdf0663b3d561ab05d9baed9d7e727e6221d7e1544?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/d67b9f14672af470efdd9c4f0b8673cfc71704bb39006441ff5b950422b9bc3c?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/5H1jkA7erRxwD8uqH8KimMD74ctjUYBd32rbp2jubonk?timestamp=1790628300000",
+      "websites": [
+        {
+          "url": "https://www.theunicornsheep.dog/",
+          "label": "Website"
+        }
+      ],
+      "socials": [
+        {
+          "url": "https://x.com/UnicornSheepDog",
+          "type": "twitter"
+        },
+        {
+          "url": "https://t.me/UnicornSheepDog1",
+          "type": "telegram"
+        }
+      ]
+    }
+  },
+  {
+    "chainId": "solana",
+    "dexId": "meteora",
+    "url": "https://dexscreener.com/solana/grfkhaccsjgejdfg89mnbhk2ktqgmpmue4cey6xesoce",
+    "pairAddress": "GrfKHACcSJgeJDFG89mNbHK2kTQGmpMUE4CEY6XesocE",
+    "labels": [
+      "DYN2"
+    ],
+    "baseToken": {
+      "address": "5H1jkA7erRxwD8uqH8KimMD74ctjUYBd32rbp2jubonk",
+      "name": "UnicornSheepDog1",
+      "symbol": "USD1"
+    },
+    "quoteToken": {
+      "address": "3F4aTvvQBdtWj672kNYRenMtMG4jwQE63redg2cN4tCm",
+      "name": "Skol! (Wormhole)",
+      "symbol": "SKOL"
+    },
+    "priceNative": "0.0003862",
+    "priceUsd": "0.00001652",
+    "txns": {
+      "m5": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h1": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h6": {
+        "buys": 0,
+        "sells": 0
+      },
+      "h24": {
+        "buys": 2,
+        "sells": 1
+      }
+    },
+    "volume": {
+      "h24": 0.53,
+      "h6": 0,
+      "h1": 0,
+      "m5": 0
+    },
+    "priceChange": {
+      "h24": 0.41
+    },
+    "liquidity": {
+      "usd": 75.19,
+      "base": 2280523,
+      "quote": 877.279
+    },
+    "fdv": 16511,
+    "marketCap": 16511,
+    "pairCreatedAt": 1769933159000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/88c7efc55f586fe98ede60bdf0663b3d561ab05d9baed9d7e727e6221d7e1544?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/d67b9f14672af470efdd9c4f0b8673cfc71704bb39006441ff5b950422b9bc3c?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/5H1jkA7erRxwD8uqH8KimMD74ctjUYBd32rbp2jubonk?timestamp=1790628300000",
+      "websites": [
+        {
+          "url": "https://www.theunicornsheep.dog/",
+          "label": "Website"
+        }
+      ],
+      "socials": [
+        {
+          "url": "https://x.com/UnicornSheepDog",
+          "type": "twitter"
+        },
+        {
+          "url": "https://t.me/UnicornSheepDog1",
+          "type": "telegram"
+        }
+      ]
+    }
+  }
+]

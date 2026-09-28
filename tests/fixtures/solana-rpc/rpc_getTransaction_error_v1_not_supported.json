@@ -1,0 +1,22 @@
+{
+  "_note": "Live error 2026-09-28 when requesting a v1 transaction with maxSupportedTransactionVersion:0",
+  "request": {
+    "method": "getTransaction",
+    "params": [
+      "HrZ6CFEg9rzqG6ernMN2dwxyyvUCswL8NQtYWGqJ8PVJixyxEcDD6jSHVUeguaBiyQCRkN6dcsPkWZmdBdDAhUX",
+      {
+        "encoding": "jsonParsed",
+        "maxSupportedTransactionVersion": 0,
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "error": {
+      "code": -32015,
+      "message": "Transaction version (1) is not supported by the requesting client. Please try the request again with the following configuration parameter: \"maxSupportedTransactionVersion\": 1"
+    },
+    "id": 1
+  }
+}

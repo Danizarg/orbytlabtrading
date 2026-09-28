@@ -1,0 +1,132 @@
+{
+  "_note": "REAL responses 2026-09-28 from api.mainnet-beta.solana.com",
+  "getTokenSupply_mayhem_coin_GJNV": {
+    "request": {
+      "method": "getTokenSupply",
+      "params": [
+        "GJNVxxuSGZ4FQYVBrYYEQe4DFDithm9LopFno2XKpump"
+      ]
+    },
+    "http_status": 200,
+    "headers": {
+      "access-control-allow-headers": "authorization, *",
+      "access-control-allow-methods": "OPTIONS, POST, GET",
+      "access-control-allow-origin": "backend_traffic",
+      "access-control-max-age": "86400",
+      "x-ratelimit-conn-limit": "40",
+      "x-ratelimit-conn-remaining": "39",
+      "x-ratelimit-connrate-limit": "40",
+      "x-ratelimit-connrate-remaining": "39",
+      "x-ratelimit-endpoint-limit": "unlimited",
+      "x-ratelimit-endpoint-remaining": "-16602",
+      "x-ratelimit-method-limit": "150",
+      "x-ratelimit-method-remaining": "149",
+      "x-ratelimit-pubsub-limit": "10",
+      "x-ratelimit-pubsub-remaining": "10",
+      "x-ratelimit-rps-limit": "250",
+      "x-ratelimit-rps-remaining": "249",
+      "x-ratelimit-tier": "free"
+    },
+    "body": {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.3.0",
+          "slot": 451431807
+        },
+        "value": {
+          "amount": "2000000000000000",
+          "decimals": 6,
+          "uiAmount": 2000000000,
+          "uiAmountString": "2000000000"
+        }
+      },
+      "id": 1
+    }
+  },
+  "getTokenSupply_regular_coin_dB98": {
+    "request": {
+      "method": "getTokenSupply",
+      "params": [
+        "dB98iqo6YQ2p1X1KtvmLRDFmtQauEiA2CtxL8cvpump"
+      ]
+    },
+    "http_status": 200,
+    "headers": {
+      "access-control-allow-headers": "authorization, *",
+      "access-control-allow-methods": "OPTIONS, POST, GET",
+      "access-control-allow-origin": "backend_traffic",
+      "access-control-max-age": "86400",
+      "x-ratelimit-conn-limit": "40",
+      "x-ratelimit-conn-remaining": "39",
+      "x-ratelimit-connrate-limit": "40",
+      "x-ratelimit-connrate-remaining": "39",
+      "x-ratelimit-endpoint-limit": "unlimited",
+      "x-ratelimit-endpoint-remaining": "-16585",
+      "x-ratelimit-method-limit": "150",
+      "x-ratelimit-method-remaining": "148",
+      "x-ratelimit-pubsub-limit": "10",
+      "x-ratelimit-pubsub-remaining": "10",
+      "x-ratelimit-rps-limit": "250",
+      "x-ratelimit-rps-remaining": "248",
+      "x-ratelimit-tier": "free"
+    },
+    "body": {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.3.0",
+          "slot": 451431808
+        },
+        "value": {
+          "amount": "1000000000000000",
+          "decimals": 6,
+          "uiAmount": 1000000000,
+          "uiAmountString": "1000000000"
+        }
+      },
+      "id": 1
+    }
+  },
+  "getAccountInfo_with_browser_Origin_header": {
+    "request": {
+      "method": "getAccountInfo",
+      "params": [
+        "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf",
+        {
+          "encoding": "base64"
+        }
+      ],
+      "extra_header": {
+        "Origin": "https://www.orbytai.org"
+      }
+    },
+    "http_status": 403,
+    "headers": {
+      "access-control-allow-methods": "POST, GET, OPTIONS",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "86400",
+      "x-ratelimit-conn-limit": "",
+      "x-ratelimit-conn-remaining": "",
+      "x-ratelimit-connrate-limit": "",
+      "x-ratelimit-connrate-remaining": "",
+      "x-ratelimit-endpoint-limit": "",
+      "x-ratelimit-endpoint-remaining": "",
+      "x-ratelimit-method-limit": "",
+      "x-ratelimit-method-remaining": "",
+      "x-ratelimit-pubsub-limit": "",
+      "x-ratelimit-pubsub-remaining": "",
+      "x-ratelimit-rps-limit": "",
+      "x-ratelimit-rps-remaining": "",
+      "x-ratelimit-tier": ""
+    },
+    "body": {
+      "jsonrpc": "2.0",
+      "error": {
+        "code": 403,
+        "message": "Access forbidden"
+      },
+      "id": 1
+    }
+  }
+}

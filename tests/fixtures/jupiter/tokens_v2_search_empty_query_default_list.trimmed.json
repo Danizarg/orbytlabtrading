@@ -1,0 +1,201 @@
+[
+  {
+    "id": "So11111111111111111111111111111111111111112",
+    "name": "Wrapped SOL",
+    "symbol": "SOL",
+    "icon": "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
+    "decimals": 9,
+    "circSupply": 587781633.5011806,
+    "totalSupply": 634840344.7209167,
+    "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "holderCount": 3820662,
+    "fdv": 75286179833.05675,
+    "mcap": 69705452922.64209,
+    "usdPrice": 118.59072987264763,
+    "priceBlockId": 451432059,
+    "liquidity": 954541869.2971042,
+    "stats5m": {
+      "priceChange": -0.08837498378233462,
+      "liquidityChange": -0.01721084157160698,
+      "volumeChange": 3.2506412969069887,
+      "buyVolume": 7354982.877190786,
+      "sellVolume": 7714751.860471792,
+      "buyOrganicVolume": 128017.00015214918,
+      "sellOrganicVolume": 138071.6787475168,
+      "numBuys": 64043,
+      "numSells": 89500,
+      "numTraders": 38405,
+      "numOrganicBuyers": 648,
+      "numNetBuyers": 7004
+    },
+    "stats1h": {
+      "priceChange": 0.10949424214657034,
+      "liquidityChange": 0.1259082774688403,
+      "volumeChange": -2.897139284381663,
+      "buyVolume": 91185707.80787103,
+      "sellVolume": 91540400.86925764,
+      "buyOrganicVolume": 1595277.3020326328,
+      "sellOrganicVolume": 1582434.2272094637,
+      "numBuys": 762515,
+      "numSells": 996704,
+      "numTraders": 198647,
+      "numOrganicBuyers": 1579,
+      "numNetBuyers": 36545
+    },
+    "stats6h": {
+      "priceChange": 0.6704228073950184,
+      "liquidityChange": -0.07803305602428416,
+      "volumeChange": 7.582005007304347,
+      "buyVolume": 601973258.7884496,
+      "sellVolume": 605591389.3309879,
+      "buyOrganicVolume": 10711131.371128874,
+      "sellOrganicVolume": 10534346.943980724,
+      "numBuys": 4649749,
+      "numSells": 6343440,
+      "numTraders": 549107,
+      "numOrganicBuyers": 5500,
+      "numNetBuyers": 46688
+    },
+    "stats24h": {
+      "priceChange": -3.328301614816102,
+      "liquidityChange": -1.7147527969344476,
+      "volumeChange": 4.527123535881588,
+      "buyVolume": 2188679147.989494,
+      "sellVolume": 2229227534.629559,
+      "buyOrganicVolume": 38498978.944312334,
+      "sellOrganicVolume": 40771853.56155581,
+      "numBuys": 16407930,
+      "numSells": 22485812,
+      "numTraders": 1047882,
+      "numOrganicBuyers": 11884,
+      "numNetBuyers": 81313
+    },
+    "firstPool": {
+      "id": "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2",
+      "createdAt": "2021-03-29T10:05:48Z"
+    },
+    "apy": {
+      "jupEarn": 3.8625321400776125
+    },
+    "audit": {
+      "mintAuthorityDisabled": true,
+      "freezeAuthorityDisabled": true,
+      "topHoldersPercentage": 0.580364331199791,
+      "devMints": 1
+    },
+    "organicScore": 99.29618813893212,
+    "organicScoreLabel": "high",
+    "isVerified": true,
+    "tags": [
+      "community",
+      "moonshot-verified",
+      "strict",
+      "verified",
+      "major"
+    ],
+    "createdAt": "2024-06-05T08:55:25.527Z",
+    "updatedAt": "2026-09-28T20:53:33.487028051Z"
+  },
+  {
+    "id": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "name": "USD Coin",
+    "symbol": "USDC",
+    "icon": "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
+    "decimals": 6,
+    "twitter": "https://twitter.com/circle",
+    "discord": "https://discord.com/invite/buildoncircle",
+    "website": "https://www.circle.com/en/usdc",
+    "dev": "5TYZChz7APFopR5QirD5of4rQj1p9AXxeSAg6JndBdGj",
+    "circSupply": 8310758739.416223,
+    "totalSupply": 8310758739.416223,
+    "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "mintAuthority": "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG",
+    "freezeAuthority": "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar",
+    "holderCount": 5248202,
+    "fdv": 8309970862.409311,
+    "mcap": 8309970862.409311,
+    "usdPrice": 0.9999051979450234,
+    "priceBlockId": 451432059,
+    "liquidity": 473183202.5491626,
+    "stats5m": {
+      "priceChange": -0.000044102844285888684,
+      "liquidityChange": 0.06560712449315585,
+      "volumeChange": -6.286554221613421,
+      "buyVolume": 3392726.993415815,
+      "sellVolume": 3020789.64082584,
+      "buyOrganicVolume": 166155.60756917542,
+      "sellOrganicVolume": 119221.04715867003,
+      "numBuys": 14992,
+      "numSells": 15176,
+      "numTraders": 4640,
+      "numOrganicBuyers": 192,
+      "numNetBuyers": 799
+    },
+    "stats1h": {
+      "priceChange": -0.0009414132279850398,
+      "liquidityChange": 0.770508694942041,
+      "volumeChange": -9.766057218688157,
+      "buyVolume": 40469362.86376674,
+      "sellVolume": 41356757.80744041,
+      "buyOrganicVolume": 1745891.20856183,
+      "sellOrganicVolume": 1900060.0226955342,
+      "numBuys": 165113,
+      "numSells": 181140,
+      "numTraders": 26236,
+      "numOrganicBuyers": 624,
+      "numNetBuyers": 4714
+    },
+    "stats6h": {
+      "priceChange": 0.0021993539563445277,
+      "liquidityChange": 0.8828374182222589,
+      "volumeChange": 8.27352371403145,
+      "buyVolume": 307753468.42626953,
+      "sellVolume": 306296838.0100433,
+      "buyOrganicVolume": 13525552.236241652,
+      "sellOrganicVolume": 16111649.283662567,
+      "numBuys": 1169006,
+      "numSells": 1266555,
+      "numTraders": 97778,
+      "numOrganicBuyers": 2717,
+      "numNetBuyers": 13058
+    },
+    "stats24h": {
+      "priceChange": 0.006097695395418495,
+      "liquidityChange": -0.8736835899403177,
+      "volumeChange": 58.03733445429182,
+      "buyVolume": 1075608895.8785572,
+      "sellVolume": 1050878804.9916515,
+      "buyOrganicVolume": 51681848.379190736,
+      "sellOrganicVolume": 52484200.526725724,
+      "numBuys": 4192475,
+      "numSells": 4606230,
+      "numTraders": 222859,
+      "numOrganicBuyers": 7086,
+      "numNetBuyers": 30648
+    },
+    "firstPool": {
+      "id": "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2",
+      "createdAt": "2021-03-29T10:05:48Z"
+    },
+    "apy": {
+      "jupEarn": 4.937717106456496
+    },
+    "audit": {
+      "topHoldersPercentage": 24.81574094171956,
+      "devBalancePercentage": 2.411309921073183e-7,
+      "devMints": 1
+    },
+    "organicScore": 100,
+    "organicScoreLabel": "high",
+    "isVerified": true,
+    "tags": [
+      "community",
+      "moonshot-verified",
+      "strict",
+      "verified",
+      "stable"
+    ],
+    "createdAt": "2024-06-05T08:55:25.527Z",
+    "updatedAt": "2026-09-28T20:53:33.487117937Z"
+  }
+]

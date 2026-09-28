@@ -1,0 +1,202 @@
+[
+  {
+    "id": "ATsnpDf6tahuXJCz5MxZWV1CbTJ7qigRVbFoi379FHVD",
+    "name": "Snowflake",
+    "symbol": "FLAKE",
+    "decimals": 6,
+    "dev": "8ScbJvHvekKi8RerdkuqPDM3JCNEAmwZrwWyQGeuq2HC",
+    "circSupply": 1000000000,
+    "totalSupply": 1000000000,
+    "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "launchpad": "pump.fun",
+    "holderCount": 6,
+    "fdv": 3689.0319064805035,
+    "mcap": 3689.0319064805035,
+    "usdPrice": 0.0000036890319064805037,
+    "priceBlockId": 451433726,
+    "liquidity": 3756.185095670127,
+    "stats5m": {
+      "priceChange": 0.668632934249741,
+      "buyVolume": 193.08647842115738,
+      "numBuys": 17,
+      "numTraders": 5,
+      "numNetBuyers": 5
+    },
+    "stats1h": {
+      "priceChange": 0.668632934249741,
+      "buyVolume": 193.08647842115738,
+      "numBuys": 17,
+      "numTraders": 5,
+      "numNetBuyers": 5
+    },
+    "stats6h": {
+      "priceChange": 0.668632934249741,
+      "buyVolume": 193.08647842115738,
+      "numBuys": 17,
+      "numTraders": 5,
+      "numNetBuyers": 5
+    },
+    "stats24h": {
+      "priceChange": 0.668632934249741,
+      "buyVolume": 193.08647842115738,
+      "numBuys": 17,
+      "numTraders": 5,
+      "numNetBuyers": 5
+    },
+    "firstPool": {
+      "id": "ATsnpDf6tahuXJCz5MxZWV1CbTJ7qigRVbFoi379FHVD",
+      "createdAt": "2026-09-28T21:00:58Z"
+    },
+    "audit": {
+      "mintAuthorityDisabled": true,
+      "freezeAuthorityDisabled": true,
+      "devBalancePercentage": 0.03531347272009999,
+      "devMints": 1
+    },
+    "organicScore": 0,
+    "organicScoreLabel": "low",
+    "tags": [
+      "unknown",
+      "token-2022"
+    ],
+    "createdAt": "2026-09-28T21:00:58Z",
+    "updatedAt": "2026-09-28T21:01:01.786080441Z"
+  },
+  {
+    "id": "HYHtQudUCPzNEf3eb3bceErbPzpE5fCjhRvULPgmPwe1",
+    "name": "1% and a dream",
+    "symbol": "DREAM",
+    "icon": "https://gateway.irys.xyz/CBysZbNUabxwEVNU7hkSR5mFeJTvpRiXowtx3r7najFa",
+    "decimals": 6,
+    "dev": "853Wepgh8EfcjdYBrXHT1x27SaaqkhN841vjmqGigeix",
+    "circSupply": 1000000000,
+    "totalSupply": 1000000000,
+    "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "launchpad": "met-dbc",
+    "metaLaunchpad": "met-dbc",
+    "partnerConfig": "72EacE7PkPtpy2jDf9TJcRKDj1aGLEhGevpPN1FZsAH5",
+    "holderCount": 5,
+    "fdv": 107.33404743504705,
+    "mcap": 107.33404743504705,
+    "usdPrice": 1.0733404743504705e-7,
+    "priceBlockId": 451433706,
+    "liquidity": 4.124202128631788,
+    "stats5m": {
+      "liquidityChange": 312.36866989642976,
+      "buyVolume": 4.124202128631788,
+      "numBuys": 4,
+      "numTraders": 4,
+      "numNetBuyers": 4
+    },
+    "stats1h": {
+      "liquidityChange": 312.36866989642976,
+      "buyVolume": 4.124202128631788,
+      "numBuys": 4,
+      "numTraders": 4,
+      "numNetBuyers": 4
+    },
+    "stats6h": {
+      "liquidityChange": 312.36866989642976,
+      "buyVolume": 4.124202128631788,
+      "numBuys": 4,
+      "numTraders": 4,
+      "numNetBuyers": 4
+    },
+    "stats24h": {
+      "liquidityChange": 312.36866989642976,
+      "buyVolume": 4.124202128631788,
+      "numBuys": 4,
+      "numTraders": 4,
+      "numNetBuyers": 4
+    },
+    "firstPool": {
+      "id": "HYHtQudUCPzNEf3eb3bceErbPzpE5fCjhRvULPgmPwe1",
+      "createdAt": "2026-09-28T21:00:41Z"
+    },
+    "audit": {
+      "mintAuthorityDisabled": true,
+      "freezeAuthorityDisabled": true,
+      "devMints": 14
+    },
+    "organicScore": 0,
+    "organicScoreLabel": "low",
+    "tags": [
+      "unknown",
+      "token-2022"
+    ],
+    "createdAt": "2026-09-28T21:00:41Z",
+    "updatedAt": "2026-09-28T21:00:54.784905135Z"
+  },
+  {
+    "id": "BwPsb7EAFb5e1yB9Aj9fse7QvHjJwWvyRntwuVnqwSiN",
+    "name": "pupi world",
+    "symbol": "PUPI",
+    "decimals": 6,
+    "dev": "EDcQogzqUfP3LQrYY7KqbsS85LrA6JSWBj3Lj6WHLMd6",
+    "circSupply": 1000000000,
+    "totalSupply": 1000000000,
+    "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "launchpad": "stonkfun",
+    "metaLaunchpad": "raydium-launchlab",
+    "partnerConfig": "4E876qZTE9FJMrBzgVtBrSrzz2TLivB5Y5QXPjB4gZL7",
+    "holderCount": 1,
+    "fdv": 3333.062619703189,
+    "mcap": 3333.062619703189,
+    "usdPrice": 0.000003333062619703189,
+    "priceBlockId": 451433608,
+    "liquidity": 2.376444583330799e-7,
+    "stats5m": {
+      "priceChange": -3.1457308334558607,
+      "holderChange": -50,
+      "buyVolume": 470.5360274994981,
+      "sellVolume": 458.8461475910186,
+      "numBuys": 2,
+      "numSells": 4,
+      "numTraders": 2
+    },
+    "stats1h": {
+      "priceChange": -3.1457308334558607,
+      "holderChange": -50,
+      "buyVolume": 470.5360274994981,
+      "sellVolume": 458.8461475910186,
+      "numBuys": 2,
+      "numSells": 4,
+      "numTraders": 2
+    },
+    "stats6h": {
+      "priceChange": -3.1457308334558607,
+      "holderChange": -50,
+      "buyVolume": 470.5360274994981,
+      "sellVolume": 458.8461475910186,
+      "numBuys": 2,
+      "numSells": 4,
+      "numTraders": 2
+    },
+    "stats24h": {
+      "priceChange": -3.1457308334558607,
+      "holderChange": -50,
+      "buyVolume": 470.5360274994981,
+      "sellVolume": 458.8461475910186,
+      "numBuys": 2,
+      "numSells": 4,
+      "numTraders": 2
+    },
+    "firstPool": {
+      "id": "BwPsb7EAFb5e1yB9Aj9fse7QvHjJwWvyRntwuVnqwSiN",
+      "createdAt": "2026-09-28T21:00:21Z"
+    },
+    "audit": {
+      "mintAuthorityDisabled": true,
+      "freezeAuthorityDisabled": true,
+      "devMints": 1
+    },
+    "organicScore": 0,
+    "organicScoreLabel": "low",
+    "tags": [
+      "unknown",
+      "token-2022"
+    ],
+    "createdAt": "2026-09-28T21:00:21Z",
+    "updatedAt": "2026-09-28T21:00:33.623026608Z"
+  }
+]

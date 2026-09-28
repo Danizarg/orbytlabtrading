@@ -1,0 +1,64 @@
+// Derive the canonical PumpSwap pool of a graduated pump.fun coin and price it from vault balances.
+// Seeds from pump IDL `migrate`: pool_authority = PDA(["pool-authority", mint], PUMP)
+//                               pool = PDA(["pool", u16le(0), pool_authority, mint, WSOL], PUMP_AMM)
+import { writeFileSync } from 'node:fs';
+import { PublicKey } from '@solana/web3.js';
+
+const RPC = 'https://api.mainnet-beta.solana.com';
+const PUMP = new PublicKey('6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P');
+const AMM = new PublicKey('pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA');
+const WSOL = new PublicKey('So11111111111111111111111111111111111111112');
+const mints = process.argv.slice(3);
+const outPath = process.argv[2];
+
+const rpc = async (method, params) => {
+  const r = await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
+  const j = await r.json(); if (j.error) throw new Error(JSON.stringify(j.error)); return j.result;
+};
+const pk = (b, o) => new PublicKey(b.subarray(o, o + 32)).toBase58();
+
+function decodePool(b) {
+  let o = 8; const out = {};
+  out.pool_bump = b[o]; o += 1;
+  out.index = b.readUInt16LE(o); o += 2;
+  for (const f of ['creator', 'base_mint', 'quote_mint', 'lp_mint', 'pool_base_token_account', 'pool_quote_token_account']) { out[f] = pk(b, o); o += 32; }
+  out.lp_supply = b.readBigUInt64LE(o).toString(); o += 8;
+  if (b.length >= o + 32) { out.coin_creator = pk(b, o); o += 32; }
+  if (b.length >= o + 1) { out.is_mayhem_mode = !!b[o]; o += 1; }
+  if (b.length >= o + 1) { out.is_cashback_coin = !!b[o]; o += 1; }
+  if (b.length >= o + 16) { const lo = b.readBigUInt64LE(o), hi = b.readBigInt64LE(o + 8); out.virtual_quote_reserves = ((hi << 64n) + lo).toString(); o += 16; }
+  if (b.length >= o + 8) { out.creator_fee_bps = b.readBigUInt64LE(o).toString(); o += 8; }
+  if (b.length >= o + 1) { out.can_edit_creator_fee = !!b[o]; o += 1; }
+  if (b.length >= o + 1) { out.is_holder_reward = !!b[o]; o += 1; }
+  out._account_data_len = b.length; out._decoded_bytes = o;
+  return out;
+}
+
+const results = [];
+for (const m of mints) {
+  const mint = new PublicKey(m);
+  const [poolAuthority] = PublicKey.findProgramAddressSync([Buffer.from('pool-authority'), mint.toBuffer()], PUMP);
+  const idx = Buffer.alloc(2); idx.writeUInt16LE(0);
+  const [pool] = PublicKey.findProgramAddressSync([Buffer.from('pool'), idx, poolAuthority.toBuffer(), mint.toBuffer(), WSOL.toBuffer()], AMM);
+  const acc = await rpc('getAccountInfo', [pool.toBase58(), { encoding: 'base64' }]);
+  const res = { mint: m, pool_authority: poolAuthority.toBase58(), derived_pool: pool.toBase58() };
+  if (!acc.value) { res.pool_account = null; results.push(res); continue; }
+  res.pool_owner = acc.value.owner;
+  const p = decodePool(Buffer.from(acc.value.data[0], 'base64'));
+  res.decoded_pool = p;
+  res.pool_creator_equals_pool_authority = p.creator === poolAuthority.toBase58(); // "canonical pool" test from pump fee docs
+  await new Promise((r) => setTimeout(r, 400));
+  const vaults = await rpc('getMultipleAccounts', [[p.pool_base_token_account, p.pool_quote_token_account], { encoding: 'jsonParsed' }]);
+  const base = vaults.value[0].data.parsed.info.tokenAmount, quote = vaults.value[1].data.parsed.info.tokenAmount;
+  res.vaults = { base_tokenAmount: base, quote_tokenAmount: quote, base_token_program: vaults.value[0].owner };
+  const effQuote = Number(quote.amount) + Number(p.virtual_quote_reserves || 0);
+  res.derived = {
+    price_sol_per_token: (effQuote / 10 ** quote.decimals) / (Number(base.amount) / 10 ** base.decimals),
+    effective_quote_reserves_sol: effQuote / 10 ** quote.decimals,
+  };
+  results.push(res);
+  await new Promise((r) => setTimeout(r, 400));
+}
+const out = { _note: 'REAL mainnet data ' + new Date().toISOString() + ' via ' + RPC + '. Pool layout from pump-public-docs idl/pump_amm.json.', pools: results };
+writeFileSync(outPath, JSON.stringify(out, null, 2));
+console.log(JSON.stringify(out, null, 2));

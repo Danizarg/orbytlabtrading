@@ -1,0 +1,29 @@
+{
+  "_meta": {
+    "source": "Moralis Solana gateway probes without X-API-Key, captured 2026-09-28T20:56Z (Origin: https://www.orbytai.org)",
+    "note": "Genuine responses. Live endpoints answer 401 'Missing api key.'; the pump.fun discovery and Solana holders endpoints (removed 2026-07-31 per Moralis changelog) answer 404 even before auth."
+  },
+  "live_endpoint_no_key": {
+    "request": "GET https://solana-gateway.moralis.io/token/mainnet/So11111111111111111111111111111111111111112/price",
+    "http_status": 401,
+    "headers": { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*" },
+    "body": {"message":"Missing api key."}
+  },
+  "removed_pumpfun_new": {
+    "request": "GET https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new?limit=2",
+    "http_status": 404,
+    "headers": { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*" },
+    "body": {"message":"Resource not found. Please check out the API documentation: https://docs.moralis.com/"}
+  },
+  "removed_solana_holders": {
+    "request": "GET https://solana-gateway.moralis.io/token/mainnet/holders/So11111111111111111111111111111111111111112",
+    "http_status": 404,
+    "headers": { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*" },
+    "body": {"message":"Resource not found. Please check out the API documentation: https://docs.moralis.com/"}
+  },
+  "cors_preflight": {
+    "request": "OPTIONS https://solana-gateway.moralis.io/token/mainnet/So111.../price (Access-Control-Request-Headers: x-api-key)",
+    "http_status": 204,
+    "headers": { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,HEAD,PUT,PATCH,POST,DELETE", "access-control-allow-headers": "x-api-key" }
+  }
+}

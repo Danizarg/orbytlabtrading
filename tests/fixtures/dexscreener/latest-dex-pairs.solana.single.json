@@ -1,0 +1,151 @@
+{
+  "schemaVersion": "1.0.0",
+  "pairs": [
+    {
+      "chainId": "solana",
+      "dexId": "pumpswap",
+      "url": "https://dexscreener.com/solana/g5sqxttksjv5wcj47y4cprduqspczy7jclubq7myxhj9",
+      "pairAddress": "G5sqxttkSJv5wcj47Y4CPRDuqsPCZy7jCLuBQ7MyXhJ9",
+      "baseToken": {
+        "address": "B5R7Xt9pXBHDAs2jkJ67nM2Wwch1napBsdzMxk56qpJk",
+        "name": "pumpfun(sol/xmr-deployed(main)",
+        "symbol": "p/xmr"
+      },
+      "quoteToken": {
+        "address": "So11111111111111111111111111111111111111112",
+        "name": "Wrapped SOL",
+        "symbol": "SOL"
+      },
+      "priceNative": "0.0000003067",
+      "priceUsd": "0.00003642",
+      "txns": {
+        "m5": {
+          "buys": 65,
+          "sells": 43
+        },
+        "h1": {
+          "buys": 1877,
+          "sells": 1419
+        },
+        "h6": {
+          "buys": 3363,
+          "sells": 2547
+        },
+        "h24": {
+          "buys": 3363,
+          "sells": 2547
+        }
+      },
+      "volume": {
+        "h24": 322544.44,
+        "h6": 322544.44,
+        "h1": 183305.94,
+        "m5": 5735.62
+      },
+      "priceChange": {
+        "m5": -10.86,
+        "h1": 6.6,
+        "h6": -25.31,
+        "h24": -25.31
+      },
+      "liquidity": {
+        "usd": 15587.09,
+        "base": 242596104,
+        "quote": 56.837
+      },
+      "fdv": 34883,
+      "marketCap": 34883,
+      "pairCreatedAt": 1790624360000,
+      "info": {
+        "imageUrl": "https://cdn.dexscreener.com/cms/images/sUB77XQ-gjOovXz0?width=800&height=800&quality=95&format=auto",
+        "header": "https://cdn.dexscreener.com/cms/images/_KvdvhcUL59zKCLe?width=1500&height=500&quality=95&format=auto",
+        "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/B5R7Xt9pXBHDAs2jkJ67nM2Wwch1napBsdzMxk56qpJk?timestamp=1790628300000",
+        "websites": [
+          {
+            "url": "https://white-near-flamingo-764.mypinata.cloud/ipfs/bafkreidtgsmdi27asz42whrppdhftl6mtmqjearipl3iswdieqdmrjon5e",
+            "label": "Website"
+          }
+        ],
+        "socials": [
+          {
+            "url": "https://x.com/CryptoMagnus10/status/2104670980920750383",
+            "type": "twitter"
+          }
+        ]
+      }
+    }
+  ],
+  "pair": {
+    "chainId": "solana",
+    "dexId": "pumpswap",
+    "url": "https://dexscreener.com/solana/g5sqxttksjv5wcj47y4cprduqspczy7jclubq7myxhj9",
+    "pairAddress": "G5sqxttkSJv5wcj47Y4CPRDuqsPCZy7jCLuBQ7MyXhJ9",
+    "baseToken": {
+      "address": "B5R7Xt9pXBHDAs2jkJ67nM2Wwch1napBsdzMxk56qpJk",
+      "name": "pumpfun(sol/xmr-deployed(main)",
+      "symbol": "p/xmr"
+    },
+    "quoteToken": {
+      "address": "So11111111111111111111111111111111111111112",
+      "name": "Wrapped SOL",
+      "symbol": "SOL"
+    },
+    "priceNative": "0.0000003067",
+    "priceUsd": "0.00003642",
+    "txns": {
+      "m5": {
+        "buys": 65,
+        "sells": 43
+      },
+      "h1": {
+        "buys": 1877,
+        "sells": 1419
+      },
+      "h6": {
+        "buys": 3363,
+        "sells": 2547
+      },
+      "h24": {
+        "buys": 3363,
+        "sells": 2547
+      }
+    },
+    "volume": {
+      "h24": 322544.44,
+      "h6": 322544.44,
+      "h1": 183305.94,
+      "m5": 5735.62
+    },
+    "priceChange": {
+      "m5": -10.86,
+      "h1": 6.6,
+      "h6": -25.31,
+      "h24": -25.31
+    },
+    "liquidity": {
+      "usd": 15587.09,
+      "base": 242596104,
+      "quote": 56.837
+    },
+    "fdv": 34883,
+    "marketCap": 34883,
+    "pairCreatedAt": 1790624360000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/sUB77XQ-gjOovXz0?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/_KvdvhcUL59zKCLe?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/B5R7Xt9pXBHDAs2jkJ67nM2Wwch1napBsdzMxk56qpJk?timestamp=1790628300000",
+      "websites": [
+        {
+          "url": "https://white-near-flamingo-764.mypinata.cloud/ipfs/bafkreidtgsmdi27asz42whrppdhftl6mtmqjearipl3iswdieqdmrjon5e",
+          "label": "Website"
+        }
+      ],
+      "socials": [
+        {
+          "url": "https://x.com/CryptoMagnus10/status/2104670980920750383",
+          "type": "twitter"
+        }
+      ]
+    }
+  }
+}

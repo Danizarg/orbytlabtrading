@@ -1,0 +1,23 @@
+{
+  "_note": "Live response 2026-09-28T20:49:24.282Z from https://api.mainnet-beta.solana.com. value is lamports (1 SOL = 1e9).",
+  "request": {
+    "method": "getBalance",
+    "params": [
+      "DHpRzLRuACd8i1BVGZh8rGQWaQsP7b4spBZFWbzW5WSb",
+      {
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "result": {
+      "context": {
+        "apiVersion": "4.3.0",
+        "slot": 451431128
+      },
+      "value": 9759034646
+    },
+    "id": 1
+  }
+}

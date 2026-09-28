@@ -1,0 +1,17 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/networks/solana/tokens/5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs?include=top_pools&include_composition=true",
+    "http_status": 429,
+    "fetched_at": "2026-09-28T20:46:15.121Z",
+    "response_headers": {
+      "cache-control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+      "content-type": "application/json",
+      "retry-after": "0"
+    },
+    "note": "Body copied verbatim from the logged live response (raw file was later overwritten by a successful retry). NOTE: no access-control-allow-origin header on 429, so a browser sees it as a CORS failure. Same body observed at 20:53:52Z, 20:57:05Z and 20:59:05Z."
+  },
+  "status": {
+    "error_code": 429,
+    "error_message": "You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans for higher rate limits and use the onchain endpoints: https://docs.coingecko.com/reference/endpoint-overview"
+  }
+}

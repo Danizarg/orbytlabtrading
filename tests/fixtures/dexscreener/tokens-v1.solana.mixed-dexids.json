@@ -1,0 +1,284 @@
+[
+  {
+    "chainId": "solana",
+    "dexId": "pumpfun",
+    "url": "https://dexscreener.com/solana/ffk6jzjsqnbgrprdtuchneulxyk4mgtn6sidfpwc8ysb",
+    "pairAddress": "FFk6jzJsqNBgRprDTUChNeULXyK4mGtN6SidFPWc8YSB",
+    "baseToken": {
+      "address": "FtvDpvtyVepN9YFhwymwQRC3oEuig57kiDxBSMgkpump",
+      "name": "KolPacks",
+      "symbol": "KolPacks"
+    },
+    "quoteToken": {
+      "address": "So11111111111111111111111111111111111111112",
+      "name": "Wrapped SOL",
+      "symbol": "SOL"
+    },
+    "priceNative": "0.00000002954",
+    "priceUsd": "0.000003509",
+    "txns": {
+      "m5": {
+        "buys": 85,
+        "sells": 174
+      },
+      "h1": {
+        "buys": 735,
+        "sells": 628
+      },
+      "h6": {
+        "buys": 735,
+        "sells": 628
+      },
+      "h24": {
+        "buys": 735,
+        "sells": 628
+      }
+    },
+    "volume": {
+      "h24": 62302.97,
+      "h6": 62302.97,
+      "h1": 62302.97,
+      "m5": 10320.25
+    },
+    "priceChange": {
+      "m5": -78.19,
+      "h1": -22.3,
+      "h6": -22.3,
+      "h24": -22.3
+    },
+    "fdv": 3509.12,
+    "marketCap": 3509.12,
+    "pairCreatedAt": 1790627602000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/6SFwyNnBHnkT080I?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/suURhMcadHh8s-yR?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/FtvDpvtyVepN9YFhwymwQRC3oEuig57kiDxBSMgkpump?timestamp=1790628300000",
+      "websites": [
+        {
+          "url": "https://kolpacks.fun",
+          "label": "Website"
+        }
+      ],
+      "socials": []
+    }
+  },
+  {
+    "chainId": "solana",
+    "dexId": "pumpswap",
+    "url": "https://dexscreener.com/solana/g5sqxttksjv5wcj47y4cprduqspczy7jclubq7myxhj9",
+    "pairAddress": "G5sqxttkSJv5wcj47Y4CPRDuqsPCZy7jCLuBQ7MyXhJ9",
+    "baseToken": {
+      "address": "B5R7Xt9pXBHDAs2jkJ67nM2Wwch1napBsdzMxk56qpJk",
+      "name": "pumpfun(sol/xmr-deployed(main)",
+      "symbol": "p/xmr"
+    },
+    "quoteToken": {
+      "address": "So11111111111111111111111111111111111111112",
+      "name": "Wrapped SOL",
+      "symbol": "SOL"
+    },
+    "priceNative": "0.0000003605",
+    "priceUsd": "0.00004282",
+    "txns": {
+      "m5": {
+        "buys": 120,
+        "sells": 54
+      },
+      "h1": {
+        "buys": 2026,
+        "sells": 1535
+      },
+      "h6": {
+        "buys": 3352,
+        "sells": 2534
+      },
+      "h24": {
+        "buys": 3352,
+        "sells": 2534
+      }
+    },
+    "volume": {
+      "h24": 321032.34,
+      "h6": 321032.34,
+      "h1": 196206.6,
+      "m5": 12083.14
+    },
+    "priceChange": {
+      "m5": 98.24,
+      "h1": -12.98,
+      "h6": -12.2,
+      "h24": -12.2
+    },
+    "liquidity": {
+      "usd": 17075.29,
+      "base": 223728810,
+      "quote": 63.1103
+    },
+    "fdv": 41006,
+    "marketCap": 41006,
+    "pairCreatedAt": 1790624360000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/sUB77XQ-gjOovXz0?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/_KvdvhcUL59zKCLe?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/B5R7Xt9pXBHDAs2jkJ67nM2Wwch1napBsdzMxk56qpJk?timestamp=1790628300000",
+      "websites": [
+        {
+          "url": "https://white-near-flamingo-764.mypinata.cloud/ipfs/bafkreidtgsmdi27asz42whrppdhftl6mtmqjearipl3iswdieqdmrjon5e",
+          "label": "Website"
+        }
+      ],
+      "socials": [
+        {
+          "url": "https://x.com/CryptoMagnus10/status/2104670980920750383",
+          "type": "twitter"
+        }
+      ]
+    }
+  },
+  {
+    "chainId": "solana",
+    "dexId": "meteoradbc",
+    "url": "https://dexscreener.com/solana/42v7dbnwh16m8arkdcg815hmsuwkqxwr8waeutct7zjk",
+    "pairAddress": "42v7DBnWH16M8ARkDcg815hmsuwKQxWR8waEUtct7ZjK",
+    "baseToken": {
+      "address": "Dvx47FCHEa77thmxtgzfyx35vq3cPvy2D7mZfpCzVwUP",
+      "name": "1% can change your life",
+      "symbol": "1%"
+    },
+    "quoteToken": {
+      "address": "So11111111111111111111111111111111111111112",
+      "name": "Wrapped SOL",
+      "symbol": "SOL"
+    },
+    "priceNative": "0.0000002220",
+    "priceUsd": "0.00002638",
+    "txns": {
+      "m5": {
+        "buys": 140,
+        "sells": 44
+      },
+      "h1": {
+        "buys": 380,
+        "sells": 92
+      },
+      "h6": {
+        "buys": 380,
+        "sells": 92
+      },
+      "h24": {
+        "buys": 380,
+        "sells": 92
+      }
+    },
+    "volume": {
+      "h24": 20464.66,
+      "h6": 20464.66,
+      "h1": 20464.66,
+      "m5": 10704.66
+    },
+    "priceChange": {
+      "m5": 63.31,
+      "h1": 424,
+      "h6": 424,
+      "h24": 424
+    },
+    "fdv": 26380.14,
+    "marketCap": 26380.14,
+    "pairCreatedAt": 1790627663000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/YXp-LBGnld3vX7tc?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/ODvNyQZPUp5Ttc-G?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/Dvx47FCHEa77thmxtgzfyx35vq3cPvy2D7mZfpCzVwUP?timestamp=1790628300000",
+      "websites": [],
+      "socials": [
+        {
+          "url": "https://x.com/drilladev/status/2104670951585821040",
+          "type": "twitter"
+        }
+      ]
+    }
+  },
+  {
+    "chainId": "solana",
+    "dexId": "raydium",
+    "url": "https://dexscreener.com/solana/5hc8grucvlqqd8mw85ai1nv6v1tyua9a8hmt1qutna6",
+    "pairAddress": "5hc8GruCvLQQd8mw85Ai1nV6v1tyuA9a8HMt1quTNA6",
+    "labels": [
+      "CLMM"
+    ],
+    "baseToken": {
+      "address": "CS2T1HQRPCXaYR5V3SNDb5ceERwZg1Nb5uuw6Dg5hpsn",
+      "name": "The Whale Monkey",
+      "symbol": "$TWM$"
+    },
+    "quoteToken": {
+      "address": "So11111111111111111111111111111111111111112",
+      "name": "Wrapped SOL",
+      "symbol": "SOL"
+    },
+    "priceNative": "0.0000007836",
+    "priceUsd": "0.00009306",
+    "txns": {
+      "m5": {
+        "buys": 2,
+        "sells": 5
+      },
+      "h1": {
+        "buys": 42,
+        "sells": 61
+      },
+      "h6": {
+        "buys": 94,
+        "sells": 123
+      },
+      "h24": {
+        "buys": 223,
+        "sells": 293
+      }
+    },
+    "volume": {
+      "h24": 13080.49,
+      "h6": 5357.11,
+      "h1": 2273.76,
+      "m5": 150.58
+    },
+    "priceChange": {
+      "m5": -0.42,
+      "h1": -0.19,
+      "h6": 0.63,
+      "h24": -2.14
+    },
+    "liquidity": {
+      "usd": 45939.64,
+      "base": 246798801,
+      "quote": 193.4274
+    },
+    "fdv": 93064,
+    "marketCap": 93064,
+    "pairCreatedAt": 1783519177000,
+    "info": {
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/byY24WR4m2gs67Yc?width=800&height=800&quality=95&format=auto",
+      "header": "https://cdn.dexscreener.com/cms/images/A03ax6Da48tZ5LRT?width=1500&height=500&quality=95&format=auto",
+      "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/CS2T1HQRPCXaYR5V3SNDb5ceERwZg1Nb5uuw6Dg5hpsn?timestamp=1790628300000",
+      "websites": [
+        {
+          "url": "http://www.thewhalemonkey.com",
+          "label": "Website"
+        }
+      ],
+      "socials": [
+        {
+          "url": "https://x.com/TWM20724",
+          "type": "twitter"
+        },
+        {
+          "url": "https://t.me/thewhalemonkey",
+          "type": "telegram"
+        }
+      ]
+    },
+    "boosts": {
+      "active": 30
+    }
+  }
+]

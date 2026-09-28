@@ -1,0 +1,180 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/networks/solana/pools/CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs?include=base_token,quote_token,dex&include_volume_breakdown=true&include_composition=true",
+    "http_status": 200,
+    "fetched_at": "2026-09-28T20:45:53.071Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "MISS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:45:53 GMT",
+      "etag": "W/\"0155724ee2ec9ad35450cf30af85663f\"",
+      "vary": "Accept, Origin, accept-encoding",
+      "x-runtime": "0.080095"
+    },
+    "trimmed": "untrimmed"
+  },
+  "data": {
+    "id": "solana_CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs",
+    "type": "pool",
+    "attributes": {
+      "base_token_price_usd": "0.000916892312481002815581917050585391677766421884911919392848741178",
+      "base_token_price_native_currency": "0.00000790459821218359",
+      "base_token_balance": "46747372.785993",
+      "base_token_liquidity_usd": "43848.1540554146901893040085818866222052226925012998054",
+      "quote_token_price_usd": "118.738242161225618886967433278566259850591157466",
+      "quote_token_price_native_currency": "1.0",
+      "quote_token_balance": "354.987510031",
+      "quote_token_liquidity_usd": "42123.7842445900654108401488703498637831168992",
+      "base_token_price_quote_token": "0.000007904598212",
+      "quote_token_price_base_token": "126508.643849686",
+      "address": "CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs",
+      "name": "CLONES / SOL",
+      "pool_name": "CLONES / SOL",
+      "pool_fee_percentage": null,
+      "pool_created_at": "2026-09-28T19:58:37Z",
+      "fdv_usd": "935706.5355",
+      "market_cap_usd": null,
+      "price_change_percentage": {
+        "m5": "-19.43",
+        "m15": "70.78",
+        "m30": "-5.714",
+        "h1": "2574.02",
+        "h6": "2574.02",
+        "h24": "2574.02"
+      },
+      "transactions": {
+        "m5": {
+          "buys": 1007,
+          "sells": 787,
+          "buyers": 95,
+          "sellers": 90
+        },
+        "m15": {
+          "buys": 3102,
+          "sells": 2438,
+          "buyers": 103,
+          "sellers": 99
+        },
+        "m30": {
+          "buys": 5046,
+          "sells": 4105,
+          "buyers": 110,
+          "sellers": 104
+        },
+        "h1": {
+          "buys": 9689,
+          "sells": 6354,
+          "buyers": 2124,
+          "sellers": 115
+        },
+        "h6": {
+          "buys": 9689,
+          "sells": 6354,
+          "buyers": 2124,
+          "sellers": 115
+        },
+        "h24": {
+          "buys": 9689,
+          "sells": 6354,
+          "buyers": 2124,
+          "sellers": 115
+        }
+      },
+      "volume_usd": {
+        "m5": "574285.425681855",
+        "m15": "1693432.94498851",
+        "m30": "2793307.08465089",
+        "h1": "4029613.58936263",
+        "h6": "4029613.58936263",
+        "h24": "4029613.58936263"
+      },
+      "net_buy_volume_usd": {
+        "m5": "-3073.956831111",
+        "m15": "10064.721272432",
+        "m30": "1963.76355945",
+        "h1": "34033.65159597",
+        "h6": "34033.65159597",
+        "h24": "34033.65159597"
+      },
+      "buy_volume_usd": {
+        "m5": "285605.734425372",
+        "m15": "851748.833130471",
+        "m30": "1397635.42410517",
+        "h1": "2031823.6204793",
+        "h6": "2031823.6204793",
+        "h24": "2031823.6204793"
+      },
+      "sell_volume_usd": {
+        "m5": "288679.691256483",
+        "m15": "841684.111858039",
+        "m30": "1395671.66054572",
+        "h1": "1997789.96888333",
+        "h6": "1997789.96888333",
+        "h24": "1997789.96888333"
+      },
+      "reserve_in_usd": "85971.9383",
+      "locked_liquidity_percentage": "0.00000000284970451014351"
+    },
+    "relationships": {
+      "base_token": {
+        "data": {
+          "id": "solana_5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs",
+          "type": "token"
+        }
+      },
+      "quote_token": {
+        "data": {
+          "id": "solana_So11111111111111111111111111111111111111112",
+          "type": "token"
+        }
+      },
+      "dex": {
+        "data": {
+          "id": "pumpswap",
+          "type": "dex"
+        }
+      }
+    }
+  },
+  "included": [
+    {
+      "id": "solana_5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs",
+      "type": "token",
+      "attributes": {
+        "address": "5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs",
+        "name": "CLONES",
+        "symbol": "CLONES",
+        "decimals": 6,
+        "image_url": "https://assets.geckoterminal.com/m5v6ax92hlhxjon5fog7ak1zwx78",
+        "coingecko_coin_id": null
+      }
+    },
+    {
+      "id": "solana_So11111111111111111111111111111111111111112",
+      "type": "token",
+      "attributes": {
+        "address": "So11111111111111111111111111111111111111112",
+        "name": "Wrapped SOL",
+        "symbol": "SOL",
+        "decimals": 9,
+        "image_url": "https://coin-images.coingecko.com/coins/images/21629/large/solana.jpg?1696520989",
+        "coingecko_coin_id": "wrapped-solana"
+      }
+    },
+    {
+      "id": "pumpswap",
+      "type": "dex",
+      "attributes": {
+        "name": "PumpSwap"
+      }
+    }
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/networks/solana/pools/CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs/info?include=pool",
+    "http_status": 200,
+    "fetched_at": "2026-09-28T20:55:20.783Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "MISS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:55:20 GMT",
+      "etag": "W/\"1fa1d123e0f5352e4d47386005624252\"",
+      "vary": "Accept, Origin, accept-encoding",
+      "x-runtime": "0.134838"
+    },
+    "trimmed": "untrimmed (data[] = both tokens, quote first here)"
+  },
+  "data": [
+    {
+      "id": "solana_So11111111111111111111111111111111111111112",
+      "type": "token",
+      "attributes": {
+        "address": "So11111111111111111111111111111111111111112",
+        "name": "Wrapped SOL",
+        "symbol": "SOL",
+        "decimals": 9,
+        "image_url": "https://coin-images.coingecko.com/coins/images/21629/large/solana.jpg?1696520989",
+        "image": {
+          "thumb": "https://coin-images.coingecko.com/coins/images/21629/thumb/solana.jpg?1696520989",
+          "small": "https://coin-images.coingecko.com/coins/images/21629/small/solana.jpg?1696520989",
+          "large": "https://coin-images.coingecko.com/coins/images/21629/large/solana.jpg?1696520989"
+        },
+        "banner_image_url": null,
+        "coingecko_coin_id": "wrapped-solana",
+        "websites": [
+          "https://solana.com"
+        ],
+        "discord_url": "https://discordapp.com/invite/pquxPsq",
+        "farcaster_url": null,
+        "zora_url": null,
+        "telegram_handle": null,
+        "twitter_handle": "solana",
+        "description": "",
+        "gt_score": 84.93506493506494,
+        "gt_score_details": {
+          "pool": 65.714,
+          "transaction": 100,
+          "creation": 0,
+          "info": 100,
+          "holders": 93.75
+        },
+        "gt_verified": true,
+        "categories": [],
+        "gt_category_ids": [],
+        "holders": {
+          "count": 8461812,
+          "distribution_percentage": {
+            "top_10": "19.5139",
+            "11_20": "4.0173",
+            "21_40": "3.7011",
+            "rest": "72.7677"
+          },
+          "last_updated": "2026-09-28T20:50:03Z"
+        },
+        "mint_authority": "no",
+        "freeze_authority": "no",
+        "is_honeypot": "unknown",
+        "developer_address": null,
+        "developer_holding_percentage": null
+      },
+      "relationships": {
+        "pool": {
+          "data": {
+            "id": "solana_CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs",
+            "type": "pool"
+          }
+        }
+      }
+    },
+    {
+      "id": "solana_5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs",
+      "type": "token",
+      "attributes": {
+        "address": "5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs",
+        "name": "CLONES",
+        "symbol": "CLONES",
+        "decimals": 6,
+        "image_url": "https://assets.geckoterminal.com/m5v6ax92hlhxjon5fog7ak1zwx78",
+        "image": {
+          "thumb": "https://assets.geckoterminal.com/yqeklu1orv8s2g63526dwpe4bhlu",
+          "small": "https://assets.geckoterminal.com/0b434tfiv1z6kmqi1coq3nbupx8h",
+          "large": "https://assets.geckoterminal.com/m5v6ax92hlhxjon5fog7ak1zwx78"
+        },
+        "banner_image_url": null,
+        "coingecko_coin_id": null,
+        "websites": [
+          "https://yourclone.fun"
+        ],
+        "discord_url": null,
+        "farcaster_url": null,
+        "zora_url": null,
+        "telegram_handle": null,
+        "twitter_handle": "davdevsx/status/2104652942892794024",
+        "description": null,
+        "gt_score": 54.649350649350644,
+        "gt_score_details": {
+          "pool": 65.714,
+          "transaction": 100,
+          "creation": 0,
+          "info": 60,
+          "holders": 60
+        },
+        "gt_verified": false,
+        "categories": [],
+        "gt_category_ids": [],
+        "holders": {
+          "count": 2113,
+          "distribution_percentage": {
+            "top_10": "89.0668",
+            "11_20": "4.0654",
+            "21_40": "4.8878",
+            "rest": "1.98"
+          },
+          "last_updated": "2026-09-28T20:42:49Z"
+        },
+        "mint_authority": "no",
+        "freeze_authority": "no",
+        "is_honeypot": "unknown",
+        "developer_address": "9etxSKvGXhPKL1kGDnhrzXZE5yR6hQBpBvk5r36B6CmC",
+        "developer_holding_percentage": "20.66",
+        "launchpad_details": {
+          "graduation_percentage": 100,
+          "completed": true,
+          "completed_at": "2026-09-28T19:58:10.000Z",
+          "migrated_destination_pool_address": "GG6MBPb94r8dPfba9Fkrn5tyFPWeVZGd1VyBPxQKFSmg"
+        }
+      },
+      "relationships": {
+        "pool": {
+          "data": {
+            "id": "solana_CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs",
+            "type": "pool"
+          }
+        }
+      }
+    }
+  ],
+  "included": [
+    {
+      "id": "solana_CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs",
+      "type": "pool",
+      "attributes": {
+        "base_token_address": "5RJGBaFrTcTrmu5HuukxHxKeqpmRWf346YxQ1kXGetRs",
+        "quote_token_address": "So11111111111111111111111111111111111111112",
+        "sentiment_vote_positive_percentage": 0,
+        "sentiment_vote_negative_percentage": 0,
+        "community_sus_report": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "_note": "REAL subscribeNewToken events, pool=pump (pump.fun bonding curve). Amounts are decimal-adjusted UI units (token decimals 6, SOL not lamports). 3rd sample shows name/symbol/uri can be ABSENT.",
+  "events": [
+    {
+      "signature": "58GxbVCPKzjvMaFuiY9PNVeAeL1ftNENZwqX4cSdpNKADXtxnYBmV2CQji9SvpXnFybdJs7K83KnN6WEcmmVXp9d",
+      "mint": "24DUUJB1gT27TdbqvuLBUZqKJR1xbpFwTfNVoroWxq1P",
+      "traderPublicKey": "Di9s2Gg8eAwE26ruJ114bQWWQzF5Edajgj6eS5Q8TJzj",
+      "txType": "create",
+      "initialBuy": 62324960.753532,
+      "solAmount": 1.85,
+      "bondingCurveKey": "A5UrnigxruyYtXd3W5JGtpXfxt2J92YCGFro4mTrZLLX",
+      "vTokensInBondingCurve": 1010675039.246468,
+      "vSolInBondingCurve": 31.849999999999994,
+      "marketCapSol": 31.513591177384267,
+      "name": "PALMO",
+      "symbol": "PALMO",
+      "uri": "https://pump.mypinata.cloud/ipfs/bafkreih3rzlvard4wax7fzy22iaxyd7aivvrzaviuwhipae2ltx3k5p24e",
+      "is_mayhem_mode": false,
+      "pool": "pump"
+    },
+    {
+      "signature": "4AK2jMexi62h8AGnb7LDp4qD31pHekbAheMBbahp2AUBH7LJDEa4Wf3RAFzxZHZomwWpDoVTZ5MVV7aqxkWLPAHY",
+      "mint": "Cn573YtVhybK8t9GY6eaG1HKgzQrtK2KotgPHYFepump",
+      "traderPublicKey": "EjcwXG6ywzorxLcX7565C614LdhxiHF6uJhkYyRTDVgZ",
+      "txType": "create",
+      "initialBuy": 6948618.075286,
+      "solAmount": 0.195542678,
+      "bondingCurveKey": "3ozSPYk82nuG6kcoSFzhmEm6nCGViprZjpSyS7qZbe9Y",
+      "vTokensInBondingCurve": 1066051381.924714,
+      "vSolInBondingCurve": 30.19554267814204,
+      "marketCapSol": 28.324659758542943,
+      "name": "Haaland Hair",
+      "symbol": "HALH",
+      "uri": "https://ipfs.io/ipfs/QmYtULBSGFSR2Xxbj8WpWfD8CzrBzPi9RXQAtC7EJ1dr4m",
+      "is_mayhem_mode": true,
+      "pool": "pump"
+    },
+    {
+      "signature": "qSfRFAPJYZ9Wp7UZ4ASyp3HxBtCV7gYkKDuiqboqC3Q4UTxYDUGtSRzmex7gaz8bKdaqEc8mJA1dKmqEjdyuwdm",
+      "mint": "cPW1Zrx1zqEVb21pcQrzfjNkhS4Dz6fyztKooh6xfEX",
+      "traderPublicKey": "D7i91E1ZVGHCH2FBCUurqpUUi7RDYXg8Wu8f9Suf4xEK",
+      "txType": "create",
+      "initialBuy": 0,
+      "solAmount": 0,
+      "bondingCurveKey": "BCvxF8vJ5dyfTmHVkbPKhB8eqyMA76TL92esBq3YvvJx",
+      "vTokensInBondingCurve": 1073000000,
+      "vSolInBondingCurve": 30,
+      "marketCapSol": 27.958993476234856,
+      "is_mayhem_mode": false,
+      "pool": "pump"
+    }
+  ]
+}

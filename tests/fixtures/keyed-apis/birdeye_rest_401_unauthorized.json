@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "source": "Birdeye REST without X-API-KEY, captured 2026-09-28T20:44Z",
+    "request": "GET https://public-api.birdeye.so/defi/price?address=So11111111111111111111111111111111111111112 (x-chain: solana, Origin: https://www.orbytai.org)",
+    "http_status": 401,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-expose-headers": "X-RateLimit-Limit,X-RateLimit-Remaining,X-RateLimit-Reset,PAYMENT-REQUIRED,PAYMENT-RESPONSE,PAYMENT-SIGNATURE,X-Payment-ID,X-Payment-Cached,X-Cache-Age",
+      "preflight_OPTIONS": "204; Access-Control-Allow-Origin: *; Access-Control-Allow-Headers: x-api-key,x-chain; Access-Control-Allow-Methods: GET,HEAD,PUT,PATCH,POST,DELETE"
+    }
+  },
+  "body": {"success":false,"message":"Unauthorized"}
+}

@@ -1,0 +1,25 @@
+{
+  "_note": "Live 2026-09-28T21:00:10.530Z: POST https://api.mainnet-beta.solana.com with header Origin: https://www.orbytai.org (what every browser sends). HTTP 403. Same request without Origin returns 200. WebSocket upgrade with Origin also gets HTTP 403. => public mainnet RPC cannot be used from the browser.",
+  "responseHeaders": {
+    "x-ratelimit-tier": "",
+    "x-ratelimit-method-limit": "",
+    "x-ratelimit-method-remaining": "",
+    "x-ratelimit-rps-limit": "",
+    "x-ratelimit-rps-remaining": "",
+    "x-ratelimit-conn-remaining": "",
+    "x-ratelimit-connrate-remaining": "",
+    "x-ratelimit-pubsub-limit": "",
+    "x-rpc-node": "fra102",
+    "cache-control": "no-cache",
+    "access-control-allow-origin": "*",
+    "content-length": "82"
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "error": {
+      "code": 403,
+      "message": "Access forbidden"
+    },
+    "id": 1
+  }
+}

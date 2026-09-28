@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "source": "Bitquery V2 streaming endpoint probes without a token, captured 2026-09-28T20:58Z (Origin: https://www.orbytai.org)",
+    "note": "Genuine responses: both HTTP and WebSocket upgrade are rejected with 401 before any data."
+  },
+  "http_no_token": {
+    "request": "POST https://streaming.bitquery.io/graphql  body: { Solana { DEXTrades(limit:{count:1}) { Block { Time } } } }",
+    "http_status": 401,
+    "headers": {
+      "content-type": "text/plain",
+      "access-control-allow-origin": "*",
+      "access-control-allow-credentials": "true",
+      "access-control-allow-methods": "GET, POST, PUT, OPTIONS"
+    },
+    "body_text": "Unauthorized. Provide Authorization as documented at https://docs.bitquery.io/docs/category/authorization"
+  },
+  "ws_no_token": {
+    "request": "wss://streaming.bitquery.io/graphql  subprotocol graphql-ws (no ?token=)",
+    "http_status": 401,
+    "headers": { "content-type": "text/plain", "access-control-allow-origin": "*" },
+    "body_text": "Unauthorized. Provide Authorization as documented at https://docs.bitquery.io/docs/category/authorization"
+  }
+}

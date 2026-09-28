@@ -1,0 +1,182 @@
+{
+  "_meta": {
+    "source": "Birdeye x402 pay-per-request probe (no payment sent)",
+    "request": "GET https://public-api.birdeye.so/x402/defi/price?address=So11111111111111111111111111111111111111112",
+    "captured_at": "2026-09-28T20:47:47Z",
+    "http_status": 402,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "x-ratelimit-limit": "100",
+      "x-ratelimit-remaining": "99",
+      "x-ratelimit-reset": "1790628469"
+    }
+  },
+  "body": {
+    "success": false,
+    "message": "Payment is required to access this resource"
+  },
+  "payment_required_header_decoded": {
+    "x402Version": 2,
+    "error": "Payment required",
+    "resource": {
+      "url": "http://public-api.birdeye.so/x402/defi/price?address=So11111111111111111111111111111111111111112",
+      "description": "Get token price data",
+      "mimeType": ""
+    },
+    "accepts": [
+      {
+        "scheme": "exact",
+        "network": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+        "amount": "3000",
+        "asset": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "payTo": "3Wuj6VjJXuCmQZjGRhW56xbEk6TzCyMEUVRZgLBYNE2Z",
+        "maxTimeoutSeconds": 60,
+        "extra": {
+          "feePayer": "GVJJ7rdGiXr5xaYbRwRbjfaJL7fmwRygFi1H6aGqDveb"
+        }
+      }
+    ],
+    "extensions": {
+      "payment-identifier": {
+        "info": {
+          "required": true
+        },
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^pay_[a-zA-Z0-9_-]{10,120}$",
+              "minLength": 16,
+              "maxLength": 128,
+              "description": "Unique payment identifier for idempotency (e.g., pay_abc123...)"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "offer-receipt": {
+        "info": {},
+        "schema": {
+          "type": "object",
+          "properties": {
+            "offers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "eip712",
+                      "jws"
+                    ]
+                  },
+                  "acceptIndex": {
+                    "type": "integer"
+                  },
+                  "payload": {
+                    "type": "object"
+                  },
+                  "signature": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "format",
+                  "signature"
+                ]
+              }
+            },
+            "receipt": {
+              "type": "object",
+              "properties": {
+                "format": {
+                  "type": "string",
+                  "enum": [
+                    "eip712",
+                    "jws"
+                  ]
+                },
+                "payload": {
+                  "type": "object"
+                },
+                "signature": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "format",
+                "signature"
+              ]
+            }
+          }
+        }
+      },
+      "bazaar": {
+        "info": {
+          "input": {
+            "type": "http",
+            "method": "GET",
+            "queryParams": {
+              "address": "So11111111111111111111111111111111111111112",
+              "check_liquidity": "1000",
+              "include_liquidity": "true",
+              "ui_amount_mode": "scaled"
+            }
+          },
+          "output": {
+            "type": "json",
+            "example": {
+              "success": true,
+              "data": {}
+            }
+          }
+        },
+        "schema": {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "http"
+                  ]
+                },
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "GET"
+                  ]
+                },
+                "queryParams": {
+                  "type": "object"
+                }
+              },
+              "required": [
+                "type",
+                "method"
+              ]
+            },
+            "output": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "required": [
+            "input"
+          ]
+        }
+      }
+    }
+  }
+}

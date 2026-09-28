@@ -1,0 +1,55 @@
+{
+  "amount": "860805774",
+  "uiAmount": 0.860805774,
+  "uiAmountString": "0.860805774",
+  "tokens": {
+    "JxxWsvm9jHt4ah7DT9NuLyVLYZcZLUdPD93PcPQ71Ka": [
+      {
+        "account": "KgRjF5h49DU8URPpSfhMfwosfgvYYhAPUikMvJG3NYh",
+        "amount": "1000000000",
+        "uiAmount": 1,
+        "uiAmountString": "1",
+        "isFrozen": false,
+        "isAssociatedTokenAccount": true,
+        "decimals": 9,
+        "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "excludeFromNetWorth": false,
+        "lamports": "2039280",
+        "reclaimableLamports": "550840",
+        "reclaimAction": "excess"
+      }
+    ],
+    "2rEvYMLNncmvqUiJqeW59YsHFtUbAMLgJ7dMyjrvseC7": [
+      {
+        "account": "ppCsvuBTDKDUapCFa4tEfyVw2FKcGHzYBoHrMhAeEbk",
+        "amount": "5000000000000000",
+        "uiAmount": 5000000,
+        "uiAmountString": "5000000",
+        "isFrozen": false,
+        "isAssociatedTokenAccount": true,
+        "decimals": 9,
+        "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "excludeFromNetWorth": false,
+        "lamports": "2039280",
+        "reclaimableLamports": "550840",
+        "reclaimAction": "excess"
+      }
+    ],
+    "FvzLALAbwwETJYd1WKRLjjssANGwsL12RKdz4QpogRrc": [
+      {
+        "account": "2CZFYKVdg6ou2xQR3v5oGTAZhSvicUYvH2dsA3ZcjEzr",
+        "amount": "68206250000000",
+        "uiAmount": 68206250,
+        "uiAmountString": "68206250",
+        "isFrozen": false,
+        "isAssociatedTokenAccount": true,
+        "decimals": 6,
+        "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "excludeFromNetWorth": false,
+        "lamports": "2039280",
+        "reclaimableLamports": "550840",
+        "reclaimAction": "excess"
+      }
+    ]
+  }
+}

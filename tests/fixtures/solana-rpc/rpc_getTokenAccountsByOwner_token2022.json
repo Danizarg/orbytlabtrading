@@ -1,0 +1,131 @@
+{
+  "_note": "Live response 2026-09-28T20:49:25.129Z from https://api.mainnet-beta.solana.com. value[] trimmed to 3.",
+  "request": {
+    "method": "getTokenAccountsByOwner",
+    "params": [
+      "DHpRzLRuACd8i1BVGZh8rGQWaQsP7b4spBZFWbzW5WSb",
+      {
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+      },
+      {
+        "encoding": "jsonParsed",
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "result": {
+      "context": {
+        "slot": 451431132,
+        "apiVersion": "4.3.0-beta.2"
+      },
+      "value": [
+        {
+          "pubkey": "Wz7SUAzCmjNrZxpUp5zwMeKdkMUgzpHWYCR54WiqUzU",
+          "account": {
+            "lamports": 1513840,
+            "data": {
+              "program": "spl-token-2022",
+              "parsed": {
+                "info": {
+                  "extensions": [
+                    {
+                      "extension": "immutableOwner"
+                    }
+                  ],
+                  "isNative": false,
+                  "mint": "jxEwNi2DqURYYrpzbzdhMUEg8SZdJpbUDPyEn9Rpump",
+                  "owner": "DHpRzLRuACd8i1BVGZh8rGQWaQsP7b4spBZFWbzW5WSb",
+                  "state": "initialized",
+                  "tokenAmount": {
+                    "amount": "0",
+                    "decimals": 6,
+                    "uiAmount": 0,
+                    "uiAmountString": "0"
+                  }
+                },
+                "type": "account"
+              },
+              "space": 170
+            },
+            "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+            "executable": false,
+            "rentEpoch": 18446744073709552000,
+            "space": 170
+          }
+        },
+        {
+          "pubkey": "AHUjyJj8QrXghmaKHGtF9Q4vSZ7fhnQy1oHLoKvHEbGh",
+          "account": {
+            "lamports": 1513840,
+            "data": {
+              "program": "spl-token-2022",
+              "parsed": {
+                "info": {
+                  "extensions": [
+                    {
+                      "extension": "immutableOwner"
+                    }
+                  ],
+                  "isNative": false,
+                  "mint": "2kUuo77HAWbr4HUkAerf3RU4izteNXxM6YpiKX6Hpump",
+                  "owner": "DHpRzLRuACd8i1BVGZh8rGQWaQsP7b4spBZFWbzW5WSb",
+                  "state": "initialized",
+                  "tokenAmount": {
+                    "amount": "0",
+                    "decimals": 6,
+                    "uiAmount": 0,
+                    "uiAmountString": "0"
+                  }
+                },
+                "type": "account"
+              },
+              "space": 170
+            },
+            "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+            "executable": false,
+            "rentEpoch": 18446744073709552000,
+            "space": 170
+          }
+        },
+        {
+          "pubkey": "mGTV67eBwUQaK1VSEtDq6gR7Z4QUCdPDGrQYsZ8kd7t",
+          "account": {
+            "lamports": 1513840,
+            "data": {
+              "program": "spl-token-2022",
+              "parsed": {
+                "info": {
+                  "extensions": [
+                    {
+                      "extension": "immutableOwner"
+                    }
+                  ],
+                  "isNative": false,
+                  "mint": "3wMyHNykNCdZXUsWCbWVb3n14AU8xM94X5yPVXkHpump",
+                  "owner": "DHpRzLRuACd8i1BVGZh8rGQWaQsP7b4spBZFWbzW5WSb",
+                  "state": "initialized",
+                  "tokenAmount": {
+                    "amount": "0",
+                    "decimals": 6,
+                    "uiAmount": 0,
+                    "uiAmountString": "0"
+                  }
+                },
+                "type": "account"
+              },
+              "space": 170
+            },
+            "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+            "executable": false,
+            "rentEpoch": 18446744073709552000,
+            "space": 170
+          }
+        }
+      ]
+    },
+    "id": 1
+  },
+  "_resultCount": 18
+}

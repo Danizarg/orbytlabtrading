@@ -1,0 +1,277 @@
+{
+  "_fixture_meta": {
+    "source_url": "https://api.geckoterminal.com/api/v2/networks/solana/dexes?page=1",
+    "http_status": 200,
+    "fetched_at": "2026-09-28T20:46:22.543Z",
+    "request_headers": {
+      "Accept": "application/json;version=20230302",
+      "Origin": "https://www.orbytai.org"
+    },
+    "response_headers": {
+      "access-control-allow-methods": "GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "7200",
+      "cache-control": "max-age=30, public, must-revalidate, s-maxage=60",
+      "cf-cache-status": "MISS",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Mon, 28 Sep 2026 20:46:22 GMT",
+      "etag": "W/\"5cd0e535b6077eeb50011fa0c796fb64\"",
+      "vary": "Origin, accept-encoding",
+      "x-runtime": "0.022365"
+    },
+    "trimmed": "UNTRIMMED on purpose: full list of 35 Solana dex ids (single page) is reference data"
+  },
+  "data": [
+    {
+      "id": "raydium",
+      "type": "dex",
+      "attributes": {
+        "name": "Raydium"
+      }
+    },
+    {
+      "id": "orca",
+      "type": "dex",
+      "attributes": {
+        "name": "Orca"
+      }
+    },
+    {
+      "id": "raydium-clmm",
+      "type": "dex",
+      "attributes": {
+        "name": "Raydium (CLMM)"
+      }
+    },
+    {
+      "id": "fluxbeam",
+      "type": "dex",
+      "attributes": {
+        "name": "FluxBeam"
+      }
+    },
+    {
+      "id": "meteora",
+      "type": "dex",
+      "attributes": {
+        "name": "Meteora"
+      }
+    },
+    {
+      "id": "dexlab",
+      "type": "dex",
+      "attributes": {
+        "name": "Dexlab"
+      }
+    },
+    {
+      "id": "daos-fun",
+      "type": "dex",
+      "attributes": {
+        "name": "Daos.fun"
+      }
+    },
+    {
+      "id": "pumpswap",
+      "type": "dex",
+      "attributes": {
+        "name": "PumpSwap"
+      }
+    },
+    {
+      "id": "virtuals-solana",
+      "type": "dex",
+      "attributes": {
+        "name": "Virtuals (Solana)"
+      }
+    },
+    {
+      "id": "boop-fun",
+      "type": "dex",
+      "attributes": {
+        "name": "Boop.fun"
+      }
+    },
+    {
+      "id": "saros-amm",
+      "type": "dex",
+      "attributes": {
+        "name": "Saros AMM"
+      }
+    },
+    {
+      "id": "meteora-dbc",
+      "type": "dex",
+      "attributes": {
+        "name": "Meteora DBC"
+      }
+    },
+    {
+      "id": "byreal",
+      "type": "dex",
+      "attributes": {
+        "name": "Byreal"
+      }
+    },
+    {
+      "id": "pancakeswap-v3-solana",
+      "type": "dex",
+      "attributes": {
+        "name": "Pancakeswap V3 (Solana)"
+      }
+    },
+    {
+      "id": "meteora-damm-v2",
+      "type": "dex",
+      "attributes": {
+        "name": "Meteora DAMM V2"
+      }
+    },
+    {
+      "id": "raydium-launchlab",
+      "type": "dex",
+      "attributes": {
+        "name": "Raydium Launchlab"
+      }
+    },
+    {
+      "id": "pump-fun",
+      "type": "dex",
+      "attributes": {
+        "name": "Pump.fun"
+      }
+    },
+    {
+      "id": "saros-dlmm",
+      "type": "dex",
+      "attributes": {
+        "name": "Saros DLMM"
+      }
+    },
+    {
+      "id": "wavebreak",
+      "type": "dex",
+      "attributes": {
+        "name": "Wavebreak"
+      }
+    },
+    {
+      "id": "heaven",
+      "type": "dex",
+      "attributes": {
+        "name": "Heaven"
+      }
+    },
+    {
+      "id": "token-mill",
+      "type": "dex",
+      "attributes": {
+        "name": "Token Mill"
+      }
+    },
+    {
+      "id": "defituna",
+      "type": "dex",
+      "attributes": {
+        "name": "DeFiTuna"
+      }
+    },
+    {
+      "id": "moonit",
+      "type": "dex",
+      "attributes": {
+        "name": "Moonit"
+      }
+    },
+    {
+      "id": "humidifi",
+      "type": "dex",
+      "attributes": {
+        "name": "Humidifi"
+      }
+    },
+    {
+      "id": "zora",
+      "type": "dex",
+      "attributes": {
+        "name": "Zora"
+      }
+    },
+    {
+      "id": "bags-fm",
+      "type": "dex",
+      "attributes": {
+        "name": "Bags.fm"
+      }
+    },
+    {
+      "id": "moonshot",
+      "type": "dex",
+      "attributes": {
+        "name": "Moonshot"
+      }
+    },
+    {
+      "id": "clanker-solana",
+      "type": "dex",
+      "attributes": {
+        "name": "Clanker (Solana)"
+      }
+    },
+    {
+      "id": "printr-v2",
+      "type": "dex",
+      "attributes": {
+        "name": "Printr V2"
+      }
+    },
+    {
+      "id": "manifest",
+      "type": "dex",
+      "attributes": {
+        "name": "Manifest"
+      }
+    },
+    {
+      "id": "metadao",
+      "type": "dex",
+      "attributes": {
+        "name": "MetaDAO"
+      }
+    },
+    {
+      "id": "zerofi",
+      "type": "dex",
+      "attributes": {
+        "name": "ZeroFi"
+      }
+    },
+    {
+      "id": "easya-kickstart",
+      "type": "dex",
+      "attributes": {
+        "name": "EasyA Kickstart"
+      }
+    },
+    {
+      "id": "stonkfun",
+      "type": "dex",
+      "attributes": {
+        "name": "StonkFun"
+      }
+    },
+    {
+      "id": "letsbonk-fun",
+      "type": "dex",
+      "attributes": {
+        "name": "letsbonk.fun"
+      }
+    }
+  ],
+  "links": {
+    "first": "https://api.geckoterminal.com/api/v2/networks/solana/dexes?page=1",
+    "prev": null,
+    "next": null,
+    "last": "https://api.geckoterminal.com/api/v2/networks/solana/dexes?page=1"
+  }
+}

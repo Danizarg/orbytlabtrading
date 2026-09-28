@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "source": "Solana Tracker Data API without x-api-key, captured 2026-09-28T20:50Z",
+    "request": "GET https://data.solanatracker.io/tokens/latest (Origin: https://www.orbytai.org)",
+    "http_status": 401,
+    "headers": {
+      "access-control-allow-origin": "https://www.orbytai.org",
+      "access-control-allow-credentials": "true",
+      "access-control-allow-methods": "GET",
+      "vary": "*"
+    },
+    "preflight_OPTIONS": {
+      "status": 204,
+      "access-control-allow-origin": "https://www.orbytai.org",
+      "access-control-allow-methods": "GET",
+      "access-control-allow-headers": "x-api-key",
+      "access-control-max-age": "5"
+    }
+  },
+  "body": {"error":"API key is required"}
+}

@@ -1,0 +1,17 @@
+{
+  "_note": "Live response 2026-09-28T20:49:22.004Z from https://api.mainnet-beta.solana.com. value[] trimmed to 3 (max 20 returned).",
+  "request": {
+    "method": "getTokenLargestAccounts",
+    "params": [
+      "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+    ]
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "error": {
+      "code": 429,
+      "message": "Too many requests for a specific RPC call"
+    },
+    "id": 1
+  }
+}

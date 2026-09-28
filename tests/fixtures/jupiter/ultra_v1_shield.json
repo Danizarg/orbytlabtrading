@@ -1,0 +1,39 @@
+{
+  "warnings": {
+    "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump": [
+      {
+        "type": "NOT_VERIFIED",
+        "message": "This token is not verified, make sure the mint address is correct before trading",
+        "severity": "info"
+      },
+      {
+        "type": "LOW_ORGANIC_ACTIVITY",
+        "message": "This token has low organic activity",
+        "severity": "info"
+      },
+      {
+        "type": "NEW_LISTING",
+        "message": "This token is newly listed",
+        "severity": "info"
+      }
+    ],
+    "DKxXdaMC1so182urvrrnhs6V6fGTrttPS8br6JuEpump": [
+      {
+        "type": "NOT_VERIFIED",
+        "message": "This token is not verified, make sure the mint address is correct before trading",
+        "severity": "info"
+      },
+      {
+        "type": "LOW_ORGANIC_ACTIVITY",
+        "message": "This token has low organic activity",
+        "severity": "info"
+      },
+      {
+        "type": "NEW_LISTING",
+        "message": "This token is newly listed",
+        "severity": "info"
+      }
+    ],
+    "So11111111111111111111111111111111111111112": []
+  }
+}
