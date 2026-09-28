@@ -1,0 +1,175 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. The official 'Get Token Overview' (GET /tokens/multi/all) reference defines { latest, graduating, graduated } arrays of TokenInfo but ships no example values. graduating[0] is copied verbatim from the official Datastream 'graduating' room example payload (TokenInfo for BUY / FS53Kr...bonk, raydium-launchpad curve at 89.2%, launchpad letsbonk.fun, risk.risks[] as objects, score 3). latest[0] and graduated[0] were constructed from the documented TokenInfo/Pool schema (market 'pumpfun' with curvePercentage; market 'pumpfun-amm') using the on-chain identity of 7ehsm...pump from the live RPC fixtures; their market values are illustrative, and graduated[0] deliberately carries edge cases (an http:// image, an ipfs:// uri, risks[] as plain strings and an out-of-range score of 11).",
+  "source": "https://docs.solanatracker.io/data-api/tokens/get-token-overview.md ; https://docs.solanatracker.io/datastream/websockets/graduating.md",
+  "request": "GET https://data.solanatracker.io/tokens/multi/all?limit=50 (header x-api-key)",
+  "response": {
+    "latest": [
+      {
+        "token": {
+          "name": "Corgi Capital",
+          "symbol": "CC",
+          "mint": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+          "uri": "https://gateway.pinata.cloud/ipfs/bafkreiayapwpeno6y5lcw2csdodxotsbtzrklxosixwiej3sk72ous32ku",
+          "decimals": 6,
+          "image": "https://image.solanatracker.io/proxy?url=https%3A%2F%2Fexample.invalid%2Fcc.png",
+          "hasFileMetaData": true,
+          "twitter": "https://x.com/example_cc",
+          "strictSocials": {},
+          "creation": {
+            "creator": "J5gXsyettqJsMScenY7q7KnNDcojmaKX9jeBCNAMCgBW",
+            "created_tx": "4cD9Dfwqmcv9PgsAKS36UJ3sXMTNgbnd858kAXzA2h3HW8TEqoWEaqNYbqf1ABw4rXPiu2G1DvELLtvUvhqwAL1Q",
+            "created_time": 1790000000
+          }
+        },
+        "pools": [
+          {
+            "poolId": "9ZZuz4cVoYhbAFomLMHJjpPijY7EXryqHRjY79f9VC7A",
+            "liquidity": { "quote": 17.6, "usd": 3100.5 },
+            "price": { "quote": 7.04e-8, "usd": 0.0000124 },
+            "tokenSupply": 1000000000,
+            "lpBurn": 100,
+            "tokenAddress": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+            "marketCap": { "quote": 70.4, "usd": 12400 },
+            "market": "pumpfun",
+            "curvePercentage": 50.03,
+            "quoteToken": "So11111111111111111111111111111111111111112",
+            "decimals": 6,
+            "security": { "freezeAuthority": null, "mintAuthority": null },
+            "deployer": "J5gXsyettqJsMScenY7q7KnNDcojmaKX9jeBCNAMCgBW",
+            "lastUpdated": 1790000100000,
+            "createdAt": 1790000000500,
+            "txns": { "buys": 41, "sells": 12, "total": 53, "volume": 2400.5, "volume24h": 2400.5 }
+          }
+        ],
+        "events": { "1m": { "priceChangePercentage": 3.2 } },
+        "risk": {
+          "snipers": { "count": 2, "totalBalance": 21000000, "totalPercentage": 2.1, "wallets": [] },
+          "insiders": { "count": 1, "totalBalance": 5000000, "totalPercentage": 0.5, "wallets": [] },
+          "top10": 71.2,
+          "dev": { "percentage": 1.5, "amount": 15000000 },
+          "rugged": false,
+          "risks": [],
+          "score": 2
+        },
+        "buys": 41,
+        "sells": 12,
+        "txns": 53,
+        "holders": 37
+      }
+    ],
+    "graduating": [
+      {
+        "token": {
+          "name": "The Buy Mechanism",
+          "symbol": "BUY",
+          "mint": "FS53KrzKqNTp3CS7YDSJ61rgyN1cMyUhAbJrn4tbonk",
+          "uri": "https://metadata.pumplify.eu/data/QmcqFDJBnt693eEWSq4xXg31vtfoV3g2PpuEJ5jTyC78hC",
+          "decimals": 6,
+          "description": "A token demonstrating buy mechanics",
+          "twitter": "https://x.com/i/communities/1943034658800963764",
+          "image": "https://image.solanatracker.io/proxy?url=https%3A%2F%2Fmetadata.pumplify.eu%2Fdata%2FQmbrz6CHYyjSu74HyPh8bUCh2ULKtdp7wffJSzKfw5UTCZ",
+          "hasFileMetaData": true,
+          "strictSocials": { "twitter": "https://x.com/i/communities/1943034658800963764" },
+          "creation": {
+            "creator": "J5gXsyettqJsMScenY7q7KnNDcojmaKX9jeBCNAMCgBW",
+            "created_tx": "4cD9Dfwqmcv9PgsAKS36UJ3sXMTNgbnd858kAXzA2h3HW8TEqoWEaqNYbqf1ABw4rXPiu2G1DvELLtvUvhqwAL1Q",
+            "created_time": 1752091418
+          }
+        },
+        "pools": [
+          {
+            "poolId": "6zSZt11CQnNL1cyEMAMgdsgyNgB84iqwMWmdqmiKKQFh",
+            "liquidity": { "quote": 60.997, "usd": 9573.96 },
+            "price": { "quote": 2.8887e-8, "usd": 0.00000453 },
+            "tokenSupply": 1000000000,
+            "lpBurn": 100,
+            "tokenAddress": "FS53KrzKqNTp3CS7YDSJ61rgyN1cMyUhAbJrn4tbonk",
+            "marketCap": { "quote": 28.887, "usd": 4534.02 },
+            "market": "raydium-launchpad",
+            "curvePercentage": 89.2,
+            "quoteToken": "So11111111111111111111111111111111111111112",
+            "decimals": 6,
+            "security": { "freezeAuthority": null, "mintAuthority": null },
+            "deployer": "J5gXsyettqJsMScenY7q7KnNDcojmaKX9jeBCNAMCgBW",
+            "lastUpdated": 1752091418185,
+            "createdAt": 1752091417977,
+            "txns": { "buys": 2, "sells": 0, "total": 2, "volume": 109, "volume24h": 109 },
+            "launchpad": {
+              "name": "letsbonk.fun",
+              "url": "https://letsbonk.fun/",
+              "logo": "https://sapphire-working-koi-276.mypinata.cloud/ipfs/bafkreicgnuyebtmnyhmjbwd32t5w2hcwbtwqlrxsc5eedpgtjy7q4remfa",
+              "baseLiquidity": { "amount": 1073025605.596382, "usd": 4865.12 },
+              "quoteLiquidity": { "amount": 30.000852951, "usd": 4708.85 }
+            }
+          }
+        ],
+        "events": {
+          "1m": { "priceChangePercentage": 0 },
+          "5m": { "priceChangePercentage": 0 },
+          "24h": { "priceChangePercentage": 0 }
+        },
+        "risk": {
+          "top10": 1.7374,
+          "dev": { "percentage": 0, "amount": 0 },
+          "rugged": false,
+          "risks": [
+            { "name": "Bonding curve not complete", "description": "No Raydium liquidity pool, bonding curve not complete", "level": "warning", "score": 4000 }
+          ],
+          "score": 3,
+          "snipers": { "count": 0, "totalBalance": 0, "totalPercentage": 0, "wallets": [] },
+          "insiders": { "count": 0, "totalBalance": 0, "totalPercentage": 0, "wallets": [] }
+        },
+        "buys": 2,
+        "sells": 0,
+        "txns": 2
+      }
+    ],
+    "graduated": [
+      {
+        "token": {
+          "name": "Nietzschean Giraffe",
+          "symbol": "GIRAFFEBETA",
+          "mint": "8avqVj8keXnxbNxDQ6w7rKZx2Sid8ygp1MBRnhqepump",
+          "uri": "ipfs://QmUPiDnnNMz3dkf8TVoknjyQsdAdixB72BMnURnByatYy9",
+          "decimals": 6,
+          "image": "http://insecure.example/giraffe.png",
+          "strictSocials": { "website": "https://giraffe.example", "telegram": "https://t.me/giraffe_example" },
+          "creation": {
+            "creator": "DJ4hjUajRDySeCMppb6vqRN97HVuogGDAnwx2k6k1cEB",
+            "created_tx": "4nY7cpV4DWBhLUuKsYuXmhWKNgwrZT3Z4jB4ob31aVvsGjXnzpf56axwWkPLW6dQE3DCvoXdhC6tGuWcvh4xBqz2",
+            "created_time": 1770717908
+          }
+        },
+        "pools": [
+          {
+            "poolId": "D45QQMsxGhohYXGZKDJEowMv2HArrKAsw5V3JnyDZWeS",
+            "liquidity": { "quote": 84.2, "usd": 15612.4 },
+            "price": { "quote": 3.1e-7, "usd": 0.0000575 },
+            "tokenSupply": 1000000000,
+            "lpBurn": 100,
+            "tokenAddress": "8avqVj8keXnxbNxDQ6w7rKZx2Sid8ygp1MBRnhqepump",
+            "marketCap": { "quote": 310, "usd": 57500 },
+            "market": "pumpfun-amm",
+            "quoteToken": "So11111111111111111111111111111111111111112",
+            "decimals": 6,
+            "security": { "freezeAuthority": null, "mintAuthority": null },
+            "lastUpdated": 1770720000000,
+            "createdAt": 1770719000000,
+            "txns": { "buys": 1200, "sells": 900, "total": 2100, "volume": 250000, "volume24h": 180000 }
+          }
+        ],
+        "risk": {
+          "top10": 24.5,
+          "dev": { "percentage": 0, "amount": 0 },
+          "rugged": false,
+          "risks": ["Low liquidity"],
+          "score": 11
+        },
+        "buys": 1200,
+        "sells": 900,
+        "txns": 2100,
+        "holders": 1450
+      }
+    ]
+  }
+}

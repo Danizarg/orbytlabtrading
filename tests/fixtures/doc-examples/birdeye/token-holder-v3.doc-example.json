@@ -1,0 +1,16 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. Copied verbatim from the official Birdeye 'Token - Holder' reference example 'SPLTokenTopHolder' (token-account mode). `top10HoldPercent` is on a 0-100 scale here, unlike token_security.",
+  "source": "https://data.birdeye.so/docs/data-api/holder/get-defi-v3-token-holder.md",
+  "request": "GET https://public-api.birdeye.so/defi/v3/token/holder?address=7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr&offset=0&limit=20",
+  "response": {
+    "success": true,
+    "data": {
+      "holder": 5321,
+      "top10HoldPercent": 22.15,
+      "items": [
+        { "amount": "100000000000", "decimals": 9, "mint": "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr", "owner": "6Zk9e3nfXdYLXHYu5NvDiPHGMcjujVBv6gWRr7ckSdhP", "token_account": "HdmGPmTkBgsiJcyVDgiGkYdTZr4h5XmpjYoUjU2rapf4", "ui_amount": 100 },
+        { "amount": "90000000000", "decimals": 9, "mint": "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr", "owner": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1", "token_account": "EauuZAnB7CcnCrwvCMcnb2Rjk12Ecs13ycAZQBb5tLYM", "ui_amount": 90 }
+      ]
+    }
+  }
+}

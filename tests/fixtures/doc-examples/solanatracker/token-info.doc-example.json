@@ -1,0 +1,96 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. Copied from the official Solana Tracker 'Get Token Information' reference example (OFFICIAL TRUMP), abridged: pools[] trimmed from 10+ to the first two and events[] trimmed to four windows. token, pools[0..1], risk (snipers/bundlers/insiders/top10/dev/fees/rugged/risks/score/jupiterVerified) and buys/sells/txns/holders are verbatim.",
+  "source": "https://docs.solanatracker.io/data-api/tokens/get-token-information.md",
+  "request": "GET https://data.solanatracker.io/tokens/6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN (header x-api-key)",
+  "response": {
+    "token": {
+      "name": "OFFICIAL TRUMP",
+      "symbol": "TRUMP",
+      "mint": "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN",
+      "uri": "https://arweave.net/cSCP0h2n1crjeSWE9KF-XtLciJalDNFs7Vf-Sm0NNY0",
+      "decimals": 6,
+      "description": "",
+      "image": "https://image.solanatracker.io/proxy?url=https%3A%2F%2Farweave.net%2FVQrPjACwnQRmxdKBTqNwPiyo65x7LAT773t8Kd7YBzw",
+      "hasFileMetaData": true,
+      "strictSocials": {},
+      "creation": {
+        "creator": "5e2qRc1DNEXmyxP8qwPwJhRWjef7usLyi7v5xjqLr5G7",
+        "created_tx": "3RVpxfaDscntzr4abnmjkkN1cDPthzpxG3Pgt6PksmvhzNDFXxCPPxnKByjPJK4vsmXueD3zxuhYq5PpwCuyigLR",
+        "created_time": 1737122459
+      }
+    },
+    "pools": [
+      {
+        "poolId": "9d9mb8kooFfaD3SctgZtkxQypkshx6ezhbKio89ixyy2",
+        "liquidity": { "quote": 163156924.893183, "usd": 288082595.6380103 },
+        "price": { "quote": 5.933132498211121, "usd": 5.933132498211121 },
+        "tokenSupply": 999999284.625164,
+        "lpBurn": 0,
+        "tokenAddress": "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN",
+        "marketCap": { "quote": 5933128253.797433, "usd": 5933128253.797433 },
+        "market": "meteora-dlmm",
+        "quoteToken": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "decimals": 6,
+        "security": { "freezeAuthority": null, "mintAuthority": null },
+        "lastUpdated": 1760273710048,
+        "createdAt": 1737196771000,
+        "deployer": "FbMxP3GVq8TQ36nbYgx4NP9iygMpwAwFWJwW81ioCiSF",
+        "txns": { "buys": 1537568, "sells": 1372762, "total": 2910330, "volume": 15790393731, "volume24h": 51264548 }
+      },
+      {
+        "poolId": "GQsPr4RJk9AZkkfWHud7v4MtotcxhaYzZHdsPCg9vNvW",
+        "liquidity": { "quote": 1351.2204397375483, "usd": 245213.24614468566 },
+        "price": { "quote": 0.03273717521157278, "usd": 5.94099139352593 },
+        "tokenSupply": 999999284.625164,
+        "lpBurn": 0,
+        "tokenAddress": "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN",
+        "marketCap": { "quote": 32737151.792221434, "usd": 5940987143.490187 },
+        "market": "raydium-clmm",
+        "quoteToken": "So11111111111111111111111111111111111111112",
+        "decimals": 6,
+        "security": { "freezeAuthority": null, "mintAuthority": null },
+        "deployer": "AshdxLbGf43Eau3wh3WmYCx41NByS2K3KAKDyeR15Q5Z",
+        "lastUpdated": 1760273584285,
+        "txns": { "buys": 160076, "sells": 127901, "total": 287977, "volume": 168500298, "volume24h": 15138 }
+      }
+    ],
+    "events": {
+      "1m": { "priceChangePercentage": -0.49751243781096 },
+      "5m": { "priceChangePercentage": 0.5 },
+      "1h": { "priceChangePercentage": 0.5 },
+      "24h": { "priceChangePercentage": -3.9114796198453 }
+    },
+    "risk": {
+      "snipers": { "count": 0, "totalBalance": 0, "totalPercentage": 0, "wallets": [] },
+      "bundlers": {
+        "count": 1,
+        "totalBalance": 35.766665,
+        "totalPercentage": 0,
+        "totalInitialBalance": 0,
+        "totalInitialPercentage": 0,
+        "wallets": [
+          { "wallet": "8sVTrS9sLF1f7TW1UBhpkpZ4oU1RgvWjUmuHcbpPP1iA", "initialBalance": 0, "initialPercentage": 0, "balance": 35.766665, "percentage": 0.0000035766665, "bundleTime": 1768493998929 }
+        ]
+      },
+      "insiders": { "count": 0, "totalBalance": 0, "totalPercentage": 0, "wallets": [] },
+      "top10": 88.9709,
+      "dev": { "percentage": 0, "amount": 0.00001 },
+      "fees": {
+        "jito": 149.856522498,
+        "network": 5.313206293,
+        "axiom": 10.692949336,
+        "totalTrading": 21.512346947000005,
+        "totalTips": 162.17335050100002,
+        "total": 183.68569744800004
+      },
+      "rugged": false,
+      "risks": [],
+      "score": 0,
+      "jupiterVerified": true
+    },
+    "buys": 155,
+    "sells": 55,
+    "txns": 210,
+    "holders": 673795
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. The official 'Get OHLCV Data for a token' reference defines ChartResponse as { oclhv: [{ open, close, low, high, volume, time }] } (key spelled 'oclhv') but ships no example values; the official price-and-charts guide iterates the response as a bare array and treats `time` as UNIX seconds. The three candles below were constructed from that schema (out of order on purpose); their values are illustrative.",
+  "source": "https://docs.solanatracker.io/data-api/chart/get-ohlcv-data-for-a-token.md ; https://docs.solanatracker.io/guides/price-and-charts.md",
+  "request": "GET https://data.solanatracker.io/chart/6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN?type=1h&time_from=1710000000&time_to=1710086400&currency=usd (header x-api-key)",
+  "response": {
+    "oclhv": [
+      { "open": 5.95, "close": 5.91, "low": 5.88, "high": 5.97, "volume": 812345.5, "time": 1710003600 },
+      { "open": 5.9, "close": 5.95, "low": 5.86, "high": 5.99, "volume": 1023456.25, "time": 1710000000 },
+      { "open": 5.91, "close": 5.93, "low": 5.9, "high": 5.94, "volume": 402000, "time": 1710007200 }
+    ]
+  }
+}
