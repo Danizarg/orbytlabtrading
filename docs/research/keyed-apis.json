@@ -1,0 +1,495 @@
+{
+ "provider": "Birdeye + SolanaTracker + Codex + Moralis + Bitquery",
+ "summary": "Status on 2026-09-28. All five need a key or a payment, so no market data could be pulled keyless. Each auth gate, CORS behaviour and WebSocket handshake was verified with real requests, and the 9 saved fixtures record exactly what they returned. Response shapes below come from each vendor's current official docs and OpenAPI/AsyncAPI specs, fetched today.\n\n(1) BIRDEYE (data.birdeye.so/docs; docs.birdeye.so now 301-redirects there). Tiers: Standard free, 30k CU/month, 1 rps, no overage. Lite $39, 2.5M CU, 15 rps. Starter $99, 8M CU, 15 rps. Premium $199, 20M CU, 50 rps, WebSockets (500 connections). Business $499, 60M CU, 100 rps, all APIs, 2,000 WS connections. B-15 $899/150M, B-30 $1350/300M, B-50 $2050/500M, AutoScale B-10A $699/100M. There is also x402 pay-per-request at $0.003 per call with no key, REST only. The richest single source for ORBYT: v3 OHLCV with 1s/15s/30s and up to 5,000 candles; meme list and detail with progress_percent, graduated and creation_time; holder-profile with sniper, bundler, insider, dev, smart_trader and kol tags; first-buyers; wallet PnL. Its WebSocket (Premium and up) has SUBSCRIBE_MEME and SUBSCRIBE_TOKEN_STATS, which carry sniper/bundler/insider/dev/top-10 fields. The free 30k CU buys roughly 1,000 to 2,500 calls a month.\n\n(2) SOLANA TRACKER (docs.solanatracker.io; prices in EUR). Free: 10,000 requests/month, 3 req/s, all REST. Advanced €50 (200k), Pro €200 (1M), Premium €397 (10M, adds Datastream WebSocket), Business €599 (25M), Enterprise €1,499 (100M). Best fit for the Pulse screen: GET /tokens/multi/all returns latest, graduating and graduated in one call. Token info returns risk data (snipers, insiders, bundlers, top10, dev, score, rugged). Charts go down to 1s/5s/15s. PnL V2 covers wallets, first buyers and top traders. Datastream needs Premium and puts the key in the URL path.\n\n(3) CODEX (docs.codex.io). GraphQL at https://graph.codex.io/graphql, header `Authorization: <key>` with no Bearer prefix. 'Almost free' plan: $1 one-time signup, 10,000 requests/month, 5 rps, a subset of queries, no WebSockets, webhooks, wallet, holders or launchpad data. Growth: from $350/month for 1M requests, 300 rps, 300 WS connections, every subscription billed per message. Codex is the only vendor with short-lived browser-safe JWTs (createApiTokens), but that needs Growth. filterTokens exposes sniper/bundler/insider/dev/top-10 fields and launchpad lifecycle filters. Keyless calls get an HTTP 402 MPP payment challenge at $0.001 per request.\n\n(4) MORALIS (docs.moralis.com). No free plan any more: Starter $149 for 2M CU at 40 rps, Pro $249 for 100M CU, Business $749. The Solana pump.fun new/bonding/graduated, bonding-status and Solana holders/top-holders endpoints were REMOVED on 2026-07-31; I confirmed they return 404 today. The Universal PnL API's chain enum does not include Solana, and Solana Token Score was sunset. What remains useful: swaps by token/pair/wallet, pair OHLCV (1s/10s/30s up to 1M timeframes), portfolio and prices.\n\n(5) BITQUERY: GraphQL V2 plus WebSocket streaming at streaming.bitquery.io. The only free option is a 7-day trial (1,000 points, 2 streams, 17 stream-minutes, real-time only). Personal $39/month has no streaming and is personal-use only. Pro $79/month (annual) has 100 streams. Good pump.fun coverage through the TokenSupplyUpdates, DEXTrades and DEXPools cubes.\n\nHeadline for ORBYT: none of the free tiers includes WebSockets. Solana Tracker Free (10k requests) and Birdeye Standard (30k CU) are the best free keyed sources for risk metrics and launch lists, but they only cover development and cached low-frequency enrichment, not a live multi-user terminal. Every key must stay server-side.",
+ "auth": "All keyed; nothing returns data keyless (verified 2026-09-28).\n- BIRDEYE: header `X-API-KEY: <key>` plus `x-chain: solana` (default solana). WebSocket: wss://public-api.birdeye.so/socket/solana?x-api-key=<key> with subprotocol `echo-protocol`; docs also list headers Origin: ws://public-api.birdeye.so and Sec-WebSocket-Origin. Free tier 'Standard': 30,000 CU/month, 1 rps. The dashboard offers IP whitelist and blacklist only; the docs show no domain allowlist. Keyless alternative: x402 at https://public-api.birdeye.so/x402/<path>, $0.003 per request (USDC on Solana, facilitator Coinbase CDP or PayAI), REST only.\n- SOLANA TRACKER: header `x-api-key: <key>` on https://data.solanatracker.io. Datastream key goes in the path: wss://datastream.solanatracker.io/<apiKey>. Free: 10,000 requests/month, 3 req/s, no Datastream.\n- CODEX: POST https://graph.codex.io/graphql with header `Authorization: <secret key>` (no Bearer), or `Authorization: Bearer <jwt>` for short-lived keys from the createApiTokens mutation (Growth+; defaults requestLimit 5000 and expiresIn 3,600,000 ms). WebSocket wss://graph.codex.io/graphql, subprotocol graphql-transport-ws, key in the connection_init payload {Authorization: key}. 'Almost free': $0 plus a $1 one-time activation, 10k requests/month, 5 rps, no WS. Keyless requests return a 402 MPP challenge ($0.001 USDC on Tempo, chainId 4217).\n- MORALIS: header `X-API-Key: <key>` on https://solana-gateway.moralis.io (Solana) and the Universal API. No free plan in the 2026 pricing; Starter $149/month.\n- BITQUERY: HTTP header `Authorization: Bearer <access_token>`. Tokens come from account.bitquery.io or the OAuth2 client-credentials flow (POST https://oauth2.bitquery.io/oauth2/token, grant_type=client_credentials, scope=api; returns expires_in). WebSocket: wss://streaming.bitquery.io/graphql?token=<token> with subprotocol graphql-ws. Free: 7-day trial only.\nSuggested env vars, all server-only with no NEXT_PUBLIC_ prefix: BIRDEYE_API_KEY, SOLANATRACKER_API_KEY, CODEX_API_KEY, MORALIS_API_KEY, BITQUERY_CLIENT_ID, BITQUERY_CLIENT_SECRET (or BITQUERY_ACCESS_TOKEN).",
+ "base_urls": [
+  "https://public-api.birdeye.so",
+  "wss://public-api.birdeye.so/socket/solana?x-api-key={KEY}",
+  "https://public-api.birdeye.so/x402 (pay-per-request prefix)",
+  "https://data.solanatracker.io",
+  "wss://datastream.solanatracker.io/{apiKey}",
+  "https://graph.codex.io/graphql",
+  "wss://graph.codex.io/graphql",
+  "https://solana-gateway.moralis.io",
+  "https://streaming.bitquery.io/graphql",
+  "wss://streaming.bitquery.io/graphql?token={TOKEN}"
+ ],
+ "cors": "All observed with Origin: https://www.orbytai.org on 2026-09-28. Browsers could technically call every one of them directly, but that exposes the key, so proxy through Next.js route handlers.\n- Birdeye REST: `Access-Control-Allow-Origin: *`, including on 401 and 402. Preflight OPTIONS returns 204 with Allow-Headers `x-api-key,x-chain` and Allow-Methods GET,HEAD,PUT,PATCH,POST,DELETE. Exposed headers include X-RateLimit-Limit/Remaining/Reset and PAYMENT-REQUIRED/PAYMENT-RESPONSE.\n- Birdeye WebSocket: upgrades (101) with a browser Origin as long as some key string is present; with no key at all it returns HTTP 400 'x-api-key is required'. With an invalid key, the first SUBSCRIBE_* gets {type:'ERROR', statusCode:400, data:'Invalid request with origin or api-key'}. Whether a valid key is accepted from a non-birdeye Origin is UNCERTAIN.\n- Solana Tracker REST: reflects the origin (`access-control-allow-origin: https://www.orbytai.org`, `access-control-allow-credentials: true`, `vary: *`). Preflight returns 204 with Allow-Headers x-api-key, Allow-Methods GET, max-age 5. Datastream WebSocket upgrade also reflects the origin.\n- Codex: `access-control-allow-origin: *` on HTTP (the 402) and on the WebSocket upgrade.\n- Moralis solana-gateway: `Access-Control-Allow-Origin: *`; preflight returns 204 allowing the x-api-key header.\n- Bitquery: `access-control-allow-origin: *` with allow-credentials true on the 401.",
+ "rate_limits": "BIRDEYE: rate limits are per account across all APIs. Standard 1 rps; Lite and Starter 15 rps; Premium 50 rps / 1,000 rpm; Business 100 rps / 1,500 rpm; B-15 and above 150 rps; AutoScale 150 rps / 9,000 rpm. Per-API caps include /defi/price and multi_price 300 rps, OHLCV 100, token_overview 300, token_security 150, v3 token txs 100, v3 token list scroll 2 rps. Wallet API limits are inconsistent across docs pages: '5 rps and 75 rpm for all wallet products' vs '30 rps / 150 rpm' vs '30 rpm'. CU costs: price 3; multi_price ceil(3*n^0.8); ohlcv 12 CU for ≤100 candles / 25 for ≤300 / 35 above; v3 ohlcv 12/25/40/75/100 CU up to 5,000 candles; token_overview 15; market-data 8; v3 token txs 12; txs/token 10; new_listing 20; meme list 30; meme detail 15; token_security 25; token holder 30; holder-profile 25; first-buyers 25; wallet-tags-tracker 30; trending 25; wallet token_list and tx_list 50 each; pnl/summary 20; pnl per token ceil(10*n^0.8). WebSocket is billed per byte: PRICE 0.0015, TXS 0.00015, TOKEN_NEW_LISTING 0.04, NEW_PAIR 0.03, LARGE_TRADE 0.005, WALLET_TXS 0.002, TOKEN_STATS 0.002, MEME 0.001 CU/byte. The account is suspended at 5x included usage unless auto-renew is on. Observed headers: X-RateLimit-Limit: 100, X-RateLimit-Remaining: 99, X-RateLimit-Reset: 1790628469 (epoch seconds) on the x402 route; cf-cache-status DYNAMIC.\nSOLANA TRACKER: Free 10k requests/month at 3 req/s; paid plans list rate limit 'None'. 429 when over quota. REST quota exhaustion does not close an open Datastream. Datastream on Premium+ has unlimited messages, connections and rooms. No rate-limit headers observed.\nCODEX: Almost free 5 rps, Growth 300 rps. Each query response counts as 1 request; aliased queries count separately; each subscription message counts as 1. 429 returns TOO_MANY_REQUESTS with extensions.retryAfterSeconds and a Retry-After header. Up to 200 filterTokens results per request; 200 events per getTokenEvents; 1,500 bars per getBars; onPricesUpdated takes at most 25 tokens; plan for about 100 watched tokens per connection; Growth allows 300 connections. Observed cache-control: no-store.\nMORALIS: Starter 40 rps, Pro 80, Business 200, measured over a rolling 4-second window; 429 when exceeded. Solana CU costs: price 10, batch prices 100, OHLCV 150, token/pair/wallet swaps 50, portfolio 10, pair stats 100, pairs/stats 80. Overage $11.25 / $5 / $4 per million CU.\nBITQUERY: points-based. Personal 30 req/min with 3 concurrent streams but no streaming allowed; Pro 90 req/min, 100 streams, 100k stream-minutes; Scale 240 req/min, 1,000 streams. Trial: 1,000 points, 2 streams, 17 stream-minutes, 7 days.",
+ "endpoints": [
+  {
+   "name": "Birdeye x402 payment challenge (keyless probe)",
+   "request": "GET https://public-api.birdeye.so/x402/defi/price?address=So11111111111111111111111111111111111111112",
+   "status": "VERIFIED",
+   "purpose": "Keyless pay-per-request access to every Birdeye REST endpoint ($0.003 per call); verified the 402 challenge only (no payment sent)",
+   "response_shape": "HTTP 402, body {success:false, message:'Payment is required to access this resource'}. Header PAYMENT-REQUIRED is base64 JSON: {x402Version:2, resource:{url, description}, accepts:[{scheme:'exact', network:'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp', amount:'3000' (USDC base units = $0.003), asset:'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', payTo, maxTimeoutSeconds:60, extra.feePayer}], extensions:{payment-identifier (id pattern ^pay_[a-zA-Z0-9_-]{10,120}$), offer-receipt, bazaar}}. The client retries with a PAYMENT-SIGNATURE header.",
+   "auth": "none (payment)",
+   "freshness": "n/a",
+   "params_limits": "REST only, no WebSocket under x402",
+   "sample_file": "tests/fixtures/keyed-apis/birdeye_x402_price_402_payment_required.json"
+  },
+  {
+   "name": "Birdeye token overview",
+   "request": "GET https://public-api.birdeye.so/defi/token_overview?address={mint}[&frames=1m,5m,...][&ui_amount_mode=scaled] (headers X-API-KEY, x-chain: solana)",
+   "status": "DOCUMENTED",
+   "purpose": "Token header stats: price, market cap, liquidity, holders, windowed volume, trades and unique wallets",
+   "response_shape": "data.{address, decimals, symbol, name, logoURI, extensions, marketCap, fdv, totalSupply, circulatingSupply, holder (count), liquidity (USD), price (USD), lastTradeUnixTime (s), numberMarkets, global_fees_paid (SOL), isScaledUiToken, multiplier}. Per window W in {1m,5m,30m,1h,2h,4h,8h,24h}: priceChange{W}Percent, history{W}Price, trade{W}, buy{W}, sell{W}, uniqueWallet{W}, v{W} (token units), v{W}USD, vBuy{W}USD, vSell{W}USD, plus *History* and *ChangePercent variants. Price-change windows also include 6h and 12h. All keys are camelCase.",
+   "auth": "X-API-KEY",
+   "freshness": "real-time aggregate",
+   "params_limits": "15 CU; Standard (free) and up; up to 8 custom frames"
+  },
+  {
+   "name": "Birdeye price / multi_price",
+   "request": "GET https://public-api.birdeye.so/defi/price?address={mint}[&include_liquidity=true]; GET|POST https://public-api.birdeye.so/defi/multi_price?list_address=a,b,c",
+   "status": "DOCUMENTED",
+   "purpose": "Live USD price for table cells and portfolio valuation",
+   "response_shape": "price: data.{value (USD), updateUnixTime (s), updateHumanTime, priceChange24h (%), priceInNative (SOL), liquidity (USD, when requested), isScaledUiToken}. multi_price: data.{<mint>: {value, updateUnixTime, updateHumanTime, priceInNative, priceChange24h, liquidity}} keyed by mint.",
+   "auth": "X-API-KEY",
+   "freshness": "real-time",
+   "params_limits": "price 3 CU (Standard+). multi_price max 100 tokens, ceil(3*n^0.8) CU, Lite+ only; it is the only 'multiple' endpoint Lite/Starter can use."
+  },
+  {
+   "name": "Birdeye OHLCV v3 (token)",
+   "request": "GET https://public-api.birdeye.so/defi/v3/ohlcv?address={mint}&type={1s|15s|30s|1m|3m|5m|15m|30m|1H|2H|4H|6H|8H|12H|1D|3D|1W|1M}&time_from={s}&time_to={s}[&currency=usd|native][&chart_type=price|mcap][&mode=range|count&count_limit<=5000][&padding=false][&outlier=true]",
+   "status": "DOCUMENTED",
+   "purpose": "Candlestick chart, including 1s/15s/30s launch candles",
+   "response_shape": "data.{is_scaled_ui_token, items[]: {o, h, l, c (USD or native per currency), v (token units), v_usd, unix_time (s, bucket start), address, type, currency}}. snake_case, unlike v1.",
+   "auth": "X-API-KEY",
+   "freshness": "live; empty candles are not padded unless padding=true",
+   "params_limits": "Max 5,000 candles. 1s data kept 2 weeks, 15s/30s 3 months. CU: 12 for ≤100, 25 for ≤300, 40 for ≤1,000, 75 for ≤2,000, 100 for ≤5,000. Available from Standard (free) up. mode=count takes time_from OR time_to, not both."
+  },
+  {
+   "name": "Birdeye OHLCV v1 + pair OHLCV",
+   "request": "GET https://public-api.birdeye.so/defi/ohlcv?address={mint}&type={1m..1M}&time_from&time_to; GET /defi/ohlcv/pair?address={pair}...; GET /defi/v3/ohlcv/pair?address={pair}&type={1s..1M}[&inversion=true]",
+   "status": "DOCUMENTED",
+   "purpose": "Legacy token candles (1m minimum) and pool-specific candles",
+   "response_shape": "v1: data.{isScaledUiToken, items[]: {o, h, l, c, v, vUsd, unixTime (s), address, type, currency}} (camelCase). v3 pair: data.items[]: {address, o, h, l, c, v, v_usd, type, unix_time}.",
+   "auth": "X-API-KEY",
+   "freshness": "live",
+   "params_limits": "v1 max 1,000 candles, no second-level intervals; CU 12 for ≤100 / 25 for ≤300 / 35 above. v3 pair max 5,000 with 1s/15s/30s. All Standard+."
+  },
+  {
+   "name": "Birdeye token trades v3",
+   "request": "GET https://public-api.birdeye.so/defi/v3/token/txs?address={mint}&limit<=100&offset&tx_type={swap|buy|sell|add|remove|all}[&owner][&pool_id][&before_time|after_time (s)][&before_block_number|after_block_number][&source=pump_dot_fun|pump_amm|raydium...]",
+   "status": "DOCUMENTED",
+   "purpose": "Live trade feed on the token page (poll), plus per-wallet filter",
+   "response_shape": "data.{items[]: {tx_type (buy|sell|...), side, tx_hash, ins_index, inner_ins_index, block_unix_time (s), block_number, volume_usd, volume (token units), owner, signers[], source, alias, price_pair, pool_id, from/to: {symbol, address, decimals, price (USD), amount (raw integer string), ui_amount (decimal-adjusted), ui_change_amount (signed)}}, has_next}",
+   "auth": "X-API-KEY",
+   "freshness": "seconds",
+   "params_limits": "12 CU; limit ≤100; offset+limit ≤10,000; sort_type desc only; Standard+. Legacy GET /defi/txs/token: limit ≤50, 10 CU, camelCase items {quote, base: {amount raw, uiAmount, price, nearestPrice, changeAmount}, basePrice, quotePrice, txHash, source, blockUnixTime, txType, owner}."
+  },
+  {
+   "name": "Birdeye new listing",
+   "request": "GET https://public-api.birdeye.so/defi/v2/tokens/new_listing?limit<=20[&time_to={s}][&meme_platform_enabled=true]",
+   "status": "DOCUMENTED",
+   "purpose": "New Pairs column seed (pump.fun included only with meme_platform_enabled=true)",
+   "response_shape": "data.items[]: {address, symbol, name, decimals, source, liquidityAddedAt (ISO string, e.g. '2024-09-18T17:59:23'; the WebSocket gives epoch seconds), logoURI, liquidity (USD)}",
+   "auth": "X-API-KEY",
+   "freshness": "real-time",
+   "params_limits": "20 CU; limit max 20; Standard+"
+  },
+  {
+   "name": "Birdeye meme token list",
+   "request": "GET https://public-api.birdeye.so/defi/v3/token/meme/list?sort_by={progress_percent|creation_time|graduated_time|market_cap|volume_5m_usd|...}&sort_type=desc[&source=pump_dot_fun|raydium_launchlab|meteora_dynamic_bonding_curve|moonshot|...][&graduated=true|false][&min_progress_percent&max_progress_percent][&min_creation_time&max_creation_time][&min_graduated_time...][&min_liquidity/min_market_cap/min_holder/min_volume_*...]&offset&limit<=100",
+   "status": "DOCUMENTED",
+   "purpose": "Pulse columns: New (graduated=false, sort creation_time); Final Stretch (graduated=false, min_progress_percent≈50-80); Migrated (graduated=true, sort graduated_time)",
+   "response_shape": "data.{items[]: {address, name, symbol, decimals, logo_uri, extensions, price, market_cap, fdv, liquidity, total_supply, circulating_supply, holder, recent_listing_time, last_trade_unix_time, global_fees_paid (SOL), volume_{1m..30d}_usd, volume_*_change_percent, price_change_{1m..30d}_percent, trade_{1m..30d}_count, buy_24h, sell_24h, volume_buy_24h_usd, unique_wallet_24h, meme_info: {source, platform_id, creator, creation_time (s), created_at: {tx_hash, slot, block_time}, graduated (bool), graduated_time (s|null), progress_percent (0-100), pool: {address, real_sol_reserves (lamports string), real_token_reserves, virtual_token_reserves, token_total_supply (raw strings)}}}, has_next}. No sniper/bundler fields in REST (they are in the SUBSCRIBE_MEME WebSocket).",
+   "auth": "X-API-KEY",
+   "freshness": "real-time",
+   "params_limits": "30 CU; limit ≤100; offset+limit ≤10,000. Tier conflict: the accessibility table says Standard, the endpoint page says Lite+."
+  },
+  {
+   "name": "Birdeye meme token detail",
+   "request": "GET https://public-api.birdeye.so/defi/v3/token/meme/detail/single?address={mint}",
+   "status": "DOCUMENTED",
+   "purpose": "Bonding-curve progress and graduation state for the token page",
+   "response_shape": "data.{address, name, symbol, decimals, extensions, logo_uri, price, liquidity, global_fees_paid, circulating_supply, total_supply, market_cap, fdv, meme_info: {source, platform_id, created_at{tx_hash, slot, block_time}, creation_time, creator, updated_at, graduated_at{slot, tx_hash, block_time}, graduated, graduated_time, pool{...raw reserve strings}, progress_percent}}",
+   "auth": "X-API-KEY",
+   "freshness": "real-time",
+   "params_limits": "15 CU; endpoint page says Lite+ (accessibility table says Standard)"
+  },
+  {
+   "name": "Birdeye token security",
+   "request": "GET https://public-api.birdeye.so/defi/token_security?address={mint}",
+   "status": "DOCUMENTED",
+   "purpose": "Mint/freeze authority, creator holdings, top-10 concentration, Token-2022 flags",
+   "response_shape": "data.{creatorAddress, creatorOwnerAddress, ownerAddress, creationTx, creationTime (s), creationSlot, mintTx, mintTime, creatorBalance, creatorPercentage (FRACTION 0-1), ownerBalance, ownerPercentage, metaplexUpdateAuthority, mutableMetadata, top10HolderBalance, top10HolderPercent (FRACTION 0-1, e.g. 0.304 means 30.4%), top10UserBalance, top10UserPercent, totalSupply, preMarketHolder[], lockInfo, freezeable, freezeAuthority, transferFeeEnable, transferFeeData, isToken2022, nonTransferable, jupStrictList, isTrueToken, fakeToken}",
+   "auth": "X-API-KEY",
+   "freshness": "cached/slow-changing",
+   "params_limits": "25 CU; Lite+ (not on free)"
+  },
+  {
+   "name": "Birdeye token holders",
+   "request": "GET https://public-api.birdeye.so/defi/v3/token/holder?address={mint}&offset&limit<=100[&mode=token_account|wallet][&get_holder_infos=true]",
+   "status": "DOCUMENTED",
+   "purpose": "Holders tab",
+   "response_shape": "data.{holder (total count), top10HoldPercent (PERCENT 0-100), items[]: {amount (raw string), decimals, mint, owner, token_account, ui_amount, is_scaled_ui_token, multiplier}}. mode=wallet groups accounts by owner; get_holder_infos adds netWorth, solBalance, funding.",
+   "auth": "X-API-KEY",
+   "freshness": "near real-time",
+   "params_limits": "30 CU; limit ≤100 (default 10); offset+limit ≤10,000; Standard+"
+  },
+  {
+   "name": "Birdeye holder profile (sniper/bundler/insider/dev tags)",
+   "request": "GET https://public-api.birdeye.so/token/v1/holder-profile?token_address={mint}[&interval=1h][&include_zero_balance=true]",
+   "status": "DOCUMENTED",
+   "purpose": "Risk panel: holdings and PnL of snipers, bundlers, insiders, dev, smart traders and KOLs",
+   "response_shape": "data.{token: {creation_time, market_cap, liquidity, volume_1h_usd, buy_volume_1h_usd, sell_volume_1h_usd, top10_holder: {hold_amount (string), percent_of_supply (0-100)}}, holder_summary: {total_holder, total_holding, percent_of_supply}, tags[]: {tag in [bundler, sniper, insider, dev, smart_trader, kol], holder_count, hold_amount (string), percent_of_supply (0-100), buy_volume, sell_volume, buy_volume_usd, sell_volume_usd, avg_buy_price, pnl (USD string)}}",
+   "auth": "X-API-KEY",
+   "freshness": "near real-time",
+   "params_limits": "25 CU; Standard (free) and up per its page; Solana only. Related: /token/v1/first-buyers (Lite+, 25 CU, up to 1,000 buyers, limit ≤100) returns buyers[]: {wallet_address, block_unix_time, first_buy_volume(_usd), total_buy_volume(_usd), initial_holding, current_holding, position_status (buy_more|hold|sell_partial|sell_all), tags[]}. /token/v1/wallet-tags-tracker (Lite+, 30 CU) gives time-bucketed tag flows with time_frame 1s..1M."
+  },
+  {
+   "name": "Birdeye trending / market data",
+   "request": "GET https://public-api.birdeye.so/defi/token_trending?sort_by=rank|volumeUSD|liquidity&sort_type=asc&interval=1h|4h|24h&offset&limit<=50; GET /defi/v3/token/market-data?address={mint}",
+   "status": "DOCUMENTED",
+   "purpose": "Discover table seed; lightweight token stats",
+   "response_shape": "trending: data.{updateUnixTime, updateTime, tokens[]: {address, decimals, liquidity, logoURI, name, symbol, volume24hUSD, volume24hChangePercent, rank, price, price24hChangePercent, fdv, marketcap}, total}. market-data: data.{address, price, liquidity, total_supply, circulating_supply, fdv, market_cap, holder, is_scaled_ui_token, multiplier}",
+   "auth": "X-API-KEY",
+   "freshness": "trending refreshed periodically (updateUnixTime)",
+   "params_limits": "trending 25 CU, limit ≤50; market-data 8 CU (the /multiple variant is Business-only); both Standard+"
+  },
+  {
+   "name": "Birdeye wallet portfolio / tx list",
+   "request": "GET https://public-api.birdeye.so/v1/wallet/token_list?wallet={addr}; GET /v1/wallet/tx_list?wallet={addr}&limit<=100[&before={txHash}]",
+   "status": "DOCUMENTED",
+   "purpose": "Wallet tracker holdings and activity",
+   "response_shape": "token_list: data.items[]: {address, decimals, balance (raw integer), uiAmount, chainId, name, symbol, icon, logoURI, priceUsd, valueUsd, isScaledUiToken, multiplier}. tx_list: data.solana[]: {txHash, blockNumber, blockTime (ISO), status, from, to, fee (lamports), mainAction, balanceChange[]: {amount (raw signed), symbol, decimals, address}, contractLabel, tokenTransfers[]}",
+   "auth": "X-API-KEY",
+   "freshness": "real-time (beta)",
+   "params_limits": "50 CU each; Lite+; wallet-group rate limits are low (documented inconsistently: 5 rps/75 rpm or 30 rpm)"
+  },
+  {
+   "name": "Birdeye wallet PnL",
+   "request": "GET https://public-api.birdeye.so/wallet/v2/pnl/summary?wallet={addr}&duration=all|90d|30d|7d|24h[&pnl_method=net_cash|wac]; GET /wallet/v2/pnl?wallet={addr}&token_addresses=a,b",
+   "status": "DOCUMENTED",
+   "purpose": "Wallet analytics / PnL",
+   "response_shape": "summary: data.summary.{unique_tokens, counts: {total_buy, total_sell, total_trade, total_win, total_loss, win_rate}, cashflow_usd: {total_invested, total_sold}, pnl: {realized_profit_usd, realized_profit_percent, unrealized_usd, total_usd, avg_profit_per_trade_usd}}. per-token: data.{meta{address, currency, time}, tokens: {<mint>: {symbol, decimals, counts, quantity{total_bought_amount, total_sold_amount, holding}, cashflow_usd{...}, pnl{realized_profit_usd, unrealized_usd, total_usd, *_percent}, pricing{...}}}}",
+   "auth": "X-API-KEY",
+   "freshness": "near real-time",
+   "params_limits": "summary 20 CU; per-token ceil(10*n^0.8) CU; both Standard+; /wallet/v2/pnl/multiple is Business-only"
+  },
+  {
+   "name": "SolanaTracker token info (with risk)",
+   "request": "GET https://data.solanatracker.io/tokens/{mint} (header x-api-key)",
+   "status": "DOCUMENTED",
+   "purpose": "Token page header plus risk panel (snipers, insiders, bundlers, top10, dev, score)",
+   "response_shape": "{token: {name, symbol, mint, uri, decimals, description, image, hasFileMetaData, strictSocials, createdOn, creation: {creator, created_tx, created_time (SECONDS)}}, pools[]: {poolId, liquidity: {quote (SOL/quote units), usd}, price: {quote, usd}, tokenSupply (UI), lpBurn (0-100), marketCap: {quote, usd}, market (pumpfun|pumpfun-amm|raydium-*|meteora-dlmm...), quoteToken, decimals, security: {freezeAuthority, mintAuthority}, lastUpdated (MS), createdAt (MS), deployer, curvePercentage, curve, txns: {buys, sells, total, volume, volume24h}}, events: {'1m'..'24h': {priceChangePercentage}}, risk: {snipers: {count, totalBalance, totalPercentage, wallets[]: {wallet, balance, percentage}}, insiders: {same}, bundlers: {count, totalBalance, totalPercentage, totalInitialBalance, totalInitialPercentage, wallets[]: {wallet, initialBalance, balance, percentage, bundleTime (MS)}}, top10 (percent), dev: {percentage, amount}, fees: {jito, axiom, photon, ..., total}, rugged, risks[] (objects {name, description, level, score}), score (1-10), jupiterVerified}, buys, sells, txns, holders}",
+   "auth": "x-api-key",
+   "freshness": "real-time",
+   "params_limits": "1 request; Free and up. risk.bundlers may be omitted, in which case use /tokens/{token}/bundlers (top 500 bundler wallets)."
+  },
+  {
+   "name": "SolanaTracker Pulse overview (latest + graduating + graduated)",
+   "request": "GET https://data.solanatracker.io/tokens/multi/all?limit<=500&minCurve=40&minHolders=20[&maxHolders][&minCreatedAt|maxCreatedAt (s, ms or ISO)][&reduceSpam=true][&minLiquidity&maxLiquidity&minMarketCap&maxMarketCap][&markets=pumpfun,...][&minRiskScore&maxRiskScore][&rugged=false]",
+   "status": "DOCUMENTED",
+   "purpose": "Pulse New / Final Stretch / Migrated in ONE request (documented as 'Axiom Pulse / Photon Memescope style')",
+   "response_shape": "{latest: TokenObj[], graduating: TokenObj[], graduated: TokenObj[]}. TokenObj has the same shape as token info (token, pools[] incl. curvePercentage, events, risk, holders, txns).",
+   "auth": "x-api-key",
+   "freshness": "real-time",
+   "params_limits": "limit per category ≤500 (default 100). Separate endpoints: GET /tokens/latest?page=1..10 (100 per page); GET /tokens/multi/graduating (minCurve/maxCurve 0-100); GET /tokens/multi/graduated?page."
+  },
+  {
+   "name": "SolanaTracker OHLCV chart",
+   "request": "GET https://data.solanatracker.io/chart/{mint}?type={1s|5s|15s|1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w|1mn}&time_from={s}&time_to={s}[&marketCap=true][&currency=usd|sol|eur][&removeOutliers=true][&dynamicPools=true][&fastCache=true]; pool variant GET /chart/{mint}/{pool}",
+   "status": "DOCUMENTED",
+   "purpose": "Candlestick chart incl. 1s/5s/15s",
+   "response_shape": "{oclhv[]: {open, close, low, high, volume, time}}. The key is spelled 'oclhv'. The docs never state the unit of `time`; seconds is likely but UNCERTAIN. The guide code treats the response as a bare array, which contradicts the schema.",
+   "auth": "x-api-key",
+   "freshness": "live (fastCache optional)",
+   "params_limits": "Max candle count per call not documented"
+  },
+  {
+   "name": "SolanaTracker token trades",
+   "request": "GET https://data.solanatracker.io/trades/{mint}[/{pool}[/{owner}]] or /trades/{mint}/by-wallet/{owner}?limit<=500&cursor&sortDirection=DESC|ASC[&events=trades|all|liquidity][&enrich=identity][&showMeta=true][&hideArb=true]",
+   "status": "DOCUMENTED",
+   "purpose": "Transaction feed on the token page; wallet-in-token trades",
+   "response_shape": "{trades[]: {tx, amount (token UI), priceUsd, volume (USD), volumeSol, type (buy|sell|add_liquidity|remove_liquidity), wallet, time (MS), program, pools[], identity?: {name, twitter, avatar, type, tags[], platforms[], developer{...}, bot{...}}}, nextCursor (ms timestamp for trades-only, opaque string otherwise), hasNextPage, sortDirection}",
+   "auth": "x-api-key",
+   "freshness": "seconds",
+   "params_limits": "limit default 250, max 500"
+  },
+  {
+   "name": "SolanaTracker holders / bundlers / risk charts",
+   "request": "GET https://data.solanatracker.io/tokens/{mint}/holders/paginated?limit<=5000&cursor; GET /tokens/{mint}/holders (top 100); GET /tokens/{mint}/holders/top (top 20); GET /tokens/{mint}/bundlers; GET /holders/chart/{mint}, /insiders/chart/{mint}, /snipers/chart/{mint}, /bundlers/chart/{mint}",
+   "status": "DOCUMENTED",
+   "purpose": "Holders tab plus historical sniper/insider/bundler charts",
+   "response_shape": "paginated: {total, accounts[]: {wallet, account, amount (UI), value: {quote, usd}, percentage (0-100)}, cursor, hasMore, limit}. top: [{address, amount, percentage, value{quote, usd}}]. bundlers: {total, balance, percentage, initialBalance, initialPercentage, wallets[]: {wallet, initialBalance, initialPercentage, balance, percentage, bundleTime (MS)}}",
+   "auth": "x-api-key",
+   "freshness": "near real-time",
+   "params_limits": "paginated limit ≤5,000 (default 1,000); bundlers returns the top 500"
+  },
+  {
+   "name": "SolanaTracker multi price",
+   "request": "GET https://data.solanatracker.io/price/multi?tokens=a,b,c[&priceChanges=true]; POST /price/multi {tokens:[...], priceChanges:true}",
+   "status": "DOCUMENTED",
+   "purpose": "Batch prices for tables and portfolio",
+   "response_shape": "{<mint>: {price (USD), priceQuote (SOL), liquidity (USD), marketCap (USD), lastUpdated (MS), priceChanges?: {'24h': {priceChangePercentage}}}}",
+   "auth": "x-api-key",
+   "freshness": "real-time",
+   "params_limits": "up to 100 tokens"
+  },
+  {
+   "name": "SolanaTracker PnL V2 wallet / first buyers / traders",
+   "request": "GET https://data.solanatracker.io/v2/pnl/wallets/{wallet}[?pnlMode=strict|adjusted|raw&currency=usd|sol|eur]; GET /v2/pnl/wallets/{wallet}/positions; GET /v2/pnl/tokens/{mint}/first-buyers?limit&cursor; GET /v2/pnl/tokens/{mint}/traders?sort=holding|pnl|realized|roi|...&direction&limit&cursor&activeOnly; GET /v2/pnl/leaderboard/top; POST /v2/pnl/wallets/batch",
+   "status": "DOCUMENTED",
+   "purpose": "Wallet analytics / PnL, first buyers, top traders, KOL leaderboards",
+   "response_shape": "wallet summary: {wallet, pnlMode, identity{name, twitter, avatar, type, tags[], platforms[]}, summary: {pnl{realized, unrealized, total} (USD), invested, proceeds, openPositions{cost, value}, counts{buys, sells, trades, tokensTraded, tokensHeldEver}, averages{buy, sell}, roi, timing{firstTrade (MS), lastTrade (MS), avgHoldTimeSecs}}, analysis{winRate, tokens{closed, winning, losing}, distribution[]}, stats{...}, tags{isArbitrage, platforms}, updatedAt (ISO)}. traders/first-buyers: {meta{symbol, name, decimals, price, marketCap, liquidity, primaryMarket}, traders[]: {wallet, pnl{token{realized, unrealized, total}, wallet{...}}, identity, position{balance, costBasis, value, price}, buyUsd, sellUsd, counts, roi, volume, current{avgCost}, timing{firstTrade (MS), firstBuy, lastSell, holdTimeSecs}}, pagination.nextCursor}",
+   "auth": "x-api-key",
+   "freshness": "near real-time",
+   "params_limits": "limit default 100; first-buyers is asc only. The deprecated /pnl/{wallet}, /first-buyers/{token}, /top-traders/* paths still work and read from PnL V2."
+  },
+  {
+   "name": "SolanaTracker wallet holdings / trades",
+   "request": "GET https://data.solanatracker.io/wallet/{owner}; /wallet/{owner}/basic; /wallet/{owner}/page/{page}; /wallet/{owner}/trades?cursor; /wallet/{owner}/chart",
+   "status": "DOCUMENTED",
+   "purpose": "Wallet tracker portfolio and trade history",
+   "response_shape": "Per the OpenAPI spec: tokens[] {token{...}, pools[], balance (UI), value (USD)}, total, totalSol; trades[] same as /trades",
+   "auth": "x-api-key",
+   "freshness": "real-time",
+   "params_limits": "1 request each"
+  },
+  {
+   "name": "Codex filterTokens",
+   "request": "POST https://graph.codex.io/graphql { filterTokens(filters:{network:[1399811149], launchpadProtocol:[\"Pump\"], launchpadCompleted:false, launchpadMigrated:false, launchpadGraduationPercent:{gte:70}, sniperHeldPercentage:{lt:20}, ...}, rankings:[{attribute:createdAt, direction:DESC}], limit:200, offset:0) { count page results { token{address name symbol info{imageThumbUrl} launchpad{launchpadName graduationPercent completed completedAt migrated migratedAt migratedPoolAddress poolAddress}} priceUSD marketCap liquidity volume24 change5m change1 buyCount5m sellCount5m holders createdAt sniperCount sniperHeldPercentage bundlerCount bundlerHeldPercentage insiderCount insiderHeldPercentage devHeldPercentage top10HoldersPercent isScam } } }",
+   "status": "DOCUMENTED",
+   "purpose": "Discover table and Pulse columns with risk filters in one query",
+   "response_shape": "data.filterTokens.{count, page, results[]: TokenFilterResult}. Numeric fields are mostly STRINGS: priceUSD, marketCap, circulatingMarketCap, liquidity, volume{5m,1,4,12,24} (USD), change* (FRACTION strings). Integers: buyCount*, sellCount*, txnCount*, uniqueBuys*. Also holders (Int), createdAt (s), lastTransaction (s), sniper/bundler/insider/suspicious Count (Int) and HeldPercentage (Float, percent), devHeldPercentage, top10HoldersPercent, walletAgeAvg, ath*/atl*, and token.launchpad.{graduationPercent, completed, completedAt, migrated, migratedAt}.",
+   "auth": "Authorization: <key>",
+   "freshness": "search cluster updates about 2-5 s behind chain; 60-150 ms response",
+   "params_limits": "≤200 results per request, offset pagination, 1 request per response. On the free plan 'launchpad data' is excluded, so launchpad filters there are UNCERTAIN."
+  },
+  {
+   "name": "Codex getBars / getTokenBars",
+   "request": "POST https://graph.codex.io/graphql { getBars(symbol:\"{pairAddress}:1399811149\", from:{s}, to:{s}, resolution:\"{1S|5S|15S|30S|1|5|15|30|60|240|720|1D|7D}\", countback:1500, removeEmptyBars:true, currencyCode:\"USD\"|\"TOKEN\", symbolType:TOKEN?) { t o h l c volume buys sells buyers sellers liquidity transactions s } }; getTokenBars(symbol:\"{mint}:1399811149\", ...)",
+   "status": "DOCUMENTED",
+   "purpose": "Charts; getTokenBars aggregates across pools",
+   "response_shape": "data.getBars: parallel arrays: t[] (Int seconds), o[], h[], l[], c[] (Float USD, or token-quoted with currencyCode TOKEN), volume[] (String USD; the Int field `v` is deprecated), volumeNativeToken[], buys[], sells[], buyers[], sellers[], buyVolume[], sellVolume[], liquidity[], traders[], transactions[], s (status 'ok'|'no_data')",
+   "auth": "Authorization",
+   "freshness": "live",
+   "params_limits": "≤1,500 bars per request; sub-minute resolutions (1S/5S/15S/30S) only cover the last 24 h. For market-cap charts multiply by circulatingSupply."
+  },
+  {
+   "name": "Codex getTokenEvents",
+   "request": "POST https://graph.codex.io/graphql { getTokenEvents(query:{address:\"{mint or pair}\", networkId:1399811149, eventDisplayType:[Buy,Sell], maker?, timestamp:{from,to}, priceUsdTotal:{gte}}, limit:200, cursor, direction:DESC) { cursor items { timestamp transactionHash maker eventDisplayType token0SwapValueUsd token1SwapValueUsd walletLabels walletAge labels{...} data { ... on SwapEventData { priceUsd priceUsdTotal priceBaseToken priceBaseTokenTotal amount0 amount1 amountNonLiquidityToken } } } } }",
+   "status": "DOCUMENTED",
+   "purpose": "Transaction feed; per-wallet trades",
+   "response_shape": "data.getTokenEvents.{cursor, items[]: Event{address, timestamp (s), blockNumber, transactionHash, maker, eventType, eventDisplayType (Buy|Sell|...), token0/1SwapValueUsd (string), walletAge, walletLabels[], labels{sandwich, washtrade}, tradeSource, data: SwapEventData{priceUsd (per token, string), priceUsdTotal (trade USD), amount0/1 (decimal strings)}}}",
+   "auth": "Authorization",
+   "freshness": "seconds",
+   "params_limits": "≤200 events per request; a token address resolves to its top pair"
+  },
+  {
+   "name": "Codex holders / tokenWalletStats / top10HoldersPercent",
+   "request": "POST https://graph.codex.io/graphql { holders(input:{tokenId:\"{mint}:1399811149\", limit, cursor, sort:{attribute:BALANCE, direction:DESC}}) { count top10HoldersPercent cursor status items { address balance shiftedBalance balanceUsd firstHeldTimestamp } } tokenWalletStats(input:{tokenAddress:\"{mint}\", networkId:1399811149}) { sniperCount sniperHeldPercentage bundlerCount bundlerHeldPercentage insiderCount insiderHeldPercentage suspiciousCount devAddress devHeldPercentage devHeldAmount tokenTotalSupply } }",
+   "status": "DOCUMENTED",
+   "purpose": "Holders tab plus sniper/bundler/insider/dev risk metrics",
+   "response_shape": "holders: {items[]: Balance{address, balance (RAW string), shiftedBalance (Float decimal-adjusted), balanceUsd (string), tokenPriceUsd, firstHeldTimestamp (s)}, count, cursor, status, top10HoldersPercent}. tokenWalletStats: counts (Int), *HeldPercentage (Float, of tokenTotalSupply), *HeldAmount (raw unshifted strings), *Addresses[]. Counts only wallets that STILL hold; suspicious = deduplicated union of the three cohorts.",
+   "auth": "Authorization",
+   "freshness": "near real-time",
+   "params_limits": "holders, tokenWalletStats, detailedWalletStats, filterTokenWallets and tokenTopTraders are all marked 'Requires a Growth or Enterprise plan'"
+  },
+  {
+   "name": "Codex wallet stats",
+   "request": "POST https://graph.codex.io/graphql { detailedWalletStats(input:{walletAddress, networkId}) { labels scammerScore botScore statsDay1 statsWeek1 statsDay30 statsYear{...} } filterTokenWallets(...) tokenTopTraders(input:{tokenAddress, networkId, tradingPeriod:DAY|WEEK|MONTH|YEAR}) }",
+   "status": "DOCUMENTED",
+   "purpose": "Wallet analytics / PnL, top traders",
+   "response_shape": "DetailedWalletStats{walletAddress, lastTransactionAt (s), labels[], scammerScore, botScore, statsDay1/Week1/Day30/Year: windowed volume/PnL stats, networkBreakdown[]}",
+   "auth": "Authorization",
+   "freshness": "near real-time",
+   "params_limits": "Growth+ only"
+  },
+  {
+   "name": "Codex MPP payment challenge (keyless probe)",
+   "request": "POST https://graph.codex.io/graphql without an Authorization header (optionally with header X-Codex-Payment: mpp)",
+   "status": "VERIFIED",
+   "purpose": "Documents the keyless behaviour: every unauthenticated query is answered with an HTTP 402 MPP challenge",
+   "response_shape": "HTTP 402, application/problem+json {type:'https://ietf.org/payment/problems/payment-required', title:'Payment Required', status:402, detail:'Payment is required to execute this GraphQL query in MPP mode.'}. Header www-authenticate: Payment id=..., realm='graph.codex.io', method='tempo', intent='charge', request=base64url({amount:'1000' ($0.001 USDC), currency:'0x20c0...8b50', expires (ISO, +2 min), methodDetails:{chainId:4217}, recipient}).",
+   "auth": "none (payment)",
+   "freshness": "n/a",
+   "params_limits": "$0.001 per request",
+   "sample_file": "tests/fixtures/keyed-apis/codex_graphql_nokey_402_mpp_challenge.json"
+  },
+  {
+   "name": "Codex createApiTokens (short-lived browser keys)",
+   "request": "POST https://graph.codex.io/graphql (server-side, secret key) mutation { createApiTokens(input:{count:1, requestLimit:\"5000\", expiresIn:3600000}) { token expiresTimeString requestLimit remaining } }",
+   "status": "DOCUMENTED",
+   "purpose": "Mint per-user JWTs so the browser can open Codex WebSockets without seeing the secret key (fits Vercel)",
+   "response_shape": "data.createApiTokens[]: {id, token (JWT; send as 'Bearer <token>'), expiresTimeString, requestLimit, remaining}",
+   "auth": "Authorization: <secret key>",
+   "freshness": "n/a",
+   "params_limits": "Growth+; expiresIn is in MILLISECONDS; short-lived keys cannot mint more keys"
+  },
+  {
+   "name": "Moralis token / pair / wallet swaps",
+   "request": "GET https://solana-gateway.moralis.io/token/mainnet/{mint}/swaps?limit<=100&cursor&order=DESC&fromDate&toDate&transactionTypes=buy,sell; GET /token/mainnet/pairs/{pair}/swaps (adds addLiquidity/removeLiquidity); GET /account/mainnet/{wallet}/swaps[?tokenAddress]",
+   "status": "DOCUMENTED",
+   "purpose": "Trade feed, wallet trade history",
+   "response_shape": "{page, pageSize, cursor, result[]: {transactionHash, transactionIndex, transactionType (buy|sell), blockNumber, blockTimestamp (ISO string), subCategory, walletAddress, pairAddress, pairLabel, exchangeAddress, exchangeName, exchangeLogo, baseToken, quoteToken, bought: {address, name, symbol, logo, amount (decimal string), usdPrice, usdAmount, tokenType}, sold: {same}, baseQuotePrice, totalValueUsd}}. The pair variant adds a top-level exchange/pair/baseToken/quoteToken block, and result[] rows carry baseTokenAmount, quoteTokenAmount, baseTokenPriceUsd, totalValueUsd.",
+   "auth": "X-API-Key",
+   "freshness": "seconds",
+   "params_limits": "50 CU each; limit ≤100; no free plan"
+  },
+  {
+   "name": "Moralis pair OHLCV",
+   "request": "GET https://solana-gateway.moralis.io/token/mainnet/pairs/{pair}/ohlcv?timeframe={1s|10s|30s|1min|5min|10min|30min|1h|4h|12h|1d|1w|1M}&currency=usd|native&fromDate&toDate&limit<=1000&cursor",
+   "status": "DOCUMENTED",
+   "purpose": "Pair candlesticks incl. 1s/10s/30s",
+   "response_shape": "{cursor, page, pairAddress, tokenAddress, timeframe, currency, result[]: {timestamp (ISO string), open, high, low, close, volume, trades}}",
+   "auth": "X-API-Key",
+   "freshness": "live",
+   "params_limits": "150 CU; limit ≤1,000; fromDate and toDate are required (seconds or a moment.js date string); pair address only, no token-level candles"
+  },
+  {
+   "name": "Moralis portfolio / price",
+   "request": "GET https://solana-gateway.moralis.io/account/mainnet/{wallet}/portfolio; GET /account/mainnet/{wallet}/tokens; GET /token/mainnet/{mint}/price; POST /token/mainnet/prices {addresses:[...]}; GET /token/mainnet/{mint}/pairs/stats",
+   "status": "DOCUMENTED",
+   "purpose": "Wallet portfolio, prices, aggregated pair stats",
+   "response_shape": "portfolio: {nativeBalance: {solana (SOL string), lamports}, tokens[]: {associatedTokenAddress, mint, name, symbol, amount (decimal string), amountRaw, decimals, logo, isVerifiedContract, possibleSpam, score (deprecated, removed 2026-07-31)}, nfts[]}. No USD values in portfolio. price: {tokenAddress, pairAddress, exchangeName, nativePrice{value, decimals, symbol}, usdPrice, usdPrice24h, usdPrice24hrUsdChange, usdPrice24hrPercentChange, isVerifiedContract}. pairs/stats: {totalLiquidityUsd, totalActivePairs, totalVolume{5min,1h,4h,24h}, totalBuyVolume, totalSellVolume, totalBuyers, totalSellers, totalSwaps, ...}",
+   "auth": "X-API-Key",
+   "freshness": "real-time",
+   "params_limits": "portfolio 10 CU; price 10 CU; batch prices 100 CU; pairs/stats 80 CU. Keyless call returns 401 {message:'Missing api key.'} (verified)."
+  },
+  {
+   "name": "Moralis pump.fun new / bonding / graduated (REMOVED)",
+   "request": "GET https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new | /bonding | /graduated; GET /token/mainnet/{mint}/bonding-status",
+   "status": "BROKEN",
+   "purpose": "Was a Pulse feed; removed 2026-07-31 per the Moralis changelog, which points to Data Feeds (sync to your own DB, early access)",
+   "response_shape": "Now HTTP 404 {message:'Resource not found. Please check out the API documentation: https://docs.moralis.com/'} (verified keyless for new, bonding and graduated)",
+   "auth": "X-API-Key",
+   "freshness": "n/a",
+   "params_limits": "n/a",
+   "sample_file": "tests/fixtures/keyed-apis/moralis_solana_gateway_probes.json"
+  },
+  {
+   "name": "Moralis Solana holders / top-holders / holder stats (REMOVED)",
+   "request": "GET https://solana-gateway.moralis.io/token/mainnet/holders/{mint}; /token/mainnet/{mint}/top-holders; /token/mainnet/holders/{mint}/historical",
+   "status": "BROKEN",
+   "purpose": "Was holders plus holder categories; removed 2026-07-31. Holder stats and holders only remain for EVM (/erc20/...)",
+   "response_shape": "HTTP 404 {message:'Resource not found...'} (verified)",
+   "auth": "X-API-Key",
+   "freshness": "n/a",
+   "params_limits": "n/a",
+   "sample_file": "tests/fixtures/keyed-apis/moralis_solana_gateway_probes.json"
+  },
+  {
+   "name": "Moralis Universal PnL",
+   "request": "GET {universal base}/v1/wallets/{wallet}/pnl?chains=...&period=7d|30d|all|fromTimestamp&toTimestamp (MS)&limit&cursor&sortBy; /v1/wallets/{wallet}/pnl/summary; /v1/chains/{chainAlias}/tokens/{token}/top-traders",
+   "status": "UNCERTAIN",
+   "purpose": "Wallet PnL. The `chains` enum lists only EVM chains (eth, pulse, base, bsc, polygon, optimism, avalanche); Solana is not in it, although one example shows 'solana-mainnet' in syncedAt",
+   "response_shape": "rows with realized/unrealized PnL, ROI, volumes, trade counts; syncedAt{chain: block|'latest'}, unsupportedChains[], failedChains[]",
+   "auth": "X-API-Key",
+   "freshness": "n/a",
+   "params_limits": "50 or 30 CU per requested chain; top-traders 50 CU"
+  },
+  {
+   "name": "Bitquery V2 GraphQL (pump.fun / DEX trades)",
+   "request": "POST https://streaming.bitquery.io/graphql (Authorization: Bearer <token>) e.g. { Solana { DEXTrades(where:{Trade:{Dex:{ProtocolName:{is:\"pump\"}}}, Transaction:{Result:{Success:true}}}) { Block{Time} Trade{Buy{Amount Account{Address} Currency{MintAddress}} Sell{Amount Price} Dex{ProtocolName}} Transaction{Signature} } } }",
+   "status": "DOCUMENTED",
+   "purpose": "Historical and real-time pump.fun creations (TokenSupplyUpdates, program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P, methods create/create_v2), trades (DEXTrades / DEXTradeByTokens; ProtocolName 'pump' on the curve, 'pump_amm' after migration), bonding state (DEXPools), holders (BalanceUpdates), OHLC (Trading cube, about 30 days)",
+   "response_shape": "data.Solana.<Cube>[] with nested objects as selected; Block.Time is an ISO datetime string; amounts are decimal-adjusted strings. Bonding progress formula from docs: 100 - ((Pool.Base.PostAmount - 206900000)*100/793100000); graduation when PostAmount reaches 206,900,000.",
+   "auth": "Bearer token",
+   "freshness": "real-time window only on self-serve plans (about 30 days of trades)",
+   "params_limits": "points-based; keyless call returns 401 text/plain 'Unauthorized. Provide Authorization as documented at https://docs.bitquery.io/docs/category/authorization' (verified)",
+   "sample_file": "tests/fixtures/keyed-apis/bitquery_nokey_probes.json"
+  }
+ ],
+ "streaming": [
+  {
+   "name": "Birdeye WebSocket (SUBSCRIBE_PRICE / SUBSCRIBE_TXS / SUBSCRIBE_BASE_QUOTE_PRICE)",
+   "url": "wss://public-api.birdeye.so/socket/solana?x-api-key={KEY}",
+   "status": "DOCUMENTED (handshake VERIFIED: no key gives HTTP 400 'x-api-key is required'; an invalid key upgrades 101, sends WELCOME, then returns ERROR 'Invalid request with origin or api-key' on subscribe)",
+   "auth": "key in query string; subprotocol echo-protocol; docs list Origin: ws://public-api.birdeye.so. Premium ($199, 500 connections) and Business (2,000 connections) only.",
+   "subscribe_message": "{\"type\":\"SUBSCRIBE_PRICE\",\"data\":{\"queryType\":\"simple\",\"chartType\":\"1s|15s|30s|1m|...|1M\",\"address\":\"<mint|pair>\",\"currency\":\"usd|pair\",\"mode\":\"raw|scaled|both\",\"chartBy\":\"price|mcap\"}}. Multi-token: queryType complex with query \"(address = X AND chartType = 1m AND currency = usd) OR (...)\", max 100. Trades: {\"type\":\"SUBSCRIBE_TXS\",\"data\":{\"queryType\":\"simple\",\"address\":\"<mint>\" or \"pairAddress\":\"<pair>\",\"txsType\":\"swap|all|add_liquidity|remove_liquidity\"}}",
+   "event_shape": "PRICE_DATA: data{eventType:'ohlcv', type (interval), unixTime (s), o, h, l, c, v, vUsd, symbol, address, isScaled, multiplier}. TXS_DATA: data{blockUnixTime (s), owner, source, txHash, side (buy|sell), tokenAddress, platform, pricePair, volumeUSD, from/to{address, amount (raw), uiAmount, decimals, price, nearestPrice, symbol, changeAmount}, tokenPrice, network, poolId}",
+   "notes": "Each new SUBSCRIBE_* of the same type REPLACES the previous one on that connection, so resend the full address list. Billed per byte: PRICE 0.0015, TXS 0.00015 CU/byte. Needs ping/reconnect handling. Whether a valid key works from a browser Origin (https://www.orbytai.org) is UNCERTAIN, and the key would sit in the page URL, so run a relay."
+  },
+  {
+   "name": "Birdeye WebSocket (SUBSCRIBE_MEME / SUBSCRIBE_TOKEN_STATS / SUBSCRIBE_TOKEN_NEW_LISTING / SUBSCRIBE_NEW_PAIR / SUBSCRIBE_WALLET_TXS / SUBSCRIBE_LARGE_TRADE_TXS)",
+   "url": "wss://public-api.birdeye.so/socket/solana?x-api-key={KEY}",
+   "status": "DOCUMENTED",
+   "auth": "same as above; Premium+",
+   "subscribe_message": "{\"type\":\"SUBSCRIBE_MEME\",\"data\":{\"graduated\":false,\"source\":\"pump_dot_fun\",\"progress_percent\":{\"min\":50,\"max\":100},\"creation_time\":{\"from\":s,\"to\":s},\"intervals\":[\"1m\",\"5m\",\"24h\"]}} | {\"type\":\"SUBSCRIBE_TOKEN_STATS\",\"data\":{\"address\":[up to 100],\"select\":{\"price\":true,\"trade_data\":{\"volume\":true,\"intervals\":[\"1m\",\"5m\"]},\"marketcap\":true,\"liquidity\":true,\"holder_data\":{\"tags\":[\"sniper\",\"bundler\",\"insider\",\"dev\"]}}}} | {\"type\":\"SUBSCRIBE_TOKEN_NEW_LISTING\",\"meme_platform_enabled\":true,\"min_liquidity\":..,\"sources\":[\"pump_dot_fun\"]} | {\"type\":\"SUBSCRIBE_NEW_PAIR\",\"min_liquidity\":..} | {\"type\":\"SUBSCRIBE_WALLET_TXS\",\"data\":{\"address\":\"<wallet>\"}}",
+   "event_shape": "MEME_DATA: data{eventType:'meme_stats', address, name, symbol, decimals, logo_uri, price, buy_{W}, sell_{W}, volume_{W}_usd, volume_buy_{W}_usd, liquidity, market_cap, fdv, holder, top10_holder_percentage (0-100), meme_info{source, platform_id, creation_time (s), creator, graduated, graduated_time, progress_percent, pool{realSolReserves... camelCase raw strings}}, sniper_count, bundler_count, insider_count, dev_count, sniper_held_percentage, bundler_held_percentage, insider_held_percentage, dev_held_percentage}. TOKEN_STATS_DATA: data{address, platform_name, graduated, graduated_time, price, circulating_supply, total_supply, top10_holder_percentage, {tag}_count, {tag}_held_percentage, volume_{W}_usd, trade_{W}, buy_{W}, sell_{W}, unique_wallet_{W}, price_change_{W}_percent, last_trade_unix_time}. TOKEN_NEW_LISTING_DATA: data{address, decimals, name, symbol, liquidity (string), liquidityAddedAt (s)}. NEW_PAIR_DATA: data{address, name, source, base{address, name, symbol, decimals}, quote{...}, txHash, blockTime (s)}. WALLET_TXS_DATA: data{type, blockUnixTime, owner, source, txHash, volumeUSD, network, base{symbol, decimals, address, uiAmount}, quote{...}}",
+   "notes": "SUBSCRIBE_MEME powers all three Pulse columns live with risk counts; it is missing from the accessibility table but is priced at 0.001 CU/byte. Token Stats holder data was added 2026-09-25. Per-byte CU: NEW_LISTING 0.04, NEW_PAIR 0.03, WALLET_TXS 0.002, TOKEN_STATS 0.002, MEME 0.001."
+  },
+  {
+   "name": "Solana Tracker Datastream",
+   "url": "wss://datastream.solanatracker.io/{apiKey}",
+   "status": "DOCUMENTED (handshake VERIFIED: an invalid key upgrades 101 with the origin reflected, then the server closes with code 1000 after about 194 ms, no JSON error and no 'joined')",
+   "auth": "API key in the URL path; Premium (€397/month) and up; unlimited messages, connections and rooms",
+   "subscribe_message": "{\"type\":\"join\",\"room\":\"<room>\"}; leave with {\"type\":\"leave\",\"room\":...}; reply {\"type\":\"pong\"} to {\"type\":\"ping\"}. Rooms: latest | graduating | graduated | curve:{pct} | transaction:{mint}[:{pool}[:{wallet}]] | price-by-token:{mint} | price:{pool} | price:aggregated:{mint} | pool:{poolId} | token:{mint}[:primary] | holders:{mint} | sniper:{mint} | insider:{mint} | bundlers:{mint} | dev_holding:{mint} | top10:{mint} | stats:token:{mint} | stats:pool:{pool} | fees:{mint} | metadata:{mint} | wallet:{wallet} | wallet:{wallet}:balance | wallet:{wallet}:{mint}:balance | liquidity:{mint}... | transaction:whale:{usd} | KOL rooms | PnL V2 rooms; append :enriched for wallet identity where supported",
+   "event_shape": "{type:'joined', room} ack; data frames {type:'message', room, data}. transaction:{mint} data is an ARRAY of {tx, amount, priceUsd, solVolume, volume (USD), type (buy|sell), wallet, time (MS), program, pools, token{from{name, symbol, image, decimals, amount, address, price{usd}}, to{...}}}. sniper:{mint} data {wallet, amount (raw string), tokenAmount (UI), percentage, previousAmount, previousPercentage, totalSniperPercentage, totalInsiderPercentage}. wallet balance amount is UI decimal. latest/graduating/graduated carry the token-info object.",
+   "notes": "Datastream only lives at this host, not at custom REST hostnames. Because the key sits in the URL path, a browser connection leaks it, so run a relay or accept per-user exposure."
+  },
+  {
+   "name": "Codex GraphQL subscriptions",
+   "url": "wss://graph.codex.io/graphql",
+   "status": "DOCUMENTED (handshake VERIFIED: 101 with graphql-transport-ws; connection_init with an unknown key closes with code 4403 'Your API key was not found')",
+   "auth": "connection_init payload {Authorization: '<secret key>'} or 'Bearer <short-lived JWT>' (createApiTokens). Requires Growth ($350+/month); every delivered message counts as 1 request.",
+   "subscribe_message": "graphql-transport-ws {type:'subscribe', id, payload:{query:'subscription { onBarsUpdated(pairId:\"{pair}:1399811149\") { pairAddress timestamp aggregates { r1S { t usd { o h l c volume } } r1 { t usd { o h l c volume } } } } }'}}. Others: onTokenBarsUpdated, onTokenEventsCreated(input:{tokenAddress, networkId:1399811149}), onEventsCreatedByMaker, onLaunchpadTokenEventBatch(input:{protocol:Pump, eventType:Deployed|Created|Updated|Migrated}), onPairMetadataUpdated(id:\"{pair}:1399811149\"), onPricesUpdated (≤25 tokens), onHoldersUpdated, onDetailedTokenStatsUpdated, onFilterTokensUpdated",
+   "event_shape": "onBarsUpdated: {pairAddress, networkId, pairId, timestamp (s), statsType, commitmentLevel, quoteToken, aggregates: {r1S, r5S, r15S, r30S, r1, r5, r15, r30, r60, r240, r720, r1D, r1W: {t (s), usd: IndividualBarData{o, h, l, c, volume (string), buys, sells, buyers, sellers, liquidity, transactions}, token: {...}}}}. onLaunchpadTokenEventBatch: [{address, networkId, protocol, launchpadName, eventType, token{name, symbol, info{imageThumbUrl}}, marketCap (string), price, liquidity (string), holders, volume1, transactions1, buyCount1, sellCount1, sniperCount, sniperHeldPercentage, bundlerCount, bundlerHeldPercentage, insiderCount, insiderHeldPercentage, suspiciousCount, devHeldPercentage, top10HoldersPercent, devWallet}]. onTokenEventsCreated: {events: Event[]} (same Event type as getTokenEvents).",
+   "notes": "For graduation use Migrated events; Completed is legacy and not emitted. Launchpad events are extremely high-frequency and billed per message; Codex offers a flat-rate deal on request. Plan for about 100 tokens per connection."
+  },
+  {
+   "name": "Bitquery streaming subscriptions",
+   "url": "wss://streaming.bitquery.io/graphql?token={ACCESS_TOKEN}",
+   "status": "DOCUMENTED (VERIFIED: an upgrade without a token is rejected with HTTP 401 text/plain)",
+   "auth": "OAuth token in the URL query (not a header); subprotocol graphql-ws. Streaming needs Pro ($79/month annual, 100 streams) or the 7-day trial (2 streams, 17 stream-minutes).",
+   "subscribe_message": "subscription { Solana { TokenSupplyUpdates(where:{Instruction:{Program:{Address:{is:\"6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P\"}, Method:{in:[\"create\",\"create_v2\"]}}}}) { Block{Time} Transaction{Signer} TokenSupplyUpdate{Amount PostBalance Currency{Symbol MintAddress Name Uri}} } } } | DEXTrades(where:{Trade:{Dex:{ProtocolName:{is:\"pump\"}}}}) {...}",
+   "event_shape": "graphql-ws data frames {type:'data', id, payload:{data:{Solana:{<Cube>:[...]}}}}",
+   "notes": "Billed in stream-minutes and points; 'selectWhere', 'if' and most statistics are query-only. Short-lived OAuth tokens (client-credentials, expires_in) can be minted server-side."
+  },
+  {
+   "name": "Moralis Streams (Solana)",
+   "url": "webhook POST to your HTTPS endpoint (created via the Streams API)",
+   "status": "DOCUMENTED",
+   "auth": "X-API-Key to create streams; webhooks are signed",
+   "subscribe_message": "n/a (address-based stream config)",
+   "event_shape": "Solana webhook payload with transactions and transfers",
+   "notes": "Not a WebSocket. It fits Vercel serverless (webhooks land in a route handler) but tracks addresses and programs, not DEX-aggregated token feeds. Billed in records/CU; no free plan."
+  }
+ ],
+ "orbyt_fit": [
+  "DISCOVERY table: Birdeye /defi/token_trending plus /defi/v3/token/list (Standard+) or /defi/v3/token/market-data; Solana Tracker /tokens/trending, /tokens/volume and /top-performers/{tf}; Codex filterTokens ranked by trendingScore24/volume24 (works on the Codex free plan).",
+  "PULSE New / Final Stretch / Migrated: best single call is Solana Tracker GET /tokens/multi/all → {latest, graduating (minCurve), graduated}, which includes risk and curvePercentage (Free tier). Birdeye /defi/v3/token/meme/list: graduated=false sorted by creation_time for New; min_progress_percent≈60-80 for Final Stretch; graduated=true sorted by graduated_time for Migrated. Codex filterTokens with launchpadCompleted/launchpadMigrated/launchpadGraduationPercent (launchpad data is not on the free plan). Live versions: Birdeye SUBSCRIBE_MEME (Premium), ST rooms latest/graduating/graduated/curve:{pct} (Premium), Codex onLaunchpadTokenEventBatch (Growth), Bitquery TokenSupplyUpdates stream (Pro). Moralis pump.fun endpoints are gone (404).",
+  "TOKEN METADATA / header stats: Birdeye /defi/token_overview (15 CU, Standard+); Solana Tracker /tokens/{mint}; Codex token/filterTokens(tokens:[...]); Moralis /token/mainnet/{mint}/metadata and pairs/stats.",
+  "PRICE / QUOTES for tables: Birdeye /defi/price (Standard) and /defi/multi_price (≤100, Lite+); Solana Tracker /price/multi (≤100); Codex getTokenPrices; Moralis POST /token/mainnet/prices. Live: Birdeye SUBSCRIBE_PRICE, ST price-by-token:{mint}, Codex onPricesUpdated (≤25 per subscription).",
+  "LIQUIDITY: Birdeye token_overview.liquidity and /defi/v3/token/exit-liquidity; Solana Tracker pools[].liquidity.{usd, quote}; Codex liquidity / totalLiquidityUsd; Moralis pairs/stats totalLiquidityUsd.",
+  "CHART (candles): Birdeye /defi/v3/ohlcv (1s/15s/30s, ≤5,000 candles, Standard+, mcap mode); Solana Tracker /chart/{mint} (1s/5s/15s, marketCap=true); Codex getBars/getTokenBars (1S-7D, ≤1,500, sub-minute only 24 h back); Moralis pair OHLCV (1s/10s/30s, pair only). Live bar: Birdeye SUBSCRIBE_PRICE (chartType 1s), Codex onBarsUpdated (r1S..r1W), ST price rooms (ticks, build bars client-side).",
+  "TRADES / live transaction feed: Birdeye /defi/v3/token/txs (≤100) and SUBSCRIBE_TXS; Solana Tracker /trades/{mint} (≤500, enrich=identity) and room transaction:{mint}; Codex getTokenEvents (≤200) and onTokenEventsCreated; Moralis token/pair swaps (≤100); Bitquery DEXTrades stream.",
+  "HOLDERS: Birdeye /defi/v3/token/holder (≤100/page, Standard+); Solana Tracker /tokens/{mint}/holders/paginated (≤5,000/page) and holders:{mint} room; Codex holders (Growth). Moralis Solana holders were removed.",
+  "RISK (insider / sniper / bundler / dev holding / top-10): Solana Tracker token info risk.{snipers, insiders, bundlers, top10, dev, score, rugged} on FREE, plus rooms sniper/insider/bundlers/dev_holding/top10. Birdeye /token/v1/holder-profile (tags sniper/bundler/insider/dev/smart_trader/kol, Standard), /defi/token_security (Lite+), SUBSCRIBE_MEME and SUBSCRIBE_TOKEN_STATS holder_data (Premium). Codex filterTokens fields sniper/bundler/insider/suspicious/devHeldPercentage/top10HoldersPercent and tokenWalletStats (Growth). Moralis: NONE for Solana now. Bitquery: derive yourself.",
+  "WALLET ACTIVITY / tracker: Birdeye /v1/wallet/tx_list and SUBSCRIBE_WALLET_TXS; Solana Tracker /wallet/{owner}/trades and rooms wallet:{wallet} / wallet:{wallet}:balance; Codex getTokenEventsForMaker and onEventsCreatedByMaker; Moralis /account/mainnet/{wallet}/swaps; Moralis Streams webhooks for tracked addresses (works on Vercel).",
+  "PORTFOLIO: Birdeye /v1/wallet/token_list (priceUsd/valueUsd, Lite+) or /wallet/v2/current-net-worth (Standard); Solana Tracker /wallet/{owner}; Codex balances; Moralis /account/mainnet/{wallet}/portfolio (no USD values).",
+  "WALLET ANALYTICS / PnL: Solana Tracker PnL V2 /v2/pnl/wallets/{wallet} (+positions, history, chart) on REST (Free tier REST; live PnL rooms Premium); Birdeye /wallet/v2/pnl/summary and /wallet/v2/pnl (Standard); Codex detailedWalletStats (Growth). Moralis Universal PnL does not list Solana.",
+  "FIRST BUYERS / TOP TRADERS: Birdeye /token/v1/first-buyers (Lite+) and /defi/v2/tokens/top_traders; Solana Tracker /v2/pnl/tokens/{mint}/first-buyers and /traders; Codex tokenTopTraders (Growth).",
+  "FREE-TIER VALUE RANKING for ORBYT: 1) Solana Tracker Free (10k requests/month, 3 rps; includes risk, Pulse lists, 1s charts, PnL V2 REST). 2) Birdeye Standard (30k CU/month, 1 rps; OHLCV v3 1s, token overview, v3 txs, holders, holder-profile tags, wallet PnL, new_listing; meme list is Lite+ per its page). 3) Codex Almost free ($1 one-time, 10k requests/month, 5 rps; filterTokens and getBars; no holders, wallets, launchpad or WS). 4) Bitquery: 7-day trial only. 5) Moralis: no free plan. No free tier includes WebSockets. Cheapest paid streaming: Bitquery Pro $79, then Birdeye Premium $199, then Codex Growth $350, then Solana Tracker Premium €397. Only Codex has a documented browser-safe short-lived key flow for WebSockets, which suits Vercel."
+ ],
+ "gotchas": [
+  "Birdeye docs moved: docs.birdeye.so → data.birdeye.so/docs (llms.txt and .md versions at data.birdeye.so/docs/<path>.md). Old /docs/pricing URLs 404.",
+  "Birdeye tier info contradicts itself: the Data Accessibility table (effective 2025-11-26) marks meme list/detail as Standard, but their endpoint pages say Lite+. The rate-limit page still says Standard is 'limited to 3 specific endpoints'. The FAQ lists stale prices (Lite 1.5M CU, Premium Plus $250, Business $699). Trust the Pricing page and confirm with a real key.",
+  "Birdeye naming differs by version: v1 OHLCV uses camelCase (unixTime, vUsd); v3 uses snake_case (unix_time, v_usd). Meme pool reserves are snake_case in REST (real_sol_reserves) and camelCase in the WebSocket (realSolReserves), and are RAW integer strings (lamports / token base units).",
+  "Birdeye percent units differ by endpoint: token_security top10HolderPercent and creatorPercentage are FRACTIONS (0.304 = 30.4%); /defi/v3/token/holder top10HoldPercent, holder-profile percent_of_supply and the MEME/TOKEN_STATS *_percentage fields are 0-100.",
+  "Birdeye new_listing REST liquidityAddedAt is an ISO string without a timezone; the WebSocket TOKEN_NEW_LISTING_DATA gives epoch seconds.",
+  "Birdeye trade amounts: `amount` is a raw integer (string in v3), `ui_amount`/`uiAmount` is decimal-adjusted, and v3 `volume` is in token units while `volume_usd` is USD.",
+  "Birdeye v3 OHLCV: 1s candles are kept only 2 weeks and 15s/30s only 3 months. Empty candles are omitted unless padding=true. CU scales with candle count (5,000 candles = 100 CU, which is 1/300 of the monthly free budget).",
+  "Birdeye WebSocket: one active subscription per message type per connection; each new SUBSCRIBE_* overwrites the previous one, so always send the full list (max 100 addresses). Docs require subprotocol echo-protocol. An invalid key still gets a 101 and a WELCOME message, and only the first subscribe returns ERROR 'Invalid request with origin or api-key'.",
+  "Birdeye usage cap: the account is auto-suspended at 5x the included CUs unless auto-renew is enabled. The wallet API group has much lower rate limits than other endpoints.",
+  "Birdeye x402 and Codex MPP let you pay per request without a key (x402 $0.003 in USDC on Solana; MPP $0.001 in USDC on Tempo), but both need a funded hot wallet signing payments server-side, and x402 excludes WebSockets. Treat them as an operator decision, not a default.",
+  "Solana Tracker timestamp units are mixed: token.creation.created_time is SECONDS; pools[].lastUpdated, createdAt, trades[].time, bundleTime and PnL timing.* are MILLISECONDS; holdTimeSecs is seconds; chart time_from/time_to are seconds; the unit of oclhv[].time is undocumented (probably seconds).",
+  "Solana Tracker chart response key is spelled `oclhv`, not ohlcv. The guide's sample code iterates the response as a bare array, contradicting the OpenAPI schema; handle both.",
+  "Solana Tracker prices are in EUR (Free €0, Advanced €50, Pro €200, Premium €397). Free is 10,000 requests/month (about 330/day), which one shared Pulse poll every 10 s would burn in about 28 hours. Cache aggressively (s-maxage 30-60 s at minimum) or use it only for on-demand token-page risk.",
+  "Solana Tracker risk.score is documented as 1-10 (higher = riskier), but examples show 0. risk.bundlers can be omitted, in which case call /tokens/{token}/bundlers. /tokens/latest is capped at 10 pages × 100.",
+  "Solana Tracker Datastream has no error payload on bad auth: the socket just closes about 200 ms after the handshake (verified). Detect a missing 'joined' ack. Heartbeats are JSON {type:'ping'} messages that need a {type:'pong'} reply, not protocol pings.",
+  "Codex numeric fields are mostly STRINGS (priceUSD, volume24, liquidity, marketCap, change24 as a fraction string). tokenWalletStats amounts are raw unshifted; holders gives both balance (raw) and shiftedBalance (decimal). Solana networkId = 1399811149; the getBars symbol format is '<address>:<networkId>'.",
+  "Codex getBars returns parallel arrays (t[], o[], ...), not candle objects. Max 1,500 bars. Sub-minute resolutions only go back 24 h. The Int `v` field is deprecated; use `volume` (string). createApiTokens expiresIn is MILLISECONDS.",
+  "Codex counts every subscription message as a billable request, and launchpad event streams are extremely high-volume. Use Migrated rather than Completed for graduation (Completed is no longer emitted).",
+  "Codex 'Almost free' requires a $1 one-time card or USDC payment at signup (it is not strictly free). It covers 'partial endpoint support (4/15)': pricing and charts, pair stats, filters and search, trending. It has no WebSockets, webhooks, wallets, holders or launchpad data.",
+  "Moralis (2026): no free plan (Starter $149/month). Solana pump.fun new/bonding/graduated, bonding-status and Solana holders/top-holders/historical were REMOVED 2026-07-31; verified 404 today, and the gateway answers 404 before checking auth. Solana Token Score was removed. The Universal PnL chain enum has no Solana. The Moralis solana-api.json OpenAPI has no response schemas for price.",
+  "Moralis timestamps: blockTimestamp and OHLCV timestamp are ISO strings; fromDate/toDate accept seconds or moment.js strings; Universal PnL fromTimestamp/toTimestamp are MILLISECONDS. OHLCV is by PAIR address only. Starter and Pro plans require attribution.",
+  "Bitquery: the only free access is a 7-day trial (1,000 points, 2 streams, 17 stream-minutes, no archive). The Personal plan ($39) has no streaming and is personal-use only. Self-serve plans only cover the real-time window (about 30 days of trades); historical data is an add-on from $70/month. The WebSocket token goes in the URL (?token=), not a header.",
+  "Every provider's key must stay server-side: Birdeye key is in the WS query string, Solana Tracker key in the WS path, Bitquery token in the WS query. CORS is open everywhere (verified), so the browser is not blocked, but calling directly would expose the key. On Vercel, proxy REST through route handlers with edge/CDN caching. For live streams either use Codex short-lived JWTs minted server-side (Growth), or run a small always-on relay outside Vercel, because serverless functions cannot hold upstream sockets.",
+  "Git Bash note for anyone reproducing: MSYS converts args starting with '/' into Windows paths; set MSYS_NO_PATHCONV=1. docs.moralis.com returns 403 to curl's default UA; send a browser User-Agent."
+ ],
+ "terms_and_risks": "- Keys are billable credentials. A leaked Birdeye, Solana Tracker, Codex or Moralis key lets anyone drain CU or requests and incur overage: Birdeye $3.5-23 per 1M CU; Moralis $4-11.25 per 1M CU; Codex bills overage at the plan rate per 1M. Keep them in Vercel env vars without the NEXT_PUBLIC_ prefix (BIRDEYE_API_KEY, SOLANATRACKER_API_KEY, CODEX_API_KEY, MORALIS_API_KEY, BITQUERY_CLIENT_ID and BITQUERY_CLIENT_SECRET or BITQUERY_ACCESS_TOKEN). Rotate on exposure. Birdeye supports IP whitelisting only, which does not suit Vercel's dynamic egress IPs.\n- Birdeye suspends the account at 5x included usage unless auto-renew is on. Codex notes that deactivating a key does NOT close open WebSockets, so they keep billing until closed.\n- Licensing: Moralis Starter and Pro require attribution. Bitquery Personal is personal-use only with no commercial use, and the trial excludes commercial use and archive data. Codex, Birdeye and Solana Tracker terms of service on redistributing and displaying data in a public app were not reviewed in detail. Check before launch, especially caching or re-serving responses to many users from one key.\n- Data integrity: all five compute sniper/insider/bundler/dev labels heuristically and differently. Show the source and label them as estimates, not facts.\n- Vendor volatility in 2026: Moralis removed Solana discovery and holders endpoints on 2026-07-31 with 30 days' notice. Birdeye ships breaking additions monthly. Pin field parsers defensively and keep a fixture-based contract test per provider.\n- The x402 and MPP pay-per-request options move real USDC from a server wallet. They are a financial operation and need an explicit decision by the operator; they are not a default integration.\n- Scope of verification: no keyed data was fetched. The only verified responses are the auth gates, payment challenges, 404s of removed endpoints, CORS headers and WebSocket handshake behaviour (fixtures in keyed-apis/). Every response shape above is DOCUMENTED from official OpenAPI/AsyncAPI/docs as of 2026-09-28."
+}

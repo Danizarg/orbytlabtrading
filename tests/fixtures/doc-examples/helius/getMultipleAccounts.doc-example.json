@@ -1,0 +1,87 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. Shape of the official getMultipleAccounts (encoding jsonParsed) reference, as served by Helius standard RPC. value[0] is copied verbatim from the live fixture tests/fixtures/solana-rpc/rpc_getMultipleAccounts_jsonParsed_mint_tokenacct_curve.json (bonding-curve vault owned by the pump.fun curve PDA 9ZZuz...); value[1] and value[2] are abridged copies of that token-account shape with illustrative owners (a normal wallet and the Raydium AMM v4 authority PDA); value[3] is null to model an account closed between calls. Keys are aligned with the non-zero accounts of getTokenLargestAccounts.doc-example.json.",
+  "source": "https://solana.com/docs/rpc/http/getmultipleaccounts",
+  "request": {
+    "method": "getMultipleAccounts",
+    "params": [
+      ["5R4MoQJCn3NDtMCzTNeJi6mFKB5cfTvyehFQcudPhWCU", "FYjHNoFtSQ5uijKrZFyYAxvEr87hsKXkXcxkcmkBAf4r", "HdmGPmTkBgsiJcyVDgiGkYdTZr4h5XmpjYoUjU2rapf4", "EauuZAnB7CcnCrwvCMcnb2Rjk12Ecs13ycAZQBb5tLYM"],
+      { "encoding": "jsonParsed", "commitment": "confirmed" }
+    ]
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "result": {
+      "context": { "apiVersion": "4.3.0", "slot": 451431134 },
+      "value": [
+        {
+          "data": {
+            "parsed": {
+              "info": {
+                "extensions": [{ "extension": "immutableOwner" }],
+                "isNative": false,
+                "mint": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+                "owner": "9ZZuz4cVoYhbAFomLMHJjpPijY7EXryqHRjY79f9VC7A",
+                "state": "initialized",
+                "tokenAmount": { "amount": "603185974343956", "decimals": 6, "uiAmount": 603185974.343956, "uiAmountString": "603185974.343956" }
+              },
+              "type": "account"
+            },
+            "program": "spl-token-2022",
+            "space": 170
+          },
+          "executable": false,
+          "lamports": 1513840,
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "rentEpoch": 18446744073709552000,
+          "space": 170
+        },
+        {
+          "data": {
+            "parsed": {
+              "info": {
+                "extensions": [{ "extension": "immutableOwner" }],
+                "isNative": false,
+                "mint": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+                "owner": "DHpRzLRuACd8i1BVGZh8rGQWaQsP7b4spBZFWbzW5WSb",
+                "state": "initialized",
+                "tokenAmount": { "amount": "20000000000000", "decimals": 6, "uiAmount": 20000000, "uiAmountString": "20000000" }
+              },
+              "type": "account"
+            },
+            "program": "spl-token-2022",
+            "space": 170
+          },
+          "executable": false,
+          "lamports": 1513840,
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "rentEpoch": 18446744073709552000,
+          "space": 170
+        },
+        {
+          "data": {
+            "parsed": {
+              "info": {
+                "extensions": [{ "extension": "immutableOwner" }],
+                "isNative": false,
+                "mint": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+                "owner": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
+                "state": "initialized",
+                "tokenAmount": { "amount": "5000000000000", "decimals": 6, "uiAmount": 5000000, "uiAmountString": "5000000" }
+              },
+              "type": "account"
+            },
+            "program": "spl-token-2022",
+            "space": 170
+          },
+          "executable": false,
+          "lamports": 1513840,
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "rentEpoch": 18446744073709552000,
+          "space": 170
+        },
+        null
+      ]
+    },
+    "id": 1
+  }
+}

@@ -45,6 +45,7 @@ export function formatUsd(n: Num, opts: { compact?: boolean; decimals?: number }
       style: 'currency',
       currency: 'USD',
       notation: 'compact',
+      minimumFractionDigits: 0,
       maximumFractionDigits: opts.decimals ?? (abs < 100_000 ? 1 : 2),
     }).format(n);
   }

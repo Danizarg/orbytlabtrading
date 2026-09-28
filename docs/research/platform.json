@@ -1,0 +1,337 @@
+{
+ "versions": [
+  {
+   "pkg": "next",
+   "latest": "16.3.6",
+   "notes": "latest tag (published 2026-09-22). Other tags: canary 16.4.0-canary.51, preview 16.3.0-preview.10, backport 15.5.26. engines.node >=20.9.0. Peer react/react-dom ^18.2 || ^19. Project already pins 16.3.6 and it is installed in node_modules. No Next 17 announced (blog: 16.3 on 2026-08-03 is the newest)."
+  },
+  {
+   "pkg": "react",
+   "latest": "19.3.0",
+   "notes": "latest; canary 19.3.0-canary-d083ec1d-20260922. The App Router bundles its own React canary internally, but still declare react/react-dom in package.json."
+  },
+  {
+   "pkg": "react-dom",
+   "latest": "19.3.0",
+   "notes": "Must match react exactly."
+  },
+  {
+   "pkg": "typescript",
+   "latest": "7.0.2",
+   "notes": "TS 7 is the native (Go) compiler with NO JavaScript compiler API. Next 16.3 can type-check with it because next build now runs the project-local tsc CLI by default (experimental.useTypeScriptCli). BUT typescript-eslint 8.71.0 (used by eslint-config-next/typescript) has peer typescript '>=4.8.4 <6.1.0', and @solana/kit needs >=5.4. RECOMMEND staying on ~5.9.3 (the project's current pin) or 6.0.3. Tags: rc 7.0.1-rc, next 7.1.0-dev.20260928.1."
+  },
+  {
+   "pkg": "@types/react",
+   "latest": "19.3.0",
+   "notes": "Also @types/react-dom 19.3.0."
+  },
+  {
+   "pkg": "@types/node",
+   "latest": "26.6.3",
+   "notes": "Latest matches Node 26. Pin to ^24 (the project already does) to match the Vercel runtime (Node 24.x is Vercel's default)."
+  },
+  {
+   "pkg": "tailwindcss",
+   "latest": "4.3.3",
+   "notes": "v3-lts tag is 3.4.19. v4 needs no tailwind.config.js and detects content automatically."
+  },
+  {
+   "pkg": "@tailwindcss/postcss",
+   "latest": "4.3.3",
+   "notes": "Depends on postcss ^8.5.16 (installed: 8.5.28), @tailwindcss/oxide and lightningcss, which use native binaries. The project's package-lock.json already has entries for the linux-x64-gnu/musl variants, so a Vercel Linux build will not hit the npm optional-deps bug."
+  },
+  {
+   "pkg": "eslint",
+   "latest": "10.11.0",
+   "notes": "Do NOT use 10.x yet. eslint-plugin-react 7.37.5 (peer ^9.7), eslint-plugin-import 2.32.0 (^9) and eslint-plugin-jsx-a11y 6.10.2 (^9) come in through eslint-config-next and don't support ESLint 10. Use the 'maintenance' tag 9.39.5, which is the project's current pin."
+  },
+  {
+   "pkg": "eslint-config-next",
+   "latest": "16.3.6",
+   "notes": "Peer eslint >=9.0.0, typescript >=3.3.1. Deps: @next/eslint-plugin-next 16.3.6, typescript-eslint ^8.46, eslint-plugin-react-hooks ^7 (resolved 7.0.0 in the test), jsx-a11y, import, react, globals 16.4.0. Ships flat configs at 'eslint-config-next/core-web-vitals' and 'eslint-config-next/typescript'."
+  },
+  {
+   "pkg": "lightweight-charts",
+   "latest": "5.2.1",
+   "notes": "Apache-2.0. Single dependency fancy-canvas 2.1.0. ESM only ('type':'module'). Other tags: next 5.0.7-rc1, next-v5 5.0.0-rc3. Importing it under Node/SSR is safe; createChart() throws 'document is not defined' on the server."
+  },
+  {
+   "pkg": "@tanstack/react-query",
+   "latest": "5.104.0",
+   "notes": "previous 4.44.0."
+  },
+  {
+   "pkg": "zustand",
+   "latest": "5.0.15",
+   "notes": ""
+  },
+  {
+   "pkg": "@solana/kit",
+   "latest": "8.4.0",
+   "notes": "engines node >=20.18.0, peer typescript >=5.4.0. Tags: canary 8.4.0-canary-20260928083836, 3x 3.0.3, 4x 4.0.0. Browser builds contain no Buffer/require/process.env (only @solana/errors uses process.env.NODE_ENV, which bundlers replace), so no polyfills are needed. Installed size is about 4.0 MB for kit alone plus about 45 @solana/* subpackages; @solana/addresses on its own is 376 KB."
+  },
+  {
+   "pkg": "@solana/web3.js",
+   "latest": "1.99.0",
+   "notes": "Legacy 1.x line (1.99.0 published 2026-09-08). Pulls in buffer, bn.js, borsh, jayson, node-fetch, rpc-websockets and needs a Buffer polyfill in browsers. Prefer @solana/kit (the '2.x' of web3.js). Tags: rc 3.0.0-rc.3, next 2.0.0."
+  },
+  {
+   "pkg": "bs58",
+   "latest": "6.0.0",
+   "notes": "ESM + CJS, single dep base-x ^5. Not needed if you use @solana/kit's getBase58Encoder/Decoder."
+  },
+  {
+   "pkg": "zod",
+   "latest": "4.6.5",
+   "notes": "canary 4.5.0-canary..., beta 4.1.13-beta.0."
+  },
+  {
+   "pkg": "vitest",
+   "latest": "5.0.2",
+   "notes": "engines node ^22.12.0 || ^24.0.0 || >=26.0.0. Peer vite ^6.4 || ^7 || ^8 (installs vite 8.3.1). V4 tag 4.1.11, V3 tag 3.2.7."
+  },
+  {
+   "pkg": "clsx",
+   "latest": "2.1.1",
+   "notes": ""
+  },
+  {
+   "pkg": "lucide-react",
+   "latest": "1.48.0",
+   "notes": "Now on 1.x (next tag 1.3.0 is stale)."
+  },
+  {
+   "pkg": "typescript-eslint",
+   "latest": "8.71.0",
+   "notes": "Transitive through eslint-config-next. Peer eslint ^8.57 || ^9 || ^10, typescript >=4.8.4 <6.1.0, which is why TypeScript 7 is blocked for linting."
+  },
+  {
+   "pkg": "postcss",
+   "latest": "8.5.28",
+   "notes": "Tailwind docs list it in the install command, but @tailwindcss/postcss already depends on it."
+  },
+  {
+   "pkg": "vite",
+   "latest": "8.3.1",
+   "notes": "Transitive through vitest. Has native resolve.tsconfigPaths (default false), so vite-tsconfig-paths is no longer needed."
+  }
+ ],
+ "findings": [
+  {
+   "topic": "Next.js latest stable major",
+   "answer": "The latest stable is Next.js 16 (16.3.6, 2026-09-22). No v17 exists. Minimum Node is 20.9.0, minimum TypeScript is 5.1.0, and browsers are Chrome/Edge/Firefox 111+ and Safari 16.4+. The installed package ships its docs at node_modules/next/dist/docs, which match the installed version and are the most reliable reference for agents.",
+   "source": "https://nextjs.org/blog ; https://nextjs.org/docs/app/getting-started/installation ; node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md ; npm view next",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "Next 16: GET route handler caching default",
+   "answer": "GET route handlers are NOT cached by default; this changed from static to dynamic in 15.0. To cache a GET handler without Cache Components, opt in with `export const dynamic = 'force-static'` (plus `revalidate = N`). With cacheComponents enabled, GET handlers follow the page model instead: they are prerendered unless they touch request data, network, Math.random and similar, and data is cached with 'use cache' in a helper function ('use cache' cannot go directly inside the handler body). Local `next build` of 16.3.6 marked all four test handlers ƒ (dynamic) with no config, including one with only `runtime`/`maxDuration` exports. For ORBYT, leave handlers dynamic and do the caching at Vercel's CDN with headers (see the CDN finding). Don't use Next's data cache or ISR for live market data.",
+   "source": "https://nextjs.org/docs/app/getting-started/route-handlers#caching ; https://nextjs.org/docs/app/api-reference/file-conventions/route (version history) ; local build log",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "Next 16: setting CDN Cache-Control from route handlers",
+   "answer": "Return headers on the Response, e.g. `Response.json(data, { headers: {...} })`. Next 16.3.6 passes custom `Cache-Control`, `CDN-Cache-Control` and `Vercel-CDN-Cache-Control` through untouched on dynamic route handlers. Observed locally with `next start`: `cache-control: public, max-age=0, must-revalidate` and `cdn-cache-control: public, s-maxage=15, stale-while-revalidate=60` came back exactly as set, and `cache-control: public, s-maxage=5, stale-while-revalidate=30` on a [mint] route was preserved. A handler that sets no Cache-Control gets none from Next, so Vercel's default `public, max-age=0, must-revalidate` applies. Next also adds `vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch` to route-handler responses. Plain `fetch()` calls from the browser don't send those request headers, so the cache key stays stable. Headers set in a function response override headers from next.config.js/vercel.json for the same route.",
+   "source": "local next start test (research/platform/local-verification-2026-09-28.json) ; https://vercel.com/docs/caching/cdn-cache",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "Next 16: segment config exports (runtime / dynamic / revalidate / maxDuration)",
+   "answer": "Without cacheComponents, which is the project's current setup: `export const runtime = 'nodejs'` (the default; 'edge' is deprecated in 16), `dynamic = 'auto'|'force-dynamic'|'error'|'force-static'`, `revalidate = false|0|number` (must be a static literal; `60*10` is invalid), `fetchCache`, `dynamicParams`, `preferredRegion` (deprecated), and `maxDuration = <seconds>`, which Vercel reads as the function timeout. With `cacheComponents: true`, `dynamic`, `dynamicParams`, `revalidate` and `fetchCache` are removed, and even `runtime` is rejected. Local build error: 'Route segment config \"runtime\" is not compatible with `nextConfig.cacheComponents`. Please remove it.' (the same error fires for \"dynamic\"). maxDuration is still allowed. Recommendation: do NOT enable cacheComponents for ORBYT. Its value is prerendering and 'use cache', which doesn't fit live data. Keep route handlers plain and dynamic, add maxDuration where useful, and skip `dynamic` (it's already dynamic).",
+   "source": "https://nextjs.org/docs/app/api-reference/file-conventions/route-segment-config ; https://nextjs.org/docs/app/guides/caching-without-cache-components ; node_modules/next/dist/docs/.../runtime.md ; local cacheComponents build test",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "Next 16: async params / RouteContext",
+   "answer": "`params` is a Promise: `export async function GET(req: NextRequest, { params }: { params: Promise<{ mint: string }> }) { const { mint } = await params }`. Synchronous access was removed entirely in 16. You can also use the global helper `ctx: RouteContext<'/api/token/[mint]'>` and `await ctx.params`. The RouteContext type only exists after `next dev`, `next build` or `next typegen`. Verified: `tsc --noEmit` on a fresh checkout fails with \"TS2304: Cannot find name 'RouteContext'\" and passes after `npx next typegen`. So either run `next typegen && tsc --noEmit` in the typecheck script or use the explicit Promise type. searchParams on pages, cookies() and headers() are async too.",
+   "source": "https://nextjs.org/docs/app/api-reference/file-conventions/route#route-context-helper ; version-16.md 'Async Request APIs' ; local tsc test",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "Next 16: streaming / SSE from route handlers",
+   "answer": "Return `new Response(readableStream, { headers: { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-transform' } })`. Verified locally: the response is chunked (Transfer-Encoding: chunked) and events arrive incrementally, 300 ms apart. Listen on `request.signal` 'abort' and on the stream's cancel() to clear timers and upstream sockets. On Vercel, streaming is on by default for Node functions and maxDuration covers the whole streamed response. See the Vercel SSE finding for limits and cost.",
+   "source": "https://nextjs.org/docs/app/api-reference/file-conventions/route#streaming ; local test",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "Next 16: next lint removed / ESLint flat config",
+   "answer": "`next lint` and the next.config `eslint` option were removed in v16, and `next build` no longer lints. Run the ESLint CLI directly: package.json `\"lint\": \"eslint .\"`, or `eslint` as in the docs. Codemod: `npx @next/codemod@canary next-lint-to-eslint-cli .`. The official flat config for TypeScript is `import { defineConfig, globalIgnores } from 'eslint/config'; import nextVitals from 'eslint-config-next/core-web-vitals'; import nextTs from 'eslint-config-next/typescript'; export default defineConfig([...nextVitals, ...nextTs, globalIgnores(['.next/**','out/**','build/**','next-env.d.ts'])])`. The project's current eslint.config.mjs matches this. It also adds dist/** and coverage/** ignores, turns off @next/next/no-img-element, and ignores underscore-prefixed args and vars. It loaded and ran cleanly (exit 0) with eslint 9.39.5 and eslint-config-next 16.3.6: 113 rules from react, react-hooks@7.0.0, import, jsx-a11y@6.10.2, @next/next and @typescript-eslint@8.71.0. Keep ESLint on 9.x (see versions).",
+   "source": "https://nextjs.org/docs/app/api-reference/config/eslint ; installation docs ; local eslint run",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "Next 16: Turbopack default",
+   "answer": "Turbopack is the default bundler for both `next dev` and `next build` since 16.0. Opt out with `--webpack`. The local build produced .next/turbopack and reported errors as 'Turbopack build failed'. `next dev` now writes to .next/dev, so dev and build can run at the same time, and a lockfile prevents two concurrent dev or build runs. The project's tsconfig already includes .next/dev/types/**/*.ts.",
+   "source": "installation docs ; version-16.md ; local build",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "Next 16: middleware renamed to proxy",
+   "answer": "Yes. The `middleware` file convention is deprecated and renamed to `proxy.ts` (project root, or `src/` next to `app/`). The file exports `export function proxy(request: NextRequest)` or a default export, plus an optional `config.matcher`. Proxy runs on the Node.js runtime by default, and exporting `runtime` from it throws. Codemod: `npx @next/codemod@canary middleware-to-proxy .`. ORBYT likely doesn't need proxy at all. Put CORS and security headers in next.config headers() or per route handler.",
+   "source": "https://nextjs.org/docs/app/api-reference/file-conventions/proxy",
+   "status": "DOCUMENTED"
+  },
+  {
+   "topic": "Next 16: cacheComponents / 'use cache' status",
+   "answer": "Stable, opt-in through the top-level `cacheComponents: true` in next.config.ts. It is no longer experimental; it replaces experimental.dynamicIO, useCache and ppr. It enables 'use cache', cacheLife and cacheTag, makes PPR the default, requires the Node runtime, and preserves route state with React <Activity> on navigation. Other 16.x API changes: `revalidateTag(tag, profile)` now takes a second argument ('max' means invalidate with stale-while-revalidate), and updateTag and refresh were added. Not recommended for ORBYT (see the segment config finding).",
+   "source": "node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/cacheComponents.md ; version-16.md",
+   "status": "DOCUMENTED"
+  },
+  {
+   "topic": "Next 16: TypeScript during build",
+   "answer": "`next build` type-checks by running the project-local `tsc` CLI by default (experimental.useTypeScriptCli defaults to true). This supports TS 6 and TS 7. It checks the WHOLE project that tsconfig selects, including test files, so Vitest tests must type-check too. Diagnostics are raw tsc output. Next may also edit tsconfig.json with 'suggested values'; in a test without allowJs it added `allowJs: true`. The project sets allowJs:false explicitly and Next only adds missing keys.",
+   "source": "node_modules/next/dist/docs/.../useTypeScriptCli.md ; 02-typescript.md ; local build log",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "Next 16: images for arbitrary token logos",
+   "answer": "`images.remotePatterns` only allows listed origins: `remotePatterns: [new URL('https://example.com/account123/**')]` or objects like `{ protocol: 'https', hostname: '**.example.com', port: '', pathname: '/**', search: '' }`. `*` matches one segment and `**` matches many (hostname prefix or path suffix only). Omitting fields implies `**`. Token logos come from IPFS gateways, Arweave, CDNs and random hosts that you can't enumerate. Optimizing them would also burn Vercel Image Optimization quota (Hobby includes 5K transformations/month). Recommendation: use a plain `<img src loading=\"lazy\" decoding=\"async\" referrerPolicy=\"no-referrer\" width height onError={fallback}>`. The project's ESLint config already disables @next/next/no-img-element. If you do use next/image, set `images: { unoptimized: true }` or the per-image `unoptimized` prop. Other 16 image changes: minimumCacheTTL, qualities and imageSizes defaults changed, `images.domains` is deprecated, local-IP sources are blocked unless dangerouslyAllowLocalIP is set, and maximumResponseBody defaults to 50 MB.",
+   "source": "node_modules/next/dist/docs/01-app/03-api-reference/02-components/image.md ; version-16.md ; https://vercel.com/docs/limits/fair-use-guidelines",
+   "status": "DOCUMENTED"
+  },
+  {
+   "topic": "Vercel: function max duration (Fluid compute)",
+   "answer": "With Fluid compute, which is the default for projects created after 2025-04-23 and can be forced with vercel.json `\"fluid\": true`: Hobby defaults to 300 s and maxes at 300 s. Pro and Enterprise default to 300 s, max 800 s (GA), and allow 1800 s (30 min, Beta) when set per function in code or vercel.json. Set it per route with `export const maxDuration = N` (seconds). Precedence is function code, then vercel.json functions.maxDuration, then the dashboard default, then Fluid defaults. Exceeding it returns 504 FUNCTION_INVOCATION_TIMEOUT. Other limits: memory is 2 GB/1 vCPU on Hobby and up to 4 GB/2 vCPU on Pro, and can't be set in vercel.json under Fluid. Request and response bodies are capped at 4.5 MB (413 FUNCTION_PAYLOAD_TOO_LARGE). There are 1,024 file descriptors per instance, the bundle limit is 250 MB, and functions run in a single region (iad1) by default.",
+   "source": "https://vercel.com/docs/functions/configuring-functions/duration ; https://vercel.com/docs/fluid-compute ; https://vercel.com/docs/functions/limitations",
+   "status": "DOCUMENTED"
+  },
+  {
+   "topic": "Vercel: long-lived streaming (SSE) and billing",
+   "answer": "Streaming is allowed and on by default for Node functions. The max duration includes streamed responses, so an SSE connection is killed at maxDuration: 300 s on Hobby, up to 800 s on Pro. Clients must reconnect; EventSource does this automatically, and sending `retry:` plus periodic heartbeats helps. Vercel sends HTTP/2 PINGs on idle long responses, but HTTP/1.1 clients can drop idle connections. Billing under Fluid: Active CPU is charged only while code runs (it pauses on I/O). Provisioned Memory (GB-hrs) is charged for the whole time any request is in flight, so an open SSE stream keeps memory billing running. Optimized concurrency lets many streams share one instance. Hobby includes 4 h Active CPU, 360 GB-hrs memory and 1M invocations per month; Pro in iad1 is $0.128/CPU-h and $0.0106/GB-h, with invocations at $0.60/M. WebSocket servers in Vercel Functions entered public beta on 2026-06-22 with the same limits. Recommendation: for live trades and prices, connect browser-side WebSockets directly to keyless or public provider feeds where possible. Otherwise poll CDN-cached route handlers (s-maxage 1-5 s). Treat SSE through Vercel as a short-lived fallback, not a permanent pipe.",
+   "source": "https://vercel.com/docs/functions/streaming-functions ; https://vercel.com/docs/functions/usage-and-pricing ; https://vercel.com/docs/functions/limitations ; https://vercel.com/changelog/websocket-support-is-now-in-public-beta",
+   "status": "DOCUMENTED"
+  },
+  {
+   "topic": "Vercel: CDN caching of route-handler GET responses",
+   "answer": "Yes. Vercel's CDN caches Function responses, including Next App Router route handlers (the docs use app/api/.../route.ts examples), when they send `s-maxage=N`, optionally with `stale-while-revalidate=Z`. Cacheable only if: the request is GET or HEAD with no Range and no Authorization header; the status is 200, 404, 410, 301, 302, 307 or 308; the response is at most 10 MB (20 MB when streaming); there is no Set-Cookie; there is no private, no-cache or no-store; and Vary is neither `*` nor a high-cardinality header like Cookie. Precedence: `Vercel-CDN-Cache-Control` (Vercel only, consumed and not forwarded), then `CDN-Cache-Control` (Vercel plus downstream CDNs, forwarded), then `Cache-Control`. When only Cache-Control is used, Vercel strips s-maxage and stale-while-revalidate before sending it to the browser, and the client sees `public, max-age=0, must-revalidate`. SWR: the first request is synchronous; after expiry the stale copy is served and refreshed in the background. `Pragma: no-cache`, which devtools send, forces a synchronous revalidation. Maximum TTL is 1 year. proxy-revalidate is unsupported, and the docs contradict each other on stale-if-error. The cache key is method + URL including the query string + host + deployment URL + scheme. A new deployment therefore starts with a cold cache, and the cache is segmented by region (best effort, with eviction). Check the `x-vercel-cache` header: HIT, MISS, STALE, PRERENDER, REVALIDATED or BYPASS. Tag purging uses the `Vercel-Cache-Tag` header. Not verified on a live Vercel deployment; no deploy was made.",
+   "source": "https://vercel.com/docs/caching/cdn-cache ; https://vercel.com/docs/caching/cache-control-headers ; https://vercel.com/docs/caching/cdn-cache/purge ; https://vercel.com/docs/headers/response-headers",
+   "status": "DOCUMENTED"
+  },
+  {
+   "topic": "Vercel: Node.js version selection",
+   "answer": "Available versions are 24.x (the default for new projects), 22.x and 20.x. Node 20 is being deprecated on Vercel on 2026-10-01 (changelog). `engines.node` in package.json overrides the dashboard setting. The docs map `24.x`, `^24.0.0` and `>=20.0.0` to the latest 24.x. The project's `\">=22\"` therefore resolves to 24.x today but will float to future majors, and Vercel warns about open-ended ranges. Recommend `\"engines\": { \"node\": \"24.x\" }`: it matches local Node 24.16 and satisfies Next (>=20.9), @solana/kit (>=20.18) and Vitest 5 (^22.12 || ^24 || >=26).",
+   "source": "https://vercel.com/docs/functions/runtimes/node-js/node-js-versions",
+   "status": "DOCUMENTED"
+  },
+  {
+   "topic": "Vercel: do vercel.json build settings override dashboard settings? (static to Next migration)",
+   "answer": "Yes. The docs say vercel.json `framework` 'overrides the Framework in Project Settings'. The same wording is used for `buildCommand`, `outputDirectory`, `installCommand`, `devCommand`, `ignoreCommand` and `regions`. Use `framework: null` to select 'Other' or `'nextjs'` for Next.js. The current repo vercel.json sets `\"framework\": null` and `\"outputDirectory\": \"dist\"`, which forces the static 'Other' build. A redeploy of the converted repo would run `next build` and then look for `dist` and fail or serve nothing. It also can't produce functions. The Vercel Next builder (vercel/vercel packages/next/src/index.ts) does `const outputDirectory = path.join('./', config.outputDirectory || '.next')`. So if a stale dashboard override of 'dist' survives, the build fails with 'The Next.js output directory \"dist\" was not found' (err.sh now-next-routes-manifest). The Vercel KB also says Output Directory must not be overridden for Next unless you use a custom distDir. Fix: set `framework: 'nextjs'` and `outputDirectory: '.next'` explicitly in vercel.json. Explicit values beat any dashboard override, and '.next' is exactly what the builder defaults to. `buildCommand: 'npm run build'` runs `next build` through package.json, the same as the Next preset. Use `installCommand: 'npm install'`, Vercel's own npm default; `npm ci` is stricter but fails if the lockfile drifts. `devCommand` only affects `vercel dev`. `fluid: true` guarantees the Fluid defaults (300 s, Active CPU pricing) even if the project predates 2025-04-23. Move the old static-site `headers` block out of vercel.json. Vercel recommends next.config.ts headers() for Next, and next.config.ts already sets nosniff, Referrer-Policy, X-Frame-Options and Permissions-Policy. The old `/config.js` rule is obsolete. Not deploy-tested (no credentials).",
+   "source": "https://vercel.com/docs/project-configuration/vercel-json (framework/buildCommand/outputDirectory/installCommand) ; https://vercel.com/docs/builds/configure-a-build ; https://github.com/vercel/vercel/blob/main/packages/next/src/index.ts line 237 ; https://github.com/vercel/vercel/blob/main/errors/now-next-routes-manifest.md",
+   "status": "DOCUMENTED"
+  },
+  {
+   "topic": "Vercel: Hobby plan commercial-use restriction",
+   "answer": "Hobby teams are restricted to 'non-commercial personal use only'. Payments, ads, affiliate-first sites, or being paid to build or host the site all count as commercial and require Pro.",
+   "source": "https://vercel.com/docs/limits/fair-use-guidelines#commercial-usage",
+   "status": "DOCUMENTED"
+  },
+  {
+   "topic": "lightweight-charts v5 API",
+   "answer": "Chart options: `createChart(el, { autoSize: true, layout: { background: { type: ColorType.Solid, color }, textColor, fontSize, attributionLogo: true, panes: { separatorColor, separatorHoverColor, enableResize } }, grid: { vertLines: { color }, horzLines: { color } }, crosshair: { mode: CrosshairMode.Normal } (enum: Normal=0, Magnet=1, Hidden=2, MagnetOHLC=3), rightPriceScale: {...}, timeScale: { timeVisible (default false), secondsVisible (default true), rightOffset, barSpacing, shiftVisibleRangeOnNewBar (default true), borderVisible, tickMarkFormatter }, localization: { locale (default navigator.language), priceFormatter, timeFormatter, dateFormat } })`. With autoSize, width and height are ignored unless ResizeObserver fails. Series are created with `chart.addSeries(CandlestickSeries | HistogramSeries | LineSeries | AreaSeries | BarSeries | BaselineSeries, options?, paneIndex?)`; the v4 addCandlestickSeries() methods are gone. v5 also moved markers to `createSeriesMarkers(series, markers)` and watermarks to `createTextWatermark(chart.panes()[0], {...})`. Volume as an overlay: `addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: '' })`, then `volume.priceScale().applyOptions({ scaleMargins: { top: 0.7–0.8, bottom: 0 } })` and `candles.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0.25–0.4 } })`. Volume in a separate pane: pass paneIndex 1 as the third argument to addSeries, then `chart.panes()[1].setHeight(px)` (minimum 30 px) or `setStretchFactor()`. Panes also support `series.moveToPane(i)` and `chart.removePane(i)`. Live data: `series.update(bar)` replaces the last bar when times are equal and appends when newer. An older time throws 'Cannot update oldest data, last time=…, new time=…' in production builds too, unless you pass `update(bar, true)` (historicalUpdate), which only works for an existing time point and not with conflation. `setData(data)` requires strictly ascending, unique times. The check ('data must be asc ordered by time') exists ONLY in the development build and is stripped from production, so sort and dedupe yourself. Time is `UTCTimestamp` in SECONDS (not ms). The library has no timezone support and displays everything as UTC, so shift timestamps or use localization.timeFormatter and timeScale.tickMarkFormatter. Other methods: `chart.subscribeCrosshairMove(handler)` and `unsubscribeCrosshairMove`, where the handler reads `param.time`, `param.point` and `param.seriesData.get(series)`; `chart.timeScale().fitContent()` and `.scrollToRealTime()`; `chart.remove()` on unmount. SSR: importing the package in Node works, but createChart throws 'document is not defined'. Use a 'use client' component and create the chart inside useEffect; next/dynamic with ssr:false isn't required.",
+   "source": "node_modules/lightweight-charts/dist/typings.d.ts + lightweight-charts.{development,production}.mjs (5.2.1) ; https://tradingview.github.io/lightweight-charts/tutorials/how_to/price-and-volume ; .../tutorials/how_to/panes ; .../docs/migrations/from-v4-to-v5 ; .../docs/time-zones ; Node import test",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "lightweight-charts: priceFormat for micro-prices (meme coins at 1e-6 to 1e-11 USD)",
+   "answer": "Built-in `{ type: 'price', precision, minMove }` has hard limits. If precision is omitted it is derived by precisionByMinMove(), which caps at 8 decimals, so 1.2e-9 renders as 0.00000000. An explicit precision above 16 throws 'invalid length' in numberToStringWithLeadingZero. The price scale base defaults to 1/minMove, and floating-point error makes 1/1e-9 = 999999999.9999999 and 1/1e-15 = 999999999999999.9. The library's PriceTickSpanCalculator then throws 'unexpected base'; this was reproduced by simulating the 5.2.1 logic. Use `{ type: 'custom', formatter: (p) => string, base: 10 ** k }`. The `base` option exists on both built-in and custom formats in 5.2.1; its typings describe it as useful 'for very small price movements like 1e-18', and it is used instead of minMove. Always pass an exact power of ten (10 ** k is exact for k ≤ 22). Pick k from the magnitude of the latest price, e.g. k = -floor(log10(price)) + 4, clamped to 2–18, and re-apply it with `series.applyOptions({ priceFormat })` when the magnitude changes. A subscript-zero formatter (0.0₇1235) keeps axis labels narrow; a tested implementation is in code_snippets. Setting `localization.priceFormatter` applies the formatter chart-wide, including the crosshair label.",
+   "source": "lightweight-charts 5.2.1 source (PriceFormatter, precisionByMinMove, isBaseDecimal, PriceTickSpanCalculator) + tmp/lwc-base-sim.mjs + tmp/microfmt2.mjs",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "lightweight-charts licence / attribution; TradingView Advanced Charts licence",
+   "answer": "Lightweight Charts is Apache-2.0. The licence requires naming TradingView as the product creator. You must add the NOTICE 'attribution notice' (\"TradingView Lightweight Charts™ / Copyright (c) 2025 TradingView, Inc. https://www.tradingview.com/\") and a link to https://www.tradingview.com/ on a page users can see. The default `layout.attributionLogo: true` satisfies the link requirement; if you set it to false, add the link elsewhere, e.g. in the footer or an about page. The npm tarball doesn't ship NOTICE, so copy it from GitHub. The full Charting Library (Advanced Charts) and Trading Platform are NOT freely usable. TradingView's FAQ says they don't provide these for personal use, hobbies, studies or testing, and the licences are only available to companies for public web projects (access by request; contact platforms@tradingview.com). Use lightweight-charts.",
+   "source": "node_modules/lightweight-charts/README.md (License) ; typings attributionLogo doc ; https://raw.githubusercontent.com/tradingview/lightweight-charts/master/NOTICE ; https://www.tradingview.com/free-charting-libraries/",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "@solana/kit: PDA, address codec, base58, isAddress",
+   "answer": "Imports: `import { address, isAddress, assertIsAddress, getAddressEncoder, getAddressDecoder, getProgramDerivedAddress, getBase58Encoder, getBase58Decoder, getBase64Encoder, getU64Decoder, getStructDecoder } from '@solana/kit'`. The same functions are in @solana/addresses and @solana/codecs-strings for smaller installs. `getProgramDerivedAddress({ programAddress, seeds })` is ASYNC and returns `readonly [Address, bump]`. It accepts at most 16 seeds; string seeds are UTF-8 encoded and bytes are passed as-is. `getAddressEncoder().encode(addr)` returns 32 bytes. `isAddress(s)` is a synchronous type guard. Codec naming is inverted: `getBase58Encoder().encode(str)` turns a base58 string into bytes, and `getBase58Decoder().decode(bytes)` turns bytes into a string; base64 works the same way. Verified against mainnet: the ATA from the docstring example (owner 9fYLF…Ddkm, USDC) derives to 5DMGH4bkaN4ZYBHrF7DVaNo3bkp5QagP1tfVUjPu7UAY with bump 255. The pump.fun bonding curve for 2qEHj…tpump (seeds ['bonding-curve', mint], program 6EF8rr…F6P) derives to 2JUXSuq1A1EdBzZj757cXFYuALPxv6vee4X981ajpzo8 with bump 254. That account exists on mainnet, is owned by the pump program and is 150 bytes. Its u64 fields decode with DataView (see the u64 finding): complete=true, tokenTotalSupply=1000000000000000, reserves 0 because it has migrated. Works in browser and Node without polyfills. PDA derivation uses `crypto.subtle.digest('SHA-256')`, so in browsers it needs a secure context (https or localhost). Node 24 has it globally. Minimal alternatives: @solana/addresses on its own (about 376 KB unpacked; deps assertions, codecs-core, codecs-strings, errors, nominal-types); bs58 6.0.0 for base58 only; or @noble/hashes 2.4.0 sha256 plus @noble/curves 2.4.0 ed25519 for a hand-rolled PDA, which isn't worth it. Avoid @solana/web3.js 1.x in the browser because it needs Buffer.",
+   "source": "@solana/addresses 8.4.0 typings (program-derived-address.d.ts, address.d.ts) ; tmp/kit-test/pda-test.mjs run ; research/platform/rpc-getAccountInfo-pump-bonding-curve.json + decoded-pump-bonding-curve.json",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "Decoding u64 LE from base64 account data in plain TS",
+   "answer": "`const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); const v = dv.getBigUint64(offset, true);` The `true` argument selects little-endian, and the result is a bigint. Convert to a decimal amount with `Number(v) / 10 ** decimals` only when the value is below 2^53. For exact math keep bigint, or split it: `whole = v / 10n ** BigInt(d)`, `frac = v % 10n ** BigInt(d)`. Pump.fun bonding-curve layout, verified on mainnet: [0..8) Anchor discriminator 17b7f83760d8ac60, then virtualTokenReserves u64 @8, virtualSolReserves u64 @16, realTokenReserves u64 @24, realSolReserves u64 @32, tokenTotalSupply u64 @40, complete bool @48, creator pubkey @49..81. The account is 150 bytes, so there are extra trailing fields. SOL reserves are in lamports (1e9 per SOL) and token reserves are raw with 6 decimals for pump tokens. Kit's `getBase64Encoder().encode(b64)` produced identical bytes to atob in the test.",
+   "source": "tmp/kit-test/pda-test.mjs output",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "Public Solana RPC from the browser",
+   "answer": "api.mainnet-beta.solana.com returns HTTP 403 `{\"jsonrpc\":\"2.0\",\"error\":{\"code\": 403,\"message\":\"Access forbidden\"}}` whenever an Origin header is present. It was tested with https://www.orbytai.org and with http://localhost:3000, and even that 403 carried access-control-allow-origin: *. Without an Origin header (server-side) it returns 200 with `access-control-allow-origin: backend_traffic` and rate-limit headers: x-ratelimit-tier: free, x-ratelimit-method-limit: 50, x-ratelimit-rps-limit: 250, x-ratelimit-conn-limit: 40, x-ratelimit-connrate-limit: 40, x-ratelimit-pubsub-limit: 10. The public RPC can therefore only be used from route handlers, or use a keyed RPC.",
+   "source": "curl + Node fetch 2026-09-28 (see research/platform/local-verification-2026-09-28.json)",
+   "status": "VERIFIED"
+  },
+  {
+   "topic": "Tailwind v4 + Next setup, and whether to use it",
+   "answer": "Setup: `npm i -D tailwindcss @tailwindcss/postcss` (postcss comes with it). Create postcss.config.mjs as `export default { plugins: { '@tailwindcss/postcss': {} } }` and put `@import \"tailwindcss\";` in globals.css; no tailwind.config.js is needed. The project already has this. Define design tokens in `@theme { --color-*, --font-*, --text-*, --spacing, --radius-*, --breakpoint-*, --animate-* }`. Each token generates utilities, e.g. --color-up gives bg-up and text-up. Reset a namespace with `--color-*: initial`. Use `@theme inline` when a token references another variable, e.g. next/font's --font-geist-mono, and plain `:root` for variables that shouldn't create utilities. Opinion: keep Tailwind v4. It adds no runtime cost, it's already installed and wired, @theme gives one token source for the dense dark palette, and the tabular-nums, truncate, grid and flex utilities fit terminal tables well. For the hottest paths, such as virtualized table rows or flashing price cells, add a few semantic classes in @layer components or a CSS module with fixed row heights, `font-variant-numeric: tabular-nums` and `contain: content` to keep JSX readable and flash animations cheap. Mixing the two is fine, but don't run both a CSS-modules design system and a Tailwind one in parallel.",
+   "source": "https://tailwindcss.com/docs/installation/framework-guides/nextjs (v4.3) ; https://tailwindcss.com/docs/theme",
+   "status": "DOCUMENTED"
+  },
+  {
+   "topic": "Vitest setup for pure-function tests",
+   "answer": "Vitest 5.0.2 runs on Vite 8.3.1, which has native `resolve.tsconfigPaths: true`. The Next docs still suggest the vite-tsconfig-paths plugin, but it's no longer needed. Verified: an `@/lib/u64` import resolved and the test passed with `defineConfig({ resolve: { tsconfigPaths: true }, test: { environment: 'node', include: ['src/**/*.test.ts'] } })`. The project's current config, which uses explicit `resolve.alias` with fileURLToPath plus a `server-only` stub alias, is also correct; keep the server-only stub because `import 'server-only'` throws outside the react-server condition. Use environment 'node' for pure functions; jsdom or happy-dom plus @vitejs/plugin-react are only needed for component tests. Vitest 5 requires Node ^22.12, ^24 or >=26. Vitest doesn't type-check, but next build does (tests included), so tests must compile.",
+   "source": "node_modules/next/dist/docs/01-app/02-guides/testing/vitest.md ; vite 8.3.1 typings ; tmp/vitest-test run",
+   "status": "VERIFIED"
+  }
+ ],
+ "recommended_vercel_json": "{\n  \"$schema\": \"https://openapi.vercel.sh/vercel.json\",\n  \"framework\": \"nextjs\",\n  \"installCommand\": \"npm install\",\n  \"buildCommand\": \"npm run build\",\n  \"outputDirectory\": \".next\",\n  \"devCommand\": \"next dev --port $PORT\",\n  \"fluid\": true\n}",
+ "gotchas": [
+  "The current vercel.json ({\"framework\": null, \"outputDirectory\": \"dist\"}) MUST be replaced. As it stands, a redeploy runs next build and then looks for dist/ as a static site, so it fails or serves nothing and creates no functions. Every value in the recommended vercel.json overrides the dashboard setting of the same name. '.next' is exactly what Vercel's Next builder defaults to (config.outputDirectory || '.next'), so setting it explicitly neutralises any stale 'dist' dashboard override. Also drop the old static headers block; next.config.ts headers() already covers it.",
+  "Set package.json engines to \"24.x\" instead of \">=22\". Open ranges float to future Node majors on Vercel (>=20 already maps to 24.x), and Node 20 is deprecated on Vercel from 2026-10-01.",
+  "Don't upgrade to TypeScript 7.0.2 (npm latest). typescript-eslint 8.71.0 (inside eslint-config-next/typescript) requires typescript <6.1.0. Keep ~5.9.3 (current) or 6.0.3.",
+  "Don't upgrade to ESLint 10.11.0 (npm latest). eslint-plugin-react 7.37.5, eslint-plugin-import 2.32.0 and eslint-plugin-jsx-a11y 6.10.2 only declare support up to ESLint 9. Stay on 9.39.5.",
+  "`next lint` no longer exists and `next build` no longer lints. Run `eslint .` in CI or in the check script.",
+  "RouteContext<'/…'> is generated by next dev, next build or next typegen. Running `tsc --noEmit` on a clean checkout fails with 'Cannot find name RouteContext'. Make the typecheck script `next typegen && tsc --noEmit`, or type params as `{ params: Promise<{ mint: string }> }`.",
+  "next build type-checks the whole tsconfig project with the tsc CLI, test files included. A broken test file breaks the Vercel build even though Vitest ran fine.",
+  "Don't enable cacheComponents. With it on, `export const runtime`, `dynamic`, `revalidate`, `fetchCache` and `dynamicParams` become build errors (verified for runtime and dynamic), and its prerender model fights live data. `runtime = 'edge'` is deprecated in 16 regardless.",
+  "GET route handlers are dynamic by default in Next 16, so `export const dynamic = 'force-dynamic'` is redundant. Cache at Vercel's CDN with s-maxage/stale-while-revalidate headers, not with Next's data cache or ISR.",
+  "Vercel CDN caching: the cache key includes the full query string, host and deployment. Normalise query params (sorted, lower-case, clamped limits) to raise the hit rate. Each new deployment and each region starts cold. Requests with an Authorization header, responses with Set-Cookie, statuses outside 200/404/410/301/302/307/308, and bodies over 10 MB (20 MB streaming) are never cached. Only Cache-Control means Vercel strips s-maxage and SWR before the browser sees it. Use Vercel-CDN-Cache-Control for edge-only TTLs. Opening devtools sends Pragma: no-cache, which forces synchronous revalidation and distorts timing. Verify with the x-vercel-cache header.",
+  "Vercel function response bodies are capped at 4.5 MB (413 FUNCTION_PAYLOAD_TOO_LARGE). Page large candle or trade histories rather than returning everything in one response.",
+  "SSE through Vercel dies at maxDuration (300 s on Hobby, which is also its max; 800 s on Pro) and bills Provisioned Memory for the whole time the connection is open. EventSource must reconnect with `retry:` and heartbeats. Prefer browser-direct WebSockets to provider feeds, or short polling of CDN-cached endpoints.",
+  "api.mainnet-beta.solana.com returns 403 'Access forbidden' to any request carrying an Origin header, i.e. every browser fetch. Only call it from server route handlers (free tier headers: method-limit 50, rps-limit 250, conn-limit 40, pubsub-limit 10) or use a keyed RPC.",
+  "Vercel Hobby is non-commercial only. Ads, payments, affiliate-first sites or paid development require Pro.",
+  "lightweight-charts production builds do NOT check data ordering; the 'asc ordered' assertion exists only in the development build. Unsorted or duplicate times render garbage silently, so sort ascending and dedupe by time before setData. series.update() with a time older than the last bar throws even in production.",
+  "lightweight-charts times are UTCTimestamp SECONDS. Divide ms by 1000 and floor to the candle bucket. The library displays everything as UTC, with no timezone support.",
+  "Micro-prices in lightweight-charts: auto precision caps at 8 decimals, precision above 16 throws, and minMove values like 1e-9 or 1e-15 make 1/minMove inexact, which throws 'unexpected base'. Use priceFormat {type:'custom', formatter, base: 10**k} with an exact power of ten.",
+  "The lightweight-charts licence requires TradingView attribution: keep layout.attributionLogo true, or add a visible tradingview.com link plus the NOTICE text. The Advanced Charts / Charting Library is not free and is only licensed to companies for public projects.",
+  "createChart must run inside useEffect in a 'use client' component and be paired with chart.remove() on cleanup. React StrictMode (reactStrictMode: true in next.config) mounts effects twice in dev, so cleanup must fully dispose the chart.",
+  "@solana/kit getProgramDerivedAddress is async and uses crypto.subtle, so it needs a secure context (https or localhost) in the browser. Codec naming is inverted: getBase58Encoder().encode(string) returns bytes.",
+  "Token logos come from arbitrary hosts, so next/image remotePatterns can't allowlist them, and Vercel Image Optimization would burn the Hobby quota of 5K transformations/month. Use plain <img> with an onError fallback, or images.unoptimized.",
+  "Next.js adds `vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch` to route-handler responses (observed locally). It's harmless for browser fetch() because those request headers are absent. Never add Vary: Cookie, which makes the response uncacheable on Vercel.",
+  "The stale dist/ folder from the old static site is still in the repo root. It is excluded in tsconfig and ESLint and unused by Next, but delete it (or keep it gitignored) to avoid confusion once outputDirectory is '.next'."
+ ],
+ "code_snippets": [
+  {
+   "topic": "eslint.config.mjs (verified with eslint 9.39.5 + eslint-config-next 16.3.6; matches official Next 16 docs)",
+   "code": "import { defineConfig, globalIgnores } from 'eslint/config';\nimport nextVitals from 'eslint-config-next/core-web-vitals';\nimport nextTs from 'eslint-config-next/typescript';\n\nexport default defineConfig([\n  ...nextVitals,\n  ...nextTs,\n  // Override default ignores of eslint-config-next (keep the defaults + project extras)\n  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'dist/**', 'coverage/**']),\n  {\n    rules: {\n      // token logos come from arbitrary hosts -> plain <img>\n      '@next/next/no-img-element': 'off',\n      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],\n    },\n  },\n]);\n\n// package.json scripts:\n// \"lint\": \"eslint .\",\n// \"typecheck\": \"next typegen && tsc --noEmit\",\n// \"test\": \"vitest run\""
+  },
+  {
+   "topic": "Route handler with Vercel CDN cache headers (Next 16, async params, no cacheComponents)",
+   "code": "// src/app/api/token/[mint]/route.ts\nimport type { NextRequest } from 'next/server';\nimport { isAddress } from '@solana/kit';\n\nexport const maxDuration = 15; // seconds (Hobby max 300). runtime defaults to 'nodejs'.\n\nconst NO_STORE = { 'Cache-Control': 'no-store' };\n\nexport async function GET(_req: NextRequest, { params }: { params: Promise<{ mint: string }> }) {\n  const { mint } = await params; // params is a Promise in Next 15+/16\n  if (!isAddress(mint)) {\n    return Response.json({ error: 'invalid_mint' }, { status: 400, headers: NO_STORE });\n  }\n\n  const upstream = await fetch(`https://example-provider.invalid/tokens/${mint}`, {\n    cache: 'no-store',                 // don't use Next's data cache for live data\n    signal: AbortSignal.timeout(8_000),\n  });\n  if (!upstream.ok) {\n    // 5xx is never cached by Vercel's CDN anyway; be explicit\n    return Response.json({ error: 'upstream', status: upstream.status }, { status: 502, headers: NO_STORE });\n  }\n  const data: unknown = await upstream.json();\n\n  return Response.json(data, {\n    headers: {\n      // Browser: always revalidate (gets forwarded as-is)\n      'Cache-Control': 'public, max-age=0, must-revalidate',\n      // Vercel edge only (consumed by Vercel, never forwarded): fresh 5s, serve stale up to 25s while refreshing in background\n      'Vercel-CDN-Cache-Control': 'public, s-maxage=5, stale-while-revalidate=25',\n    },\n  });\n}\n// Check on a deployment: curl -sI https://<deploy>/api/token/<mint> | grep -i x-vercel-cache  -> MISS, then HIT / STALE\n// Must NOT be sent/returned: Authorization request header, Set-Cookie, Vary: Cookie (all disable CDN caching)."
+  },
+  {
+   "topic": "SSE route handler (streams on Vercel; closed at maxDuration, so client must reconnect)",
+   "code": "// src/app/api/stream/route.ts\nexport const maxDuration = 60; // <= 300 on Hobby. Provisioned memory is billed while open.\n\nexport async function GET(request: Request) {\n  const enc = new TextEncoder();\n  let timer: ReturnType<typeof setInterval> | undefined;\n  const stream = new ReadableStream<Uint8Array>({\n    start(controller) {\n      controller.enqueue(enc.encode('retry: 3000\\n\\n')); // EventSource reconnect delay\n      timer = setInterval(() => {\n        controller.enqueue(enc.encode(`event: ping\\ndata: ${Date.now()}\\n\\n`));\n      }, 15_000);\n      request.signal.addEventListener('abort', () => {\n        clearInterval(timer);\n        try { controller.close(); } catch {}\n      });\n    },\n    cancel() { clearInterval(timer); },\n  });\n  return new Response(stream, {\n    headers: {\n      'Content-Type': 'text/event-stream; charset=utf-8',\n      'Cache-Control': 'no-cache, no-transform',\n      'X-Accel-Buffering': 'no',\n    },\n  });\n}"
+  },
+  {
+   "topic": "lightweight-charts v5 candle + volume client component with micro-price formatting",
+   "code": "'use client';\nimport { useEffect, useRef } from 'react';\nimport {\n  createChart, CandlestickSeries, HistogramSeries, ColorType, CrosshairMode,\n  type IChartApi, type ISeriesApi, type MouseEventParams, type CandlestickData, type UTCTimestamp,\n} from 'lightweight-charts';\n\nexport type Candle = { t: number /* unix SECONDS, bucket open */; o: number; h: number; l: number; c: number; v: number };\n\nconst SUB = '₀₁₂₃₄₅₆₇₈₉';\nexport function formatMicroPrice(p: number, sig = 4): string {\n  if (!Number.isFinite(p)) return '—';\n  if (p === 0) return '0';\n  const sign = p < 0 ? '-' : '';\n  const a = Math.abs(p);\n  if (a >= 1) return sign + a.toLocaleString('en-US', { maximumFractionDigits: a >= 1000 ? 2 : 4 });\n  let zeros = -Math.floor(Math.log10(a)) - 1;\n  let digits = Math.round(a * 10 ** (zeros + sig));\n  if (digits >= 10 ** sig) { zeros -= 1; digits = Math.round(digits / 10); }\n  if (zeros < 0) return sign + '1';\n  const body = String(digits).padStart(sig, '0').replace(/0+$/, '') || '0';\n  if (zeros >= 4) return `${sign}0.0${[...String(zeros)].map((d) => SUB[+d]).join('')}${body}`;\n  return `${sign}0.${'0'.repeat(zeros)}${body}`;\n}\n// exact power of ten for LWC price-scale base (never pass minMove like 1e-9: 1/1e-9 is inexact -> 'unexpected base')\nconst priceBase = (ref: number, sig = 4) =>\n  ref > 0 ? 10 ** Math.max(2, Math.min(18, -Math.floor(Math.log10(ref)) + sig)) : 100;\n\nconst toBar = (k: Candle): CandlestickData<UTCTimestamp> => ({ time: k.t as UTCTimestamp, open: k.o, high: k.h, low: k.l, close: k.c });\nconst toVol = (k: Candle) => ({ time: k.t as UTCTimestamp, value: k.v, color: k.c >= k.o ? 'rgba(22,199,132,0.45)' : 'rgba(234,57,67,0.45)' });\nconst sortDedupe = (rows: Candle[]) => {\n  const m = new Map<number, Candle>();\n  for (const r of rows) m.set(r.t, r); // last write wins\n  return [...m.values()].sort((a, b) => a.t - b.t); // prod build does NOT validate order\n};\n\nexport function PriceChart({ candles, live, onHover }: { candles: Candle[]; live?: Candle | null; onHover?: (c: CandlestickData | null) => void }) {\n  const el = useRef<HTMLDivElement>(null);\n  const chartRef = useRef<IChartApi | null>(null);\n  const candleRef = useRef<ISeriesApi<'Candlestick'> | null>(null);\n  const volRef = useRef<ISeriesApi<'Histogram'> | null>(null);\n  const lastT = useRef<number>(0);\n\n  useEffect(() => {\n    if (!el.current) return;\n    const chart = createChart(el.current, {\n      autoSize: true,\n      layout: { background: { type: ColorType.Solid, color: '#0b0e11' }, textColor: '#8b95a5', fontSize: 11, attributionLogo: true },\n      grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },\n      crosshair: { mode: CrosshairMode.Normal },\n      rightPriceScale: { borderVisible: false },\n      timeScale: { timeVisible: true, secondsVisible: false, borderVisible: false, rightOffset: 4 },\n      localization: { locale: 'en-US', priceFormatter: formatMicroPrice },\n    });\n    const candle = chart.addSeries(CandlestickSeries, {\n      upColor: '#16c784', downColor: '#ea3943', borderVisible: false, wickUpColor: '#16c784', wickDownColor: '#ea3943',\n      priceFormat: { type: 'custom', formatter: formatMicroPrice, base: 1e6 },\n    });\n    // Overlay volume at the bottom 20% (alternative: 3rd arg paneIndex=1 + chart.panes()[1].setHeight(90))\n    const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: '', lastValueVisible: false, priceLineVisible: false });\n    volume.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });\n    candle.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.24 } });\n\n    const onMove = (p: MouseEventParams) => {\n      const d = p.time ? (p.seriesData.get(candle) as CandlestickData | undefined) : undefined;\n      onHover?.(d ?? null);\n    };\n    chart.subscribeCrosshairMove(onMove);\n    chartRef.current = chart; candleRef.current = candle; volRef.current = volume;\n    return () => {\n      chart.unsubscribeCrosshairMove(onMove);\n      chart.remove(); // StrictMode double-mount safe\n      chartRef.current = null; candleRef.current = null; volRef.current = null;\n    };\n  }, [onHover]);\n\n  // full history\n  useEffect(() => {\n    const c = candleRef.current, v = volRef.current;\n    if (!c || !v) return;\n    const rows = sortDedupe(candles);\n    const last = rows.at(-1);\n    if (last) c.applyOptions({ priceFormat: { type: 'custom', formatter: formatMicroPrice, base: priceBase(last.c) } });\n    c.setData(rows.map(toBar));\n    v.setData(rows.map(toVol));\n    lastT.current = last?.t ?? 0;\n    chartRef.current?.timeScale().fitContent();\n  }, [candles]);\n\n  // live tick: same bucket -> replaces last bar, newer bucket -> appends; older -> would throw, so skip\n  useEffect(() => {\n    if (!live || live.t < lastT.current) return;\n    candleRef.current?.update(toBar(live));\n    volRef.current?.update(toVol(live));\n    lastT.current = live.t;\n  }, [live]);\n\n  return <div ref={el} className=\"h-[420px] w-full\" />;\n}"
+  },
+  {
+   "topic": "PDA derivation + base58 + u64 LE decode with @solana/kit (verified against mainnet)",
+   "code": "import { address, isAddress, getAddressEncoder, getProgramDerivedAddress, getBase58Decoder, type Address } from '@solana/kit';\n\nconst PUMP_PROGRAM = address('6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P');\nconst ATA_PROGRAM = address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');\nconst TOKEN_PROGRAM = address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');\nconst enc = getAddressEncoder();\n\nexport async function pumpBondingCurvePda(mint: Address) {\n  // string seeds are UTF-8 encoded; returns readonly [Address, bump]\n  const [pda] = await getProgramDerivedAddress({ programAddress: PUMP_PROGRAM, seeds: ['bonding-curve', enc.encode(mint)] });\n  return pda; // e.g. mint 2qEHj…tpump -> 2JUXSuq1A1EdBzZj757cXFYuALPxv6vee4X981ajpzo8 (bump 254)\n}\n\nexport async function associatedTokenAddress(owner: Address, mint: Address, tokenProgram: Address = TOKEN_PROGRAM) {\n  const [ata] = await getProgramDerivedAddress({ programAddress: ATA_PROGRAM, seeds: [enc.encode(owner), enc.encode(tokenProgram), enc.encode(mint)] });\n  return ata;\n}\n\n// Plain TS: base64 account data -> u64 little-endian (no library)\nexport function b64ToBytes(b64: string): Uint8Array {\n  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));\n}\nexport function readU64LE(bytes: Uint8Array, offset: number): bigint {\n  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getBigUint64(offset, true);\n}\nexport function decodePumpCurve(b64: string) {\n  const b = b64ToBytes(b64);\n  return {\n    virtualTokenReserves: readU64LE(b, 8),   // raw, 6 decimals\n    virtualSolReserves: readU64LE(b, 16),    // lamports\n    realTokenReserves: readU64LE(b, 24),\n    realSolReserves: readU64LE(b, 32),\n    tokenTotalSupply: readU64LE(b, 40),\n    complete: b[48] === 1,\n    creator: b.length >= 81 ? getBase58Decoder().decode(b.subarray(49, 81)) : null,\n  };\n}\n// bigint -> decimal string without precision loss\nexport function formatUnits(v: bigint, decimals: number): string {\n  const base = 10n ** BigInt(decimals);\n  const frac = (v % base).toString().padStart(decimals, '0').replace(/0+$/, '');\n  return frac ? `${v / base}.${frac}` : `${v / base}`;\n}\n// isAddress('…') is a sync type guard; getProgramDerivedAddress needs crypto.subtle (https/localhost in browsers)."
+  },
+  {
+   "topic": "vitest.config.ts (Vitest 5 / Vite 8, verified)",
+   "code": "import { fileURLToPath } from 'node:url';\nimport { defineConfig } from 'vitest/config';\n\nexport default defineConfig({\n  resolve: {\n    tsconfigPaths: true, // Vite 8 native; replaces vite-tsconfig-paths (the explicit alias below also works)\n    alias: {\n      // 'server-only' throws outside the react-server condition -> stub it in unit tests\n      'server-only': fileURLToPath(new URL('./src/test/server-only-stub.ts', import.meta.url)),\n    },\n  },\n  test: {\n    environment: 'node',\n    include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],\n  },\n});"
+  },
+  {
+   "topic": "Tailwind v4 wiring (postcss.config.mjs + globals.css @theme tokens)",
+   "code": "// postcss.config.mjs\nexport default { plugins: { '@tailwindcss/postcss': {} } };\n\n/* src/app/globals.css */\n@import 'tailwindcss';\n\n@theme {\n  --color-bg: #0b0e11;\n  --color-panel: #12161c;\n  --color-line: #1e242c;\n  --color-fg: #e6e9ef;\n  --color-muted: #8b95a5;\n  --color-up: #16c784;     /* -> text-up, bg-up */\n  --color-down: #ea3943;\n  --color-accent: #7c5cff;\n  --text-xxs: 0.6875rem;   /* -> text-xxs (11px) */\n  --radius-card: 6px;\n}\n@theme inline {\n  --font-mono: var(--font-geist-mono), ui-monospace, monospace; /* next/font variable */\n}\n@layer components {\n  .num { font-variant-numeric: tabular-nums; } /* or use the tabular-nums utility */\n  .row { height: 32px; contain: content; }     /* hot-path virtualized rows */\n}"
+  },
+  {
+   "topic": "next.config.ts image setting for arbitrary token logos",
+   "code": "import type { NextConfig } from 'next';\n\nconst nextConfig: NextConfig = {\n  reactStrictMode: true,\n  poweredByHeader: false,\n  // Token logos come from arbitrary hosts (IPFS gateways, arweave, CDNs): don't route them through the optimizer.\n  images: { unoptimized: true },\n  // (preferred: plain <img loading=\"lazy\" decoding=\"async\" referrerPolicy=\"no-referrer\" onError={fallback} />)\n  // DO NOT set cacheComponents: true (breaks runtime/dynamic exports, prerender model unsuitable for live data)\n};\n\nexport default nextConfig;"
+  }
+ ]
+}

@@ -1,0 +1,248 @@
+{
+ "provider": "DEX Screener (api.dexscreener.com) - free public REST API plus official WebSocket feeds",
+ "summary": "Status on 2026-09-28: the service is live, needs no key and costs nothing. I tested it with about 44 real requests and 2 WebSocket sessions. Every documented REST endpoint answered 200 for Solana: profiles, recent profile updates, boosts latest/top, community takeovers, ads, orders, pairs, tokens, token-pairs, search, metas trending and meta by slug. There is now an OFFICIAL WebSocket API at wss://api.dexscreener.com. It carries only profiles, boosts, community takeovers and ads, with no prices or trades.\n\nWhat it is good for:\n- Enriching pairs and tokens in batches of up to 30. The data covers price in USD and in the native quote, buy/sell counts and USD volume for m5/h1/h6/h24, price change %, liquidity, FDV, market cap, pair creation time, image, socials and boosts.\n- Detecting which launchpad or DEX a pool belongs to via dexId: pumpfun, pumpswap, meteoradbc, bags, raydium with labels CLMM/CPMM, orca wp/v2, meteora DLMM/DYN/DYN2.\n- Detecting pump.fun migration. For a recently graduated mint, /token-pairs/v1 returns both the frozen pumpfun bonding-curve pair and the new pumpswap pair.\n- Paid-promotion feeds (profiles, boosts, community takeovers, ads) that can serve as a \"trending/promoted\" source.\n- Very convenient in a browser: CORS is `*` and Cloudflare caches responses at the edge.\n\nMain limitations:\n- No OHLCV/candles, no trades or swaps, no holders, no wallet or PnL data, no bonding-curve progress field.\n- No \"new pairs\" or \"latest pairs\" listing. The profiles and boosts feeds only contain tokens whose team paid, so they cannot serve as a Pulse New Pairs source.\n- Bonding-curve pairs (pumpfun, meteoradbc, bags) have no liquidity object.\n- Search is capped at 30 results, has no chain filter and no pagination.\n- /tokens/v1 now returns only ONE main pair per token, and output is capped at 30.\n- Edge caching means data is 30-60 s stale.\n- The API terms forbid products whose primary purpose is to compete directly with DEX Screener. That is a real legal risk for an Axiom/GMGN-style terminal.\n- Verdict: use it as an enrichment/secondary source, not as the backbone for charts, trade feeds, Pulse, or wallet analytics.",
+ "auth": "None. No API key, header or query param is used. Free tier only: the docs list no paid tier and no signup. The API terms, section 4, mention \"a free and paid version ... detailed during the API Services checkout stage\", but no public checkout or paid plan is documented. Requests go through Cloudflare, which sets a `__cf_bm` bot-management cookie (30-minute expiry, Domain=dexscreener.com, SameSite=None). Requests work without it.",
+ "base_urls": [
+  "https://api.dexscreener.com",
+  "wss://api.dexscreener.com (official WebSocket; paths mirror the REST profile/boost/CTO/ads paths)",
+  "https://cdn.dexscreener.com (token images: /cms/images/{id}?width=..&height=..&fit=crop&quality=95&format=auto; OG images: /token-images/og/solana/{mint}?timestamp=...)",
+  "https://docs.dexscreener.com/api/reference (+ .md variants; OpenAPI YAML linked from the page)"
+ ],
+ "cors": "You can call it directly from the browser.\n\n- Every REST response tested, including the 400 error, returned `access-control-allow-origin: *` and `access-control-allow-credentials: true` when sent with Origin https://www.orbytai.org.\n- A preflight OPTIONS request to /latest/dex/pairs/... returned 204 with `access-control-allow-methods: GET,HEAD,PUT,PATCH,POST,DELETE`. `access-control-allow-headers` echoes whatever you request (content-type was echoed). `vary: Access-Control-Request-Headers`, and `cf-cache-status: DYNAMIC` on the preflight.\n- Use plain `fetch(url)` without `credentials: 'include'`. With a wildcard origin, credentialed requests are rejected by browsers.\n- The WebSocket at wss://api.dexscreener.com accepted a Node 24 connection without any Origin header. The server negotiates permessage-deflate.\n- CDN images from cdn.dexscreener.com load as images (200 image/jpeg).",
+ "rate_limits": "Documented limits (OpenAPI summaries, confirmed in today's docs):\n- 60 requests/min: /token-profiles/latest/v1, /token-profiles/recent-updates/v1, /community-takeovers/latest/v1, /ads/latest/v1, /token-boosts/latest/v1, /token-boosts/top/v1, /orders/v1/{chainId}/{tokenAddress}, /metas/trending/v1, /metas/meta/v1/{slug}.\n- 300 requests/min: /latest/dex/pairs/{chainId}/{pairIds}, /tokens/v1/{chainId}/{tokenAddresses}, /token-pairs/v1/{chainId}/{tokenAddress}, /latest/dex/search.\n- The WebSocket has no documented limits.\n\nWhat I observed:\n- No X-RateLimit-*, RateLimit-* or Retry-After headers on any response, whether a cache MISS or HIT.\n- I did not deliberately trigger a 429; the traffic budget kept me well under the limits. The response to exceeding them is undocumented. Assume per-IP enforcement at Cloudflare (not documented) and back off exponentially on any non-200.\n\nCache headers observed:\n- `Cache-Control: public, max-age=60` plus `expires` 60 s ahead on profiles, recent-updates, boosts latest/top, community takeovers, ads, search and orders.\n- `Cache-Control: public, max-age=30` on pairs, tokens/v1, token-pairs/v1, metas/trending and metas/meta.\n- Weak `etag`, `vary: Accept-Encoding`, gzip.\n- `cf-cache-status: MISS` on the first request. A repeat 4 s later returned `cf-cache-status: HIT` with `Age: 4` and an identical body (same priceUsd and txns). So Cloudflare edge hits likely don't count against origin limits. Budget with that in mind: your data can be up to 30 s old on pair/token endpoints and 60 s on search/feeds.\n- 400 errors return `cf-cache-status: BYPASS`.",
+ "endpoints": [
+  {
+   "name": "Pairs by pair address (batch)",
+   "request": "GET https://api.dexscreener.com/latest/dex/pairs/solana/{pairAddress1},{pairAddress2},...",
+   "status": "VERIFIED",
+   "purpose": "Live stats for up to 30 specific pools: price, txn counts, volume, liquidity, mc/fdv, image/socials. Main refresh endpoint for token pages and table rows once pool addresses are known.",
+   "response_shape": "Envelope: {schemaVersion:\"1.0.0\", pairs: Pair[] | null, pair: Pair | null}.\n- With 1 address: pairs[0] and pair both hold the pair.\n- With several: pair is null.\n- Unknown address: HTTP 200 with {\"schemaVersion\":\"1.0.0\",\"pairs\":null,\"pair\":null} (note: null, NOT []).\n\nPAIR OBJECT (verified across 387 Solana pair objects):\n- chainId: \"solana\"\n- dexId: string (see gotchas for the observed values)\n- url: \"https://dexscreener.com/solana/{pairAddress lowercased}\"\n- pairAddress: case-sensitive base58 pool/curve account\n- labels?: string[] (key is ABSENT when there are no labels; e.g. [\"CLMM\"], [\"CPMM\"], [\"wp\"], [\"v2\"], [\"DLMM\"], [\"DYN\"], [\"DYN2\"])\n- baseToken: {address, name, symbol}\n- quoteToken: {address, name, symbol}. Usually wSOL So11111111111111111111111111111111111111112 (symbol \"SOL\"), also USDC/USDT/USD1/arbitrary tokens.\n- priceNative: STRING decimal. Price of 1 base token in quote-token units, decimal-adjusted (e.g. \"0.00000002954\" SOL).\n- priceUsd?: STRING decimal USD. Absent on ~1% of pairs, e.g. illiquid pools quoted in exotic tokens.\n- txns: {m5:{buys:int,sells:int}, h1:{...}, h6:{...}, h24:{...}}. All 4 keys always present.\n- volume: {h24:num, h6:num, h1:num, m5:num}. USD, always 4 keys.\n- priceChange: {m5?,h1?,h6?,h24?} in PERCENT (e.g. -78.19 means -78.19%). Keys exist only for windows where the pair has history; can be {} (38/387) or only h24.\n- liquidity?: {usd:num USD, base:num decimal-adjusted base-token amount in pool, quote:num decimal-adjusted quote amount}. ABSENT for bonding-curve pairs (dexId pumpfun, meteoradbc, bags) and occasionally elsewhere.\n- fdv?: num USD\n- marketCap?: num USD. Absent when priceUsd is absent; fdv==marketCap for ~76% of pairs.\n- pairCreatedAt: int Unix MILLISECONDS with second precision (always ends in 000)\n- info?: absent on ~19% of pairs.\n  - info.imageUrl: CDN url, 800x800\n  - info.header?: CDN url, 1500x500\n  - info.openGraph: CDN og url\n  - info.websites: [{label, url}]\n  - info.socials: [{type, url}]. The docs wrongly say {platform, handle}; the actual shape is {type:\"twitter\"|\"telegram\"|..., url}.\n- boosts?: {active:int}. Present only when the pair has active boosts.",
+   "params_limits": "Max 30 comma-separated pair addresses. 30 gave HTTP 200; 31 gave HTTP 400 whose body is a JSON-encoded STRING containing an HTML '400 Bad Request' page (application/json content type). Addresses are case-sensitive. 300 req/min.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=30 (Cloudflare edge HIT with Age header observed)",
+   "sample_file": "tests/fixtures/dexscreener/latest-dex-pairs.solana.30-pairs.trimmed.json (also latest-dex-pairs.solana.single.json, latest-dex-pairs.solana.not-found.json, latest-dex-pairs.solana.31-pairs.400-error.json)"
+  },
+  {
+   "name": "Tokens -> main pair (batch)",
+   "request": "GET https://api.dexscreener.com/tokens/v1/solana/{mint1},{mint2},...",
+   "status": "VERIFIED",
+   "purpose": "Batch-enrich up to 30 mints with their MAIN pool: price, mc, liquidity, volume, image. Best endpoint for Discover rows and for refreshing Pulse cards from mints discovered elsewhere.",
+   "response_shape": "A bare JSON array of Pair objects (same Pair schema as the pairs endpoint; no envelope).\n- Today it returns exactly ONE pair per token: DexScreener's primary pair, and the token is base in that pair. For example, JUP returned only JUP/SOL orca [\"wp\"], and USDC returned USDC/USDT raydium CLMM.\n- Results come back in input order.\n- Mints with no indexed pair are silently omitted (30 inputs gave 29 results).\n- For a migrated pump token the main pair was the pumpswap pool, even when a mispriced tiny DLMM pool existed.",
+   "params_limits": "Docs: up to 30 comma-separated addresses. Observed: 31 inputs returned 30 results including the 31st address. 82 inputs gave HTTP 200 with exactly 30 results (the first 31 inputs minus one with no pairs). Output is silently truncated at 30, with no error. Send at most 30 per call. 300 req/min.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=30",
+   "sample_file": "tests/fixtures/dexscreener/tokens-v1.solana.mixed-dexids.json (pumpfun, pumpswap, meteoradbc, raydium CLMM examples); tokens-v1.solana.jup-usdc.json"
+  },
+  {
+   "name": "Token pools (all pairs for one token)",
+   "request": "GET https://api.dexscreener.com/token-pairs/v1/solana/{mint}",
+   "status": "VERIFIED",
+   "purpose": "List a token's pools (up to 30). Used for the token page pool selector and for migration detection (pumpfun curve plus pumpswap/Raydium/Meteora pools).",
+   "response_shape": "A bare array of Pair objects (same schema).\n- Includes pairs where the mint is the base OR the quote token. Example: pump.fun curves quoted in the '67' token show up under the 67 mint.\n- Examples for recently migrated pump mints:\n  - 8Lmvq...pump returned [pumpswap pool 5c7z... (liquidity present, live mc), pumpfun curve 5S9a... (no liquidity; frozen priceNative 0.0000004108 SOL, so mc ~= 410.8 SOL x SOL/USD = $48,664.65; txns m5 0/0)].\n  - 8T193...pump returned [meteora DLMM, pumpswap, pumpfun].\n- A mint still on its curve returns only [pumpfun].\n- Older migrated mints (2025) no longer list their own pumpfun curve, so the curve pair is retained only for recent migrations or pruned later.\n- Order is not strictly by liquidity.",
+   "params_limits": "One mint per call. Results capped at 30 pairs (JUP returned exactly 30). 300 req/min.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=30",
+   "sample_file": "tests/fixtures/dexscreener/token-pairs-v1.solana.migrated-pump-token.pumpswap+pumpfun.json (also ...dlmm+pumpswap+pumpfun.json, ...bonding-curve-only-pumpfun.json, ...token-as-quote-pumpfun-nonsol-quote.json, ...jup.json, ...bonk-mint-raydium-cpmm.json)"
+  },
+  {
+   "name": "Search pairs",
+   "request": "GET https://api.dexscreener.com/latest/dex/search?q={urlencoded query}",
+   "status": "VERIFIED",
+   "purpose": "Global search box: matches token name, symbol or address, and 'A/B' pair syntax such as SOL/USDC.",
+   "response_shape": "{schemaVersion:\"1.0.0\", pairs: Pair[]} with at most 30 pairs, MIXED CHAINS (q=SOL/USDC returned base, arc and robinhood pairs too). No chain filter and no pagination. Filter chainId==='solana' client-side, so you may get fewer than 30 Solana results.",
+   "params_limits": "q required. Max 30 results. 300 req/min.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=60",
+   "sample_file": "tests/fixtures/dexscreener/search.q=SOL-USDC.json (also search.q=JUP.one-per-dexId-label.json, search.q=bags.dexId-bags.json)"
+  },
+  {
+   "name": "Latest token profiles",
+   "request": "GET https://api.dexscreener.com/token-profiles/latest/v1",
+   "status": "VERIFIED",
+   "purpose": "Newest PAID token profiles (teams paid DEX Screener for 'Enhanced Token Info'). Can drive a 'recently profiled' or promoted list. NOT a new-pairs feed.",
+   "response_shape": "A bare array of 30 items, all chains mixed (20 Solana in today's sample). Each item:\n- url\n- chainId\n- tokenAddress\n- icon: full CDN url, 64x64\n- header?: CDN url, 600x200\n- openGraph: url\n- description?: string, may be absent or \"\"\n- links?: [{type?:'twitter'|'telegram'|'discord'|'tiktok'|'instagram'|'reddit', label?:'Website'|'Docs', url}]\n- cto: boolean (not in the docs)\n\nThe docs schema shows a single object; the actual response is an array.",
+   "params_limits": "No params, no chain filter, no pagination (fixed 30). 60 req/min.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=60",
+   "sample_file": "tests/fixtures/dexscreener/token-profiles-latest.solana-filtered.json"
+  },
+  {
+   "name": "Recently updated token profiles",
+   "request": "GET https://api.dexscreener.com/token-profiles/recent-updates/v1",
+   "status": "VERIFIED",
+   "purpose": "Profiles whose info was recently edited.",
+   "response_shape": "A bare array of 30 items with the same fields as latest profiles, plus updatedAt (ISO-8601 string; for example '2026-08-21T02:47:33.498Z' appeared, so it is not strictly recent).",
+   "params_limits": "No params. 60 req/min.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=60",
+   "sample_file": "tests/fixtures/dexscreener/token-profiles-recent-updates.solana-filtered.json"
+  },
+  {
+   "name": "Latest boosts",
+   "request": "GET https://api.dexscreener.com/token-boosts/latest/v1",
+   "status": "VERIFIED",
+   "purpose": "Most recent paid boost purchases, usable as a 'boosted' badge or feed.",
+   "response_shape": "A bare array of 30 items, all chains. Each item:\n- url\n- chainId\n- tokenAddress\n- description?\n- icon: a BARE CDN IMAGE ID such as \"tocfDSZsgESUSOnf\", NOT a URL. Build it as https://cdn.dexscreener.com/cms/images/{icon}?width=64&height=64&fit=crop&quality=95&format=auto (verified 200 image/jpeg).\n- header?: full URL, may be missing\n- openGraph\n- links: [{type?, url}]\n- amount: number, boosts in this purchase\n- totalAmount: number, total active boosts for the token\n\nThe same tokenAddress can appear multiple times (one entry per purchase). The docs say object; the response is an array.",
+   "params_limits": "No params. 60 req/min.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=60",
+   "sample_file": "tests/fixtures/dexscreener/token-boosts-latest.solana-filtered.json"
+  },
+  {
+   "name": "Top boosts",
+   "request": "GET https://api.dexscreener.com/token-boosts/top/v1",
+   "status": "VERIFIED",
+   "purpose": "Tokens with the most active boosts.",
+   "response_shape": "A bare array of 30 items with the same fields as latest boosts but WITHOUT amount; only totalAmount (e.g. 500, 100, 50, 30), sorted by totalAmount descending. icon is again a bare CDN image id.",
+   "params_limits": "No params. 60 req/min.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=60",
+   "sample_file": "tests/fixtures/dexscreener/token-boosts-top.solana-filtered.json"
+  },
+  {
+   "name": "Latest community takeovers",
+   "request": "GET https://api.dexscreener.com/community-takeovers/latest/v1",
+   "status": "VERIFIED",
+   "purpose": "Tokens whose community claimed a CTO profile. Can be shown as a CTO badge.",
+   "response_shape": "A bare array (15 items today). Each item: url, chainId, tokenAddress, icon (full url), header, openGraph, description, links[{type?,label?,url}], claimDate (ISO-8601 string, e.g. '2026-09-28T20:00:29.668Z').",
+   "params_limits": "No params. 60 req/min.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=60",
+   "sample_file": "tests/fixtures/dexscreener/community-takeovers-latest.solana-filtered.json"
+  },
+  {
+   "name": "Latest ads",
+   "request": "GET https://api.dexscreener.com/ads/latest/v1",
+   "status": "VERIFIED",
+   "purpose": "Tokens currently buying DEX Screener ads (promoted signal).",
+   "response_shape": "A bare array of 30 items. Each item:\n- url\n- chainId\n- tokenAddress\n- date: ISO string\n- type: 'tokenAd' | 'trendingBarAd'\n- impressions?: number, e.g. 100000\n- durationHours?: number",
+   "params_limits": "No params. 60 req/min.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=60",
+   "sample_file": "tests/fixtures/dexscreener/ads-latest.solana-filtered.json"
+  },
+  {
+   "name": "Paid orders for a token",
+   "request": "GET https://api.dexscreener.com/orders/v1/solana/{mint}",
+   "status": "VERIFIED",
+   "purpose": "Shows whether a token paid for a profile, CTO or ads, and its boost purchases ('DEX paid' badge common on Axiom/GMGN).",
+   "response_shape": "An OBJECT (the docs say array): {orders:[...], boosts:[...]}.\n- orders[]: {chainId, tokenAddress, type:'tokenProfile'|'communityTakeover'|'tokenAd'|'trendingBarAd', status:'processing'|'cancelled'|'on-hold'|'approved'|'rejected', paymentTimestamp:int Unix MILLISECONDS}\n- boosts[]: {chainId, tokenAddress, id:string, amount:int, paymentTimestamp:int ms}\n- Unknown or unpaid mint: 200 {\"orders\":[],\"boosts\":[]}.",
+   "params_limits": "One mint per call. 60 req/min, which is too low to call per row. Call it per token page, or batch in the background.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=60",
+   "sample_file": "tests/fixtures/dexscreener/orders-v1.solana.with-orders-and-boosts.json (also orders-v1.solana.empty.json)"
+  },
+  {
+   "name": "Trending metas (narratives)",
+   "request": "GET https://api.dexscreener.com/metas/trending/v1",
+   "status": "VERIFIED",
+   "purpose": "Trending narrative categories (e.g. 'Cat') with aggregated mc, liquidity and volume. Optional Discover 'narratives' strip.",
+   "response_shape": "A bare array (18 today). Each item:\n- description\n- icon: {type:'emoji', value:'🐈'}\n- name\n- slug\n- marketCap: USD\n- liquidity: USD\n- volume: USD\n- tokenCount: int\n- marketCapChange: {m5,h1,h6,h24}, in PERCENT\n- marketCapDelta: {m5,h1,h6,h24}, in USD\n\nThis is cross-chain; there is no chainId.",
+   "params_limits": "No params. 60 req/min.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=30",
+   "sample_file": "tests/fixtures/dexscreener/metas-trending.json"
+  },
+  {
+   "name": "Meta by slug",
+   "request": "GET https://api.dexscreener.com/metas/meta/v1/{slug}",
+   "status": "VERIFIED",
+   "purpose": "The tokens and pairs belonging to one narrative.",
+   "response_shape": "The Meta fields plus pairs: Pair[]. 46 pairs for slug 'cat', mixed chains; Solana pairs included raydium, fluxbeam and meteora DYN. Unknown DEXes can show a raw contract address as dexId (e.g. robinhood '0x5481...').",
+   "params_limits": "slug path param. 60 req/min.",
+   "auth": "none",
+   "freshness": "Cache-Control public, max-age=30",
+   "sample_file": "tests/fixtures/dexscreener/metas-meta-v1.cat.json"
+  },
+  {
+   "name": "OHLCV / candles / trades / holders / wallet endpoints",
+   "request": "none exist",
+   "status": "DOCUMENTED",
+   "purpose": "Checked for chart, transaction-feed and wallet features.",
+   "response_shape": "The official docs (reference.md, the OpenAPI YAML and websockets.md) have NO candles/OHLCV, trades/swaps, holders, top-traders, wallet or PnL endpoint, and no bonding-curve progress. The docs' 'TradingView Charts' page only describes the charting library DEX Screener uses on its own site; it is not an API. The web site's chart and trade feeds use undocumented io.dexscreener.com endpoints. I did not use or test those, and they must not be used.",
+   "params_limits": "n/a",
+   "auth": "n/a",
+   "freshness": "n/a"
+  }
+ ],
+ "streaming": [
+  {
+   "name": "Official WebSocket: latest token profiles",
+   "url": "wss://api.dexscreener.com/token-profiles/latest/v1",
+   "status": "VERIFIED (2 sessions: 40 s and 180 s, Node 24 global WebSocket)",
+   "auth": "none",
+   "subscribe_message": "None. Connecting to the path subscribes. The server negotiated `permessage-deflate; client_no_context_takeover; server_no_context_takeover`.",
+   "event_shape": "Frames are text JSON.\n1) Handshake snapshot about 3 ms after open: {limit:90, data: TokenProfile[90]}. That is 66.5 KB, all chains (62 of 90 were Solana). TokenProfile fields: url, chainId, tokenAddress, icon, header?, openGraph, description?, links[{type?,label?,url}], cto.\n2) Heartbeat {\"type\":\"heartbeat\"} about every 30 s (at +1.1 s, +31 s, +61 s, ...).\n3) Updates are a bare JSON ARRAY of new TokenProfile objects. I saw 3 in 180 s, each an array of 1 item of 696-842 bytes, for example [{chainId:'solana', tokenAddress:'GKokAG4o...pump', ...}].",
+   "notes": "Carries only paid-profile events, no prices. Filter chainId==='solana' client-side. Works from a browser, so it fits Vercel (no server process needed). Handle reconnects yourself, and dedupe by chainId+tokenAddress against the snapshot. Samples: ws-token-profiles-latest.handshake-snapshot.solana-filtered.json, ws-token-profiles-latest.heartbeat-frame.json, ws-token-profiles-latest.update-frames.json in the dexscreener research folder."
+  },
+  {
+   "name": "Official WebSocket: recent profile updates",
+   "url": "wss://api.dexscreener.com/token-profiles/recent-updates/v1",
+   "status": "DOCUMENTED",
+   "auth": "none",
+   "event_shape": "Documented handshake (HTTP 101): {limit:int, data: TokenProfile[]}. Update frames are presumably arrays, as seen on the verified profiles socket.",
+   "notes": "Same protocol as the verified socket. Not live-tested, to save request budget."
+  },
+  {
+   "name": "Official WebSocket: community takeovers",
+   "url": "wss://api.dexscreener.com/community-takeovers/latest/v1",
+   "status": "DOCUMENTED",
+   "auth": "none",
+   "event_shape": "Documented handshake: {limit:int, data: CommunityTakeover[]}, where CommunityTakeover is a profile plus claimDate as an ISO string.",
+   "notes": "Not live-tested."
+  },
+  {
+   "name": "Official WebSocket: ads",
+   "url": "wss://api.dexscreener.com/ads/latest/v1",
+   "status": "DOCUMENTED",
+   "auth": "none",
+   "event_shape": "Documented handshake: {limit:int, data: Ad[]}. Ad fields: url, chainId, tokenAddress, date, type, durationHours?, impressions?.",
+   "notes": "Not live-tested."
+  },
+  {
+   "name": "Official WebSocket: latest boosts / top boosts",
+   "url": "wss://api.dexscreener.com/token-boosts/latest/v1 and wss://api.dexscreener.com/token-boosts/top/v1",
+   "status": "DOCUMENTED",
+   "auth": "none",
+   "event_shape": "Documented handshake: {limit:int, data: Boost[]}. Boost fields: url, chainId, tokenAddress, amount, totalAmount, icon, header?, description?, links. Expect icon to be a bare CDN image id, as on REST.",
+   "notes": "A third-party write-up reports that the boosts socket's first frame is about 67 KB with 90 boosted tokens. Not live-tested here. There is NO WebSocket for pairs, prices or trades."
+  }
+ ],
+ "orbyt_fit": [
+  "DISCOVER table (supporting role): DEX Screener has no 'list all Solana tokens by volume/trending' endpoint. Build the candidate set from boosts top/latest, profiles, CTO, ads, metas and search, or from another provider's discovery. Then enrich rows with /tokens/v1 in batches of 30 (price, mc, fdv, liquidity.usd, volume.m5-h24, txns buys/sells, priceChange %, pairCreatedAt age, info.imageUrl/socials). At 300 req/min that is enough for a few hundred rows refreshed every 30 s from the browser.",
+  "METADATA: good. baseToken.name/symbol, info.imageUrl (800x800 CDN), header, openGraph, websites[{label,url}] and socials[{type,url}] only exist when a profile exists (~80% of pairs). Profiles, CTO and orders give 'DEX paid' / 'CTO' badges.",
+  "PRICE: priceUsd (string, USD) and priceNative (string, in quote units, usually SOL), cached 30 s at the edge. Fine for tables and headers but not tick-level. Does not replace a real-time trade stream.",
+  "LIQUIDITY: liquidity.usd/base/quote for AMM pools. Absent for pump.fun, Meteora DBC and bags bonding curves, so show '-' or compute it from another source; never fabricate it.",
+  "TRADES / live transaction feed: NOT AVAILABLE. Only aggregate buy/sell counts per window (txns.m5/h1/h6/h24) and USD volume are provided.",
+  "CHART / candlesticks: NOT AVAILABLE via API; no OHLCV. Use another provider (e.g. GeckoTerminal/Birdeye/Codex/Bitquery) or build candles from your own trade stream. The DEX Screener embed iframe is not part of the documented API and brings their branding. Treat it as UNCERTAIN and a terms risk.",
+  "PULSE 'New Pairs': NOT SUITABLE as the source. There is no new-pairs endpoint, and profiles/boosts feeds contain only tokens whose teams paid. Detect new mints elsewhere (pump.fun/PumpSwap program logs via Helius/RPC websockets, etc.) and use DEX Screener only to enrich them (dexId 'pumpfun'/'meteoradbc'/'bags' means still on a curve). Very fresh curves may not be indexed yet; one of 30 profiled mints returned no pair.",
+  "PULSE 'Final Stretch': no bonding-curve progress field. Can only be derived. A completed pump.fun curve's frozen priceNative is 0.0000004108 SOL, which on a 1B supply is ~410.8 SOL FDV, observed as $48,664.65 at SOL ~ $118.8. So progress ~ marketCap_in_SOL / ~410.8, which is approximate and should be labelled as derived. Prefer the on-chain bonding-curve account for exact progress.",
+  "PULSE 'Migrated': workable detection. /token-pairs/v1/solana/{mint} returns both a 'pumpfun' pair (frozen: no liquidity, 0 recent txns, mc fixed at graduation) and a new 'pumpswap' pair (or raydium CPMM / meteora DYN2 for other launchpads). The migration time is roughly the new pool's pairCreatedAt (ms). /tokens/v1 switches the main pair's dexId from pumpfun to pumpswap after migration. Old migrations may have the pumpfun pair pruned.",
+  "HOLDERS / RISK: not available (no holders, top-10 %, dev holdings, mint/freeze authority, LP burn). Only paid orders/CTO and boosts signals exist.",
+  "WALLET tracker / wallet activity / PnL / portfolio: not available at all.",
+  "QUOTES (swap quotes/routing): not available.",
+  "SEARCH: /latest/dex/search (max 30 results, cross-chain, filter to solana client-side) works directly from the browser for the global search box.",
+  "Trending/promoted strip: boosts top/latest, ads and metas/trending, plus the official WebSocket (profiles/boosts/CTO/ads) for live 'newly promoted' toasts without a server process."
+ ],
+ "gotchas": [
+  "The docs schemas are out of date in several places:\n- info.socials is actually [{type, url}], not [{platform, handle}].\n- info.websites is [{label, url}].\n- /orders returns an OBJECT {orders[], boosts[]}, not an array.\n- /token-profiles/latest and the boosts endpoints return ARRAYS, although the docs show a single object.\n- Undocumented extra fields: openGraph, cto (profiles), updatedAt (recent-updates), info.header, info.openGraph.",
+  "Boost responses use a bare image ID in `icon` (e.g. 'tocfDSZsgESUSOnf'), not a URL. Build https://cdn.dexscreener.com/cms/images/{id}?width=64&height=64&fit=crop&quality=95&format=auto. Profiles and CTO return full URLs.",
+  "priceNative and priceUsd are STRINGS. Parse them carefully (use decimal/big-number handling for tiny values like '0.00000002954'). priceUsd, marketCap, liquidity, info, labels, boosts and priceChange keys can all be missing. priceChange can be {} or hold only h24.",
+  "priceChange values are percentages (-78.19 means -78.19%). metas marketCapChange is also a percent, while marketCapDelta is USD.",
+  "liquidity.base and liquidity.quote are decimal-adjusted token amounts, not raw lamports or base units. volume and liquidity.usd are USD.",
+  "pairCreatedAt is Unix MILLISECONDS, but only second precision. orders paymentTimestamp is ms. claimDate, date and updatedAt are ISO-8601 strings.",
+  "/latest/dex/pairs returns {pairs:null, pair:null} (HTTP 200) for unknown pairs, not []. The 31+ address limit returns HTTP 400 whose body is a JSON STRING containing HTML. Always check res.ok and typeof body.",
+  "/tokens/v1 returns only ONE (main) pair per token and silently truncates output at 30. Tokens without an indexed pair are silently dropped. Use /token-pairs/v1 for all pools (itself capped at 30, including pools where the token is the QUOTE).",
+  "Search and all feed endpoints are cross-chain, with no chain filter or pagination: filter on chainId === 'solana'. Search maxes at 30 results.",
+  "Solana dexId values observed today:\n- pumpfun (pump.fun bonding curve; pairAddress is the bonding-curve account, owner 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P, verified via RPC)\n- pumpswap (PumpSwap AMM pool, owner pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA)\n- meteoradbc (generic Meteora Dynamic Bonding Curve, owner dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN)\n- bags (bags.fm launches; ALSO Meteora DBC pools with owner dbcij3..., so DBC pools are labelled by launchpad when DEX Screener recognises it)\n- raydium (labels absent for AMM v4, [\"CLMM\"], [\"CPMM\"])\n- orca ([\"wp\"] Whirlpool, [\"v2\"])\n- meteora ([\"DLMM\"], [\"DYN\"] = DAMM v1, [\"DYN2\"] = DAMM v2)\n- metadao\n- fluxbeam\n\nRaydium LaunchLab: dexscreener.com/solana/launchlab exists and pair pages are titled '... on Solana / LaunchLab', so the dexId is very likely 'launchlab'. It was NOT observed in the API today (UNCERTAIN). Migrated LetsBonk mints (…bonk) appeared as raydium [\"CPMM\"].\n\nKeep an allow-list with a fallback, because unknown DEXes can appear as raw program/contract addresses in dexId.",
+  "Bonding-curve pairs (pumpfun, meteoradbc, bags) have NO liquidity object. After graduation the old pumpfun pair stays listed, frozen: priceNative is constant at ~0.0000004108 SOL and mc is ~410.8 SOL x the current SOL price (DEX Screener keeps repricing it in USD), with 0 txns. Don't treat it as a live market. Pick the pumpswap/AMM pair, or the /tokens/v1 main pair.",
+  "Different pools of the same token can report wildly different marketCap values; a tiny mispriced DLMM pool showed a $136,905 mc against pumpswap's $2,824. Take token-level price and mc from the main or most-liquid pair.",
+  "Cloudflare edge caching: max-age=30 (pairs/tokens/token-pairs/metas) or 60 (search, feeds, orders). Repeated calls return the same body with an Age header, so polling faster than 30 s gains nothing. No rate-limit headers are sent, so you must count calls yourself.",
+  "Vercel serverless functions share egress IPs with other tenants. If DEX Screener limits per IP (likely, but undocumented), server-side calls may hit limits you didn't cause. Prefer browser-side fetches (CORS `*`) so each user uses their own IP. If proxying, cache with s-maxage 30 and never re-expose the API publicly (terms section 2).",
+  "Addresses are case-sensitive base58 in API paths. The `url` field lowercases them; don't parse addresses out of `url`.",
+  "Fresh pump.fun mints can take a moment to be indexed. One of 30 profiled Solana mints (8acAW9...) returned no pair.",
+  "Official WebSocket feeds only carry profile/boost/CTO/ads events plus a 30 s heartbeat. There are no price or pair streams. The first frame is a 90-item snapshot of about 66 KB across all chains.",
+  "Do not use the undocumented io.dexscreener.com endpoints (used by the website for charts and trade feeds). They are outside the API terms and were not tested."
+ ],
+ "terms_and_risks": "API Terms & Conditions (docs.dexscreener.com/api/api-terms-and-conditions, 'Last updated: August 18, 2023'), fetched today:\n\n- §1 Scope: you get a limited, non-exclusive, non-transferable, revocable license. Users \"cannot utilize the API Services to construct, enhance, or market a product or service whose primary purpose is to compete directly with DEX Screener's product or the API Services itself.\" This is the biggest risk for ORBYT. An Axiom/GMGN-style terminal with a Discover token table, token pages and search overlaps heavily with DEX Screener's screener. Relying on DEX Screener as the primary market-data backbone could be treated as a violation, and access can be cut off at any time (§5).\n- §2: no reselling, sublicensing or making the API \"or any portion thereof, available for third parties\". Do not expose a public proxy or re-serve the raw API; render derived UI only.\n- §3: DEX Screener retains all rights in the API and the data obtained through it.\n- §4: \"may be used for both non-commercial and commercial purposes\", subject to the limitations above. It mentions free and paid versions, but no paid plan is publicly documented.\n- §6: free users get no guaranteed change notice. Breaking-change notices (30 days) and discontinuation notices (3 months) go to paying customers only.\n- §7: support is as-is.\n- §8: terms can change at any time, effective on posting.\n\nAttribution: the API terms have NO attribution requirement. The general Terms & Conditions (last updated April 26, 2025) prohibit using DEX Screener's name, logo or marks without express consent or in a way that implies endorsement or affiliation. A plain-text 'Data: DEX Screener' source note is reasonable, but do not use their logo or branding, and never imply partnership.\n\nData provenance: the FAQ says all data comes from DEX Screener's own on-chain indexer, so it is real market data. Displayed values are cached aggregates, not tick data.\n\nPractical recommendation: use DEX Screener as a secondary enrichment source, fetched from the browser, with a fallback provider. Do not depend on it for charts, trades, Pulse discovery or wallets; it cannot serve those anyway."
+}

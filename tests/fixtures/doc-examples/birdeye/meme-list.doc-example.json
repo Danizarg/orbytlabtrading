@@ -1,0 +1,134 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. items[0] and items[1] are the official Birdeye 'Meme Token - List' reference example (MemeTokenListData), abridged: the 1m..30d volume/price-change/trade-count series were trimmed to the fields ORBYT reads. items[2] is NOT in the docs: it was constructed from the documented MemeTokenItem schema (meme_info.graduated=true, graduated_time, extensions with socials) to exercise the migrated branch; its values are illustrative.",
+  "source": "https://data.birdeye.so/docs/data-api/meme/get-defi-v3-token-meme-list.md",
+  "request": "GET https://public-api.birdeye.so/defi/v3/token/meme/list?sort_by=creation_time&sort_type=desc&graduated=false&offset=0&limit=50",
+  "response": {
+    "data": {
+      "items": [
+        {
+          "address": "4kniCuBuhsLBPv1zzGFEw8tySw6xV6NiHjme3pN8pump",
+          "logo_uri": "https://ipfs.io/ipfs/QmZF9uaGwUYYq4v9xbPxivHDH561jd1auoPQ8zZLmssLNx",
+          "name": "nothing ever Happens",
+          "symbol": "neh",
+          "decimals": 6,
+          "extensions": null,
+          "market_cap": 2378.761186407517,
+          "fdv": 2378.761186407517,
+          "total_supply": 1000000000,
+          "circulating_supply": 1000000000,
+          "liquidity": 0.32746902247014553,
+          "last_trade_unix_time": 1770718076,
+          "global_fees_paid": 5.5,
+          "volume_24h_usd": 83.33272090352035,
+          "trade_24h_count": 5,
+          "buy_24h": 3,
+          "volume_buy_24h_usd": 41.672060333790355,
+          "sell_24h": 2,
+          "volume_sell_24h_usd": 41.66066056973,
+          "unique_wallet_24h": 3,
+          "price": 0.000002378761186407517,
+          "price_change_24h_percent": -0.05600390312888975,
+          "holder": 2,
+          "recent_listing_time": 1770717909,
+          "meme_info": {
+            "created_at": {
+              "block_time": 1770717909,
+              "slot": 399301182,
+              "tx_hash": "57T66aM8PdrLG7mGZc4T2Uen8reC4jL9QStt8tkJcZUD5omVudbLm4tk8qrcV45Ar8i1KMTXaQxTFq8XbdGHnrSG"
+            },
+            "creator": "2J2rtMBRLxAbFkSLgrsuSNN8N5KMTJVaRTdnGfbZ5Vjw",
+            "address": "4kniCuBuhsLBPv1zzGFEw8tySw6xV6NiHjme3pN8pump",
+            "creation_time": 1770717909,
+            "graduated": false,
+            "pool": {
+              "address": "Chxbj4uRvwe94Pi4GYMgLQBkBABUJzyzoCbfMoBnQsev",
+              "real_sol_reserves": "99",
+              "real_token_reserves": "793099996586128",
+              "virtual_token_reserves": "1072999996586128",
+              "token_total_supply": "1000000000000000"
+            },
+            "progress_percent": 1.08639,
+            "source": "pump_dot_fun",
+            "platform_id": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+            "graduated_time": null
+          }
+        },
+        {
+          "address": "8avqVj8keXnxbNxDQ6w7rKZx2Sid8ygp1MBRnhqepump",
+          "logo_uri": "https://desperate-moccasin-minnow.myfilebase.com/ipfs/QmUPiDnnNMz3dkf8TVoknjyQsdAdixB72BMnURnByatYy9",
+          "name": "Nietzschean Giraffe",
+          "symbol": "GIRAFFEBETA",
+          "decimals": 6,
+          "extensions": null,
+          "market_cap": 2363.686706723888,
+          "fdv": 2363.686706723888,
+          "total_supply": 1000000000,
+          "circulating_supply": 1000000000,
+          "liquidity": 0.2631242285399431,
+          "last_trade_unix_time": 1770718296,
+          "global_fees_paid": 5.5,
+          "volume_24h_usd": 40.03289998373133,
+          "trade_24h_count": 5,
+          "buy_24h": 3,
+          "volume_buy_24h_usd": 20.026709987856,
+          "sell_24h": 2,
+          "volume_sell_24h_usd": 20.00618999587533,
+          "unique_wallet_24h": 3,
+          "price": 0.000002363686706723888,
+          "price_change_24h_percent": 0.02342091983003837,
+          "holder": 2,
+          "recent_listing_time": 1770717908,
+          "meme_info": {
+            "created_at": {
+              "block_time": 1770717908,
+              "slot": 399301180,
+              "tx_hash": "4nY7cpV4DWBhLUuKsYuXmhWKNgwrZT3Z4jB4ob31aVvsGjXnzpf56axwWkPLW6dQE3DCvoXdhC6tGuWcvh4xBqz2"
+            },
+            "creator": "DJ4hjUajRDySeCMppb6vqRN97HVuogGDAnwx2k6k1cEB",
+            "address": "8avqVj8keXnxbNxDQ6w7rKZx2Sid8ygp1MBRnhqepump",
+            "creation_time": 1770717908,
+            "graduated": false,
+            "pool": {
+              "address": "8ZL9WpMcHnrR9xGv5eVfNiYNCCdgBTNp3crAYpX74iVS",
+              "real_sol_reserves": "98765",
+              "real_token_reserves": "793096467588330",
+              "virtual_token_reserves": "1072996467588330",
+              "token_total_supply": "1000000000000000"
+            },
+            "progress_percent": 0.00045,
+            "source": "pump_dot_fun",
+            "platform_id": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+            "graduated_time": null
+          }
+        },
+        {
+          "address": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+          "logo_uri": "ipfs://bafkreiexampleonlyipfslogo",
+          "name": "Corgi Capital",
+          "symbol": "CC",
+          "decimals": 6,
+          "extensions": { "twitter": "https://x.com/example", "website": "https://example.org", "telegram": "not a url", "description": "illustrative" },
+          "market_cap": 85000.5,
+          "liquidity": 30250.75,
+          "volume_24h_usd": "125000.25",
+          "buy_24h": 910,
+          "sell_24h": 640,
+          "price": "0.0000850005",
+          "holder": 812,
+          "meme_info": {
+            "creator": "J5gXsyettqJsMScenY7q7KnNDcojmaKX9jeBCNAMCgBW",
+            "address": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+            "creation_time": 1770700000,
+            "graduated": true,
+            "graduated_time": 1770710000,
+            "progress_percent": 100,
+            "source": "pump_dot_fun",
+            "platform_id": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+          }
+        }
+      ],
+      "has_next": true
+    },
+    "success": true
+  }
+}

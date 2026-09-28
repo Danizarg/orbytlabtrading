@@ -1,0 +1,74 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. result[0] is the official Helius getAsset/getAssetBatch documentation example (Mad Lads #8420, abridged: attributes, compression, grouping, royalty, creators and ownership trimmed). result[1] is a fungible Token-2022 asset constructed from the documented DAS schema (content.metadata, content.links, content.files, token_info.{supply,decimals,token_program,price_info}, mint_extensions.metadata) using the on-chain name/symbol/uri/supply of 7ehsm...pump from the live getMultipleAccounts fixture; its image URL is illustrative and price_info is present only to prove the adapter ignores it. result[2] is null, as documented for unknown ids.",
+  "source": "https://www.helius.dev/docs/api-reference/das/getassetbatch",
+  "request": { "method": "getAssetBatch", "params": { "ids": ["F9Lw3ki3hJ7PF9HQXsBzoY8GyE6sPoEZZdXJBsTTD2rk", "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump", "So11111111111111111111111111111111111111112"], "options": { "showFungible": true } } },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "getAssetBatch",
+    "result": [
+      {
+        "last_indexed_slot": 365749093,
+        "interface": "ProgrammableNFT",
+        "id": "F9Lw3ki3hJ7PF9HQXsBzoY8GyE6sPoEZZdXJBsTTD2rk",
+        "content": {
+          "$schema": "https://schema.metaplex.com/nft1.0.json",
+          "json_uri": "https://madlads.s3.us-west-2.amazonaws.com/json/8420.json",
+          "files": [
+            {
+              "uri": "https://madlads.s3.us-west-2.amazonaws.com/images/8420.png",
+              "cdn_uri": "https://cdn.helius-rpc.com/cdn-cgi/image//https://madlads.s3.us-west-2.amazonaws.com/images/8420.png",
+              "mime": "image/png"
+            }
+          ],
+          "metadata": { "description": "Fock it.", "name": "Mad Lads #8420", "symbol": "MAD", "token_standard": "ProgrammableNonFungible" },
+          "links": { "image": "https://madlads.s3.us-west-2.amazonaws.com/images/8420.png", "external_url": "https://madlads.com" }
+        },
+        "authorities": [{ "address": "2RtGg6fsFiiF1EQzHqbd66AhW7R5bWeQGpTbv2UMkCdW", "scopes": ["full"] }],
+        "mutable": true,
+        "burnt": false,
+        "token_info": {
+          "supply": 1,
+          "decimals": 0,
+          "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "mint_authority": "TdMA45ZnakQCBt5XUvm7ib2htKuTWdcgGKu1eUGrDyJ",
+          "freeze_authority": "TdMA45ZnakQCBt5XUvm7ib2htKuTWdcgGKu1eUGrDyJ"
+        }
+      },
+      {
+        "interface": "FungibleToken",
+        "id": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+        "content": {
+          "$schema": "",
+          "json_uri": "https://gateway.pinata.cloud/ipfs/bafkreiayapwpeno6y5lcw2csdodxotsbtzrklxosixwiej3sk72ous32ku",
+          "files": [
+            { "uri": "ipfs://bafkreiexampleimagecid", "mime": "image/png" },
+            { "uri": "https://gateway.pinata.cloud/ipfs/bafkreiexampleimagecid", "cdn_uri": "https://cdn.helius-rpc.com/cdn-cgi/image//https://gateway.pinata.cloud/ipfs/bafkreiexampleimagecid", "mime": "image/png" }
+          ],
+          "metadata": { "description": "", "name": "", "symbol": "" },
+          "links": {}
+        },
+        "authorities": [{ "address": "TSLvdd1pWpHVjahSpsvCXUbgwsL3JAcvokwaKt1eokM", "scopes": ["full"] }],
+        "mutable": true,
+        "burnt": false,
+        "mint_extensions": {
+          "metadata_pointer": { "authority": null, "metadata_address": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump" },
+          "metadata": {
+            "mint": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump",
+            "name": "Corgi Capital",
+            "symbol": "CC",
+            "uri": "https://gateway.pinata.cloud/ipfs/bafkreiayapwpeno6y5lcw2csdodxotsbtzrklxosixwiej3sk72ous32ku",
+            "update_authority": null,
+            "additional_metadata": []
+          }
+        },
+        "token_info": {
+          "supply": "1000000000000000",
+          "decimals": 6,
+          "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "price_info": { "price_per_token": 0.0000123, "currency": "USDC" }
+        }
+      },
+      null
+    ]
+  }
+}

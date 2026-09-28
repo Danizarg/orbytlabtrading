@@ -1,0 +1,14 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. Copied verbatim from the official Birdeye 'OHLCV V3 - Pair' reference example (response example 'Solana', pair 9wFFy... SOL/USDC, type 15m). The example items omit the `currency` field that the schema marks as required.",
+  "source": "https://data.birdeye.so/docs/data-api/price-ohlcv/get-defi-v3-ohlcv-pair.md",
+  "request": "GET https://public-api.birdeye.so/defi/v3/ohlcv/pair?address=9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT&type=15m&mode=count&count_limit=...&time_to=...",
+  "response": {
+    "success": true,
+    "data": {
+      "items": [
+        { "address": "9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT", "h": 210, "o": 210, "l": 210, "c": 210, "type": "15m", "v": 0, "unix_time": 1726670700, "v_usd": 1000 },
+        { "address": "9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT", "h": 210, "o": 210, "l": 210, "c": 210, "type": "15m", "v": 0, "unix_time": 1726671600, "v_usd": 1000 }
+      ]
+    }
+  }
+}
