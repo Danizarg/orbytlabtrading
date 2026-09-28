@@ -6,8 +6,11 @@ import 'server-only';
  *
  * Birdeye quirks handled here (from data.birdeye.so/docs, 2026-09-28):
  * - v3 endpoints are snake_case (unix_time, v_usd, block_unix_time); v1 is camelCase.
- * - token_security `top10HolderPercent` / `creatorPercentage` are FRACTIONS (0.304 = 30.4%),
- *   while v3 holder `top10HoldPercent` and holder-profile `percent_of_supply` are 0–100.
+ * - token_security `top10UserPercent` / `top10HolderPercent` / `creatorPercentage` are
+ *   FRACTIONS (0.304 = 30.4%; the schema allows numeric strings), while v3 holder
+ *   `top10HoldPercent` and holder-profile `percent_of_supply` are 0–100.
+ * - v3 trade `side` is relative to the requested token; the sign of that token's
+ *   `ui_change_amount` is used first. v3 `volume` is in requested-token units.
  * - Trade legs carry raw `amount` (string) and decimal-adjusted `ui_amount`.
  */
 
@@ -227,7 +230,9 @@ export function parseTrade(item: unknown, mint: string): Trade | undefined {
 // Holders v3
 // ---------------------------------------------------------------------------
 
-export function parseHolderItems(items: unknown, isProgram: (owner: string) => boolean | undefined): HolderEntry[] | undefined {
+type OwnerLabel = (owner: string) => string | undefined;
+
+export function parseHolderItems(items: unknown, isProgram: (owner: string) => boolean | undefined, labelOf?: OwnerLabel): HolderEntry[] | undefined {
   if (!Array.isArray(items)) return undefined;
   const out: HolderEntry[] = [];
   for (const item of items) {
@@ -238,6 +243,8 @@ export function parseHolderItems(items: unknown, isProgram: (owner: string) => b
     const entry: HolderEntry = { owner, amount };
     const tokenAccount = r.token_account;
     if (isSolanaAddress(tokenAccount)) entry.tokenAccount = tokenAccount;
+    const label = labelOf?.(owner);
+    if (label) entry.label = label;
     const program = isProgram(owner);
     if (program !== undefined) entry.isProgramAccount = program;
     out.push(entry);
@@ -251,8 +258,9 @@ export function parseHolderSnapshot(
   limit: number,
   fetchedAt: number,
   isProgram: (owner: string) => boolean | undefined,
+  labelOf?: OwnerLabel,
 ): HolderSnapshot | undefined {
-  const top = parseHolderItems(data.items, isProgram);
+  const top = parseHolderItems(data.items, isProgram, labelOf);
   if (!top) return undefined;
   const snapshot: HolderSnapshot = { mint, top: top.slice(0, limit), updatedAt: fetchedAt };
   const holders = count(data.holder);
@@ -270,7 +278,8 @@ export type RiskFields = Partial<Omit<RiskReport, 'mint' | 'flags' | 'sources' |
 
 export function parseSecurity(data: Rec): { fields: RiskFields; flags: RiskFlag[] } {
   const fields: RiskFields = defined<RiskFields>({
-    top10Pct: fractionToPercent(data.top10HolderPercent),
+    // Wallet-level ("top 10 unique users", related accounts deduplicated) before per-account.
+    top10Pct: fractionToPercent(data.top10UserPercent) ?? fractionToPercent(data.top10HolderPercent),
     devHoldingPct: fractionToPercent(data.creatorPercentage),
   });
   const flags: RiskFlag[] = [];

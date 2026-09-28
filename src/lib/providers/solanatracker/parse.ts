@@ -15,11 +15,16 @@ import 'server-only';
  * - All risk percentages (`top10`, `*.totalPercentage`, `dev.percentage`) are 0–100.
  * - `volumeSol` on trades is a SOL-denominated valuation, not necessarily the
  *   SOL leg of the swap (USDC pools report it too), so it is not mapped.
+ * - Pool `txns.volume` is lifetime volume; only `txns.volume24h` is mapped.
+ * - Holder `identity` (enrich=identity) labels pools, developers, bots and KOLs;
+ *   pool / curve rows are left out of top-holder concentration, as Solana
+ *   Tracker's own `risk.top10` does.
  */
 
 import { num, toMs } from '@/lib/core/chain';
 import { normalizeDex, normalizeLaunchpadName } from '@/lib/core/dex';
 import { isSolanaAddress, MINTS } from '@/lib/core/solana';
+import { BONDING_CURVE_LABEL, holderDistribution } from '@/lib/providers/helius/labels';
 import type {
   Candle,
   HolderEntry,
@@ -194,9 +199,44 @@ export function parseTrade(item: unknown, pool?: string): Trade | undefined {
 // Holders
 // ---------------------------------------------------------------------------
 
+export interface HolderLabel {
+  label: string;
+  /** Curve / pool account: holds supply for traders, excluded from concentration. */
+  liquidity: boolean;
+}
+
 /**
- * `/tokens/{mint}/holders` → `{ total, accounts: [{ wallet, amount, percentage }] }`;
+ * Holder `identity` (present with `enrich=identity`) → label. Pools carry
+ * `pool.program` (a Solana Tracker market id); bonding curves are named as
+ * such so every provider labels them alike.
+ */
+export function identityLabel(value: unknown): HolderLabel | undefined {
+  const identity = rec(value);
+  if (!identity) return undefined;
+  const type = text(identity.type)?.toLowerCase();
+  const pool = rec(identity.pool);
+  if (type === 'pool' || pool) {
+    const dex = stDex(pool?.program);
+    const venue = dex ? normalizeDex('orbyt', dex) : undefined;
+    if (venue?.isBondingCurve) return { label: BONDING_CURVE_LABEL, liquidity: true };
+    return { label: venue ? `${venue.label} pool` : 'Pool', liquidity: true };
+  }
+  if (type === 'developer' || rec(identity.developer)) return { label: 'Dev', liquidity: false };
+  if (type === 'bot' || rec(identity.bot)) return { label: 'Bot', liquidity: false };
+  if (type === 'kol') return { label: text(identity.name) ?? 'KOL', liquidity: false };
+  return undefined;
+}
+
+export interface ParsedHolders {
+  snapshot: HolderSnapshot;
+  /** Liquidity accounts found in the list (excluded from the distribution). */
+  liquidity: number;
+}
+
+/**
+ * `/tokens/{mint}/holders` → `{ total, accounts: [{ wallet, amount, percentage, identity? }] }`;
  * `/tokens/{mint}/holders/top` → bare `[{ address, amount, percentage }]`. Both accepted.
+ * `staticLabel` names owners known without the upstream (the mint's curve PDA, AMM authorities).
  */
 export function parseHolders(
   body: unknown,
@@ -204,11 +244,13 @@ export function parseHolders(
   limit: number,
   fetchedAt: number,
   isProgram: (owner: string) => boolean | undefined,
-): HolderSnapshot | undefined {
+  staticLabel: (owner: string) => string | undefined = () => undefined,
+): ParsedHolders | undefined {
   const r = rec(body);
   const rows: unknown = Array.isArray(body) ? body : r?.accounts;
   if (!Array.isArray(rows)) return undefined;
   const entries: HolderEntry[] = [];
+  const liquidity = new Set<HolderEntry>();
   for (const row of rows) {
     const h = rec(row);
     const owner = address(h?.wallet) ?? address(h?.address);
@@ -220,6 +262,13 @@ export function parseHolders(
     // The docs' own example shows percentages above 100: out-of-range values are dropped, not clamped.
     const pct = percent(h.percentage);
     if (pct !== undefined) entry.pctOfSupply = pct;
+    const fromIdentity = identityLabel(h.identity);
+    const known = staticLabel(owner);
+    const label: HolderLabel | undefined = fromIdentity?.liquidity ? fromIdentity : known ? { label: known, liquidity: true } : fromIdentity;
+    if (label) {
+      entry.label = label.label;
+      if (label.liquidity) liquidity.add(entry);
+    }
     const program = isProgram(owner);
     if (program !== undefined) entry.isProgramAccount = program;
     entries.push(entry);
@@ -227,11 +276,11 @@ export function parseHolders(
   const snapshot: HolderSnapshot = { mint, top: entries.slice(0, limit), updatedAt: fetchedAt };
   const total = count(r?.total);
   if (total !== undefined) snapshot.totalHolders = total;
-  const top10 = entries.slice(0, 10);
-  if (top10.length && top10.every((e) => e.pctOfSupply !== undefined)) {
-    snapshot.distribution = { top10Pct: top10.reduce((sum, e) => sum + (e.pctOfSupply ?? 0), 0) };
-  }
-  return snapshot;
+  // Top 100 per call: the list is complete when it covers every holder.
+  const complete = total !== undefined ? total <= rows.length : rows.length < 100;
+  const distribution = holderDistribution(entries, (e) => liquidity.has(e), complete);
+  if (distribution) snapshot.distribution = distribution;
+  return { snapshot, liquidity: liquidity.size };
 }
 
 // ---------------------------------------------------------------------------
@@ -373,7 +422,8 @@ export function parsePulseToken(item: unknown, column: PulseColumn, fetchedAt: n
     marketCapUsd: positive(rec(primary?.marketCap)?.usd),
     marketCapSol: primary?.quoteToken === MINTS.SOL ? positive(rec(primary.marketCap)?.quote) : undefined,
     liquidityUsd: nonNegative(rec(primary?.liquidity)?.usd),
-    volumeUsd: nonNegative(txns?.volume24h) ?? nonNegative(txns?.volume),
+    // 24h only: `txns.volume` is the pool's lifetime volume (TRUMP doc example: 15.8B vs 51M in 24h).
+    volumeUsd: nonNegative(txns?.volume24h),
     txns: buys !== undefined || sells !== undefined ? defined({ buys, sells }) : undefined,
     holders: count(info.holders),
     socials: socialsOf(token),

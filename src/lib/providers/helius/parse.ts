@@ -116,6 +116,22 @@ export function parseTokenAccountOwners(result: unknown, requested: readonly str
   return owners;
 }
 
+/**
+ * getMultipleAccounts (any encoding) `result` → address → owning program.
+ * Used to recognise pool / curve accounts that own vaults; missing accounts
+ * (PDAs without data, closed accounts) are simply absent.
+ */
+export function parseAccountPrograms(result: unknown, requested: readonly string[]): Map<string, string> | undefined {
+  const value = rec(result)?.value;
+  if (!Array.isArray(value)) return undefined;
+  const programs = new Map<string, string>();
+  requested.forEach((account, i) => {
+    const program = rec(value[i])?.owner;
+    if (isSolanaAddress(program)) programs.set(account, program);
+  });
+  return programs;
+}
+
 // ---------------------------------------------------------------------------
 // DAS
 // ---------------------------------------------------------------------------

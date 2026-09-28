@@ -203,25 +203,32 @@ describe('birdeye getCandles', () => {
     expect(res.data.hasMore).toBe(false);
   });
 
-  it('uses the pair endpoint when a pool is given and flags non-USD pricing', async () => {
-    const { fetcher, calls } = fakeFetcher([['/defi/v3/ohlcv/pair', OHLCV_PAIR]]);
-    const be = createBirdeye({ apiKey: API_KEY, fetcher });
-    const res = await be.getCandles({ mint: MINTS.SOL, pool: PAIR, interval: '15m', limit: 5 });
-    expect(calls[0]?.url.pathname).toBe('/defi/v3/ohlcv/pair');
-    expect(calls[0]?.url.searchParams.get('address')).toBe(PAIR);
-    expect(calls[0]?.url.searchParams.has('currency')).toBe(false);
-    expect(res.data.pool).toBe(PAIR);
+  it('serves token-level USD candles when a pool is requested (pair candles are quote-priced)', async () => {
+    // The pair endpoint prices the pair's base in its quote (SOL for most pools) with no USD option.
+    const { fetcher, calls } = fakeFetcher([
+      ['/defi/v3/ohlcv/pair', OHLCV_PAIR],
+      ['/defi/v3/ohlcv', OHLCV],
+    ]);
+    const res = await createBirdeye({ apiKey: API_KEY, fetcher }).getCandles({ mint: MINTS.SOL, pool: PAIR, interval: '15m', limit: 5 });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url.pathname).toBe('/defi/v3/ohlcv');
+    expect(calls[0]?.url.searchParams.get('address')).toBe(MINTS.SOL);
+    expect(calls[0]?.url.searchParams.get('currency')).toBe('usd');
+    expect('pool' in res.data).toBe(false);
     expect(res.data.candles).toHaveLength(2);
-    expect(res.data.candles[0]?.volume).toBe(1000);
-    expect(res.notes).toBeUndefined();
+    expect(res.notes).toEqual(['Birdeye candles aggregate all pools of the token (USD).']);
+  });
 
-    const native = withItems(OHLCV_PAIR, items(OHLCV_PAIR).map((i) => ({ ...(i as object), currency: 'native' })));
-    const res2 = await createBirdeye({ apiKey: API_KEY, fetcher: fakeFetcher([['/defi/v3/ohlcv/pair', native]]).fetcher }).getCandles({
-      mint: MINTS.SOL,
-      pool: PAIR,
-      interval: '15m',
-    });
-    expect(res2.notes?.[0]).toMatch(/native/);
+  it('rejects candles priced in anything but the requested USD', async () => {
+    const native = withItems(OHLCV, items(OHLCV).map((i) => ({ ...(i as object), currency: 'native' })));
+    const err = await rejectionOf(
+      createBirdeye({ apiKey: API_KEY, fetcher: fakeFetcher([['/defi/v3/ohlcv', native]]).fetcher }).getCandles({ mint: MINTS.SOL, interval: '15m' }),
+    );
+    expect(err.code).toBe('malformed');
+    // Items without a `currency` field (as in the pair doc example) are the requested USD.
+    const bare = withItems(OHLCV, items(OHLCV).map((i) => ({ ...(i as object), currency: undefined })));
+    const res = await createBirdeye({ apiKey: API_KEY, fetcher: fakeFetcher([['/defi/v3/ohlcv', bare]]).fetcher }).getCandles({ mint: MINTS.SOL, interval: '15m' });
+    expect(res.data.candles).toHaveLength(2);
   });
 
   it('falls back to an explicit range when count mode is rejected with HTTP 400', async () => {
@@ -335,11 +342,32 @@ describe('birdeye getHolders', () => {
     expect(res.data.distribution).toEqual({ top10Pct: 22.15 });
     expect(res.data.top).toEqual([
       { owner: '6Zk9e3nfXdYLXHYu5NvDiPHGMcjujVBv6gWRr7ckSdhP', tokenAccount: 'HdmGPmTkBgsiJcyVDgiGkYdTZr4h5XmpjYoUjU2rapf4', amount: 100, isProgramAccount: false },
-      { owner: '5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1', tokenAccount: 'EauuZAnB7CcnCrwvCMcnb2Rjk12Ecs13ycAZQBb5tLYM', amount: 90, isProgramAccount: true },
+      // 5Q544f… is the Raydium AMM v4 vault authority PDA.
+      {
+        owner: '5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1',
+        tokenAccount: 'EauuZAnB7CcnCrwvCMcnb2Rjk12Ecs13ycAZQBb5tLYM',
+        amount: 90,
+        label: 'Raydium pool',
+        isProgramAccount: true,
+      },
     ]);
     // No supply in this payload → no invented percentages.
     expect(res.data.top.every((h) => !('pctOfSupply' in h))).toBe(true);
     expect('supply' in res.data).toBe(false);
+    // Birdeye's account-level top-10 share is kept, with its caveat, because a pool vault is in the list.
+    expect(res.notes).toEqual(['Top-10 share from Birdeye; it may include bonding-curve or pool accounts.']);
+  });
+
+  it("labels the mint's pump.fun bonding-curve vault", async () => {
+    const pumpMint = '7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump';
+    const curvePda = '9ZZuz4cVoYhbAFomLMHJjpPijY7EXryqHRjY79f9VC7A';
+    const list = items(HOLDERS).map((i, n) => ({ ...(i as object), mint: pumpMint, owner: n === 0 ? curvePda : (i as { owner: string }).owner }));
+    const payload = { ...HOLDERS, data: { holder: 12, items: list } };
+    const res = await createBirdeye({ apiKey: API_KEY, fetcher: fakeFetcher([['/defi/v3/token/holder', payload]]).fetcher }).getHolders(pumpMint);
+    expect(res.data.top[0]).toMatchObject({ owner: curvePda, label: 'Bonding curve', isProgramAccount: true });
+    // No upstream top-10 share → no caveat needed.
+    expect('distribution' in res.data).toBe(false);
+    expect(res.notes).toBeUndefined();
   });
 
   it('slices to the requested limit', async () => {
@@ -378,6 +406,38 @@ describe('birdeye getRisk', () => {
       { level: 'good', label: 'On Jupiter strict list', source: 'birdeye' },
     ]);
     expect(calls.find((c) => c.url.pathname === '/token/v1/holder-profile')?.url.searchParams.get('token_address')).toBe(HOLDER_MINT);
+  });
+
+  it('prefers the wallet-level top-10 share (fractions → percent) over the per-account one', async () => {
+    const sec = { ...SECURITY, data: { ...(SECURITY.data as object), top10UserPercent: 0.25, top10HolderPercent: 0.4, creatorPercentage: '0.012' } };
+    const { fetcher } = fakeFetcher([
+      ['/defi/token_security', sec],
+      ['/token/v1/holder-profile', PROFILE],
+    ]);
+    const res = await createBirdeye({ apiKey: API_KEY, fetcher }).getRisk(HOLDER_MINT);
+    expect(res.data.top10Pct).toBe(25);
+    // String fractions (the schema allows number | string) are converted too.
+    expect(res.data.devHoldingPct).toBeCloseTo(1.2, 10);
+
+    const noUser = { ...SECURITY, data: { ...(SECURITY.data as object), top10UserPercent: null, top10HolderPercent: 0.4 } };
+    const res2 = await createBirdeye({
+      apiKey: API_KEY,
+      fetcher: fakeFetcher([
+        ['/defi/token_security', noUser],
+        ['/token/v1/holder-profile', PROFILE],
+      ]).fetcher,
+    }).getRisk(HOLDER_MINT);
+    expect(res2.data.top10Pct).toBe(40);
+  });
+
+  it('never reads an out-of-range fraction as a percentage', async () => {
+    const sec = { ...SECURITY, data: { ...(SECURITY.data as object), top10UserPercent: 30.4, top10HolderPercent: 30.4 } };
+    const { fetcher } = fakeFetcher([
+      ['/defi/token_security', sec],
+      ['/token/v1/holder-profile', new ProviderError('birdeye', 'timeout', 'birdeye: timeout')],
+    ]);
+    const res = await createBirdeye({ apiKey: API_KEY, fetcher }).getRisk(HOLDER_MINT);
+    expect('top10Pct' in res.data).toBe(false);
   });
 
   it('flags an enabled freeze authority', async () => {

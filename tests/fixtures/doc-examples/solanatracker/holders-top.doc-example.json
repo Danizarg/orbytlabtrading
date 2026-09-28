@@ -1,0 +1,22 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. Copied verbatim from the official 'Get top 20 token holders' OpenAPI example: a bare array whose rows use `address` (not `wallet`) and carry no total holder count.",
+  "source": "https://docs.solanatracker.io/data-api/openapi.json (#/paths/~1tokens~1{tokenAddress}~1holders~1top)",
+  "request": "GET https://data.solanatracker.io/tokens/{tokenAddress}/holders/top (header x-api-key)",
+  "response": [
+    { "address": "2RH6rUTPBJ9rUDPpuV9b8z1YL56k1tYU6Uk5ZoaEFFSK", "amount": 800000026.907734, "percentage": 80.00005992080315, "value": { "quote": 4746506158.216048, "usd": 4746506158.216048 } },
+    { "address": "8Tp9fFkZ2KcRBLYDTUNXo98Ez6ojGb6MZEPXfGDdeBzG", "amount": 19180672.272106, "percentage": 1.9180685993486095, "value": { "quote": 113801469.99516904, "usd": 113801469.99516904 } },
+    { "address": "8N2ssXZGJbvVLszanERuCJpLZd2nuADgpZwLkDDxwNnS", "amount": 18498416.227844, "percentage": 1.8498429461154942, "value": { "quote": 109753554.4868572, "usd": 109753554.4868572 } },
+    { "address": "CBEADkb8TZAXHjVE3zwad4L995GZE7rJcacJ7asebkVG", "amount": 10621464.851442, "percentage": 1.0621472449776113, "value": { "quote": 63018558.28869768, "usd": 63018558.28869768 } },
+    { "address": "8Mm46CsqxiyAputDUp2cXHg41HE3BfynTeMBDwzrMZQH", "amount": 9201481.906, "percentage": 0.9201488488513317, "value": { "quote": 54593611.3281902, "usd": 54593611.3281902 } },
+    { "address": "C68a6RCGLiPskbPYtAcsCjhG8tfTWYcoB4JjCrXFdqyo", "amount": 5818518.189861, "percentage": 0.5818522352285473, "value": { "quote": 34522039.36369684, "usd": 34522039.36369684 } },
+    { "address": "42brAgAVNzMBP7aaktPvAmBSPEkehnFQejiZc53EpJFd", "amount": 5150000.501203, "percentage": 0.5150004185386399, "value": { "quote": 30555635.339491077, "usd": 30555635.339491077 } },
+    { "address": "8NBEbxLknGv5aRYefFrW2qFXoDZyi9fSHJNiJRvEcMBE", "amount": 3022400.362534, "percentage": 0.3022402524684711, "value": { "quote": 17932301.81355555, "usd": 17932301.81355555 } },
+    { "address": "4xLpwxgYuPwPvtQjE94RLS4WZ4aD8NJYYKr2AJk99Qdg", "amount": 2548865.187026, "percentage": 0.25488670104213196, "value": { "quote": 15122754.874702929, "usd": 15122754.874702929 } },
+    { "address": "3B7XAQrLoEMDEGvX8569F9GRb9PcXXocJmj5wvhhei9z", "amount": 2031521.758214, "percentage": 0.2031523211514584, "value": { "quote": 12053287.764482478, "usd": 12053287.764482478 } },
+    { "address": "FQEmsV5A6jZdmb3KuP3YBLmHfFNoKuoWddBGMQuW1M9f", "amount": 2000009, "percentage": 0.2000010430757134, "value": { "quote": 11866318.394614726, "usd": 11866318.394614726 } },
+    { "address": "2qo8jvuc49pFmTjmUHLiARSV6ppPTaE7gw27ZJ6DnNZy", "amount": 1939011.175822, "percentage": 0.1939012562942794, "value": { "quote": 11504410.221664065, "usd": 11504410.221664065 } },
+    { "address": "qcjtKjw2rMiA6cYkSaV8nbMDf99ASpukzhmg9a4CaN1", "amount": 1750668.358759, "percentage": 0.1750669611143986, "value": { "quote": 10386947.332942948, "usd": 10386947.332942948 } },
+    { "address": "22Wnk8PwyWZV7BfkZGJEKT9jGGdtvu7xY6EXeRh7zkBa", "amount": 1691553.436847, "percentage": 0.1691554646942628, "value": { "quote": 10036210.668617649, "usd": 10036210.668617649 } },
+    { "address": "5z7gxL5u4jCW9D6acu28LEw4RKTiBSG1EmXbtCX7efg2", "amount": 1362110.991617, "percentage": 0.13621119660376244, "value": { "quote": 8081584.990533398, "usd": 8081584.990533398 } }
+  ]
+}

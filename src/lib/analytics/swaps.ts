@@ -1,4 +1,4 @@
-import { getAddressDecoder, getBase64Encoder, isAddress, isOffCurveAddress } from '@solana/kit';
+import { getAddressDecoder, getBase58Encoder, getBase64Encoder, isAddress, isOffCurveAddress } from '@solana/kit';
 import type { ActivityKind, ActivityLeg, WalletActivity } from '@/lib/core/types';
 import type { ProviderId } from '@/lib/core/providers';
 import { num } from '@/lib/core/chain';
@@ -27,6 +27,11 @@ import type { RpcParsedInstruction, RpcParsedTransaction } from './tx-types';
  * Third-party router/bot fees and tips paid by the wallet stay in its SOL
  * delta (it really paid them). The pump.fun TradeEvent amount (curve SOL,
  * excluding protocol/creator fees) is exposed separately as `venueSolAmount`.
+ *
+ * Known limit: rent of NON-token program accounts (e.g. pump's per-user
+ * volume accumulator, ~0.00135 SOL) stays in the SOL delta both when it is
+ * deposited and when a later close refunds it — a close cannot be attributed
+ * from balances alone, so excluding only the deposit would bias PnL.
  */
 
 export interface BalanceChanges {
@@ -62,10 +67,16 @@ export interface DerivedTrade {
   /** Quote mint when not SOL (e.g. USDC). */
   quoteMint?: string;
   quoteAmount?: number;
-  /** Execution price per token in quote units (quoteAmount / tokenAmount). */
+  /**
+   * Execution price per token in quote units (quote / tokenAmount). When the
+   * trader's own quote leg is unknown it falls back to the pump.fun curve
+   * price (`venueSolAmount / tokenAmount`).
+   */
   priceQuote?: number;
-  /** Venue label, e.g. 'pump.fun', 'PumpSwap', 'Raydium', 'Jupiter'. */
+  /** Venue label, e.g. 'pump.fun', 'PumpSwap', 'Raydium', 'Jupiter' (an aggregator wins over the AMM it routed through). */
   program?: string;
+  /** The AMM / bonding-curve program that executed the swap (never an aggregator), e.g. 'PumpSwap' under 'DFlow'. */
+  venue?: string;
   /**
    * pump.fun only: SOL moved against the bonding curve per the program's own
    * TradeEvent (`sol_amount`), which excludes pump's protocol/creator fees and
@@ -91,6 +102,14 @@ export interface PumpTradeEvent {
   /** Curve quote mint; the all-zero default pubkey (1111…1111) means SOL. Absent on older layouts. */
   quoteMint?: string;
   quoteAmount?: bigint;
+  /** Post-trade curve reserves (quote lamports / raw tokens). */
+  virtualSolReserves?: bigint;
+  virtualTokenReserves?: bigint;
+  realSolReserves?: bigint;
+  realTokenReserves?: bigint;
+  /** pump protocol fee and creator fee, in quote lamports (on top of `solAmount` for buys, deducted from it for sells). */
+  fee?: bigint;
+  creatorFee?: bigint;
 }
 
 // ---------------------------------------------------------------------------
@@ -127,6 +146,10 @@ const VENUES: ReadonlyMap<string, string> = new Map([
 
 /** Anchor event discriminator of pump.fun `TradeEvent` (bddb7fd34ee661ee). */
 const TRADE_EVENT_DISCRIMINATOR = [0xbd, 0xdb, 0x7f, 0xd3, 0x4e, 0xe6, 0x61, 0xee] as const;
+/** Anchor `emit_cpi!` instruction tag (EVENT_IX_TAG_LE, e445a52e51cb9a1d): the self-CPI carrying an event. */
+const EVENT_IX_TAG = [0xe4, 0x45, 0xa5, 0x2e, 0x51, 0xcb, 0x9a, 0x1d] as const;
+/** pump.fun `__event_authority` PDA: the only account of its event self-CPI (it must sign, so only pump can emit). */
+const PUMP_EVENT_AUTHORITY = 'Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1';
 
 // ---------------------------------------------------------------------------
 // Transaction view (validated, BigInt)
@@ -181,6 +204,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function lamportsOf(value: unknown): bigint | undefined {
+  // Digit strings are parsed exactly (JSON numbers above 2^53 are already lossy; nothing to recover there).
+  if (typeof value === 'string' && /^\d+$/.test(value)) return BigInt(value);
   const n = num(value);
   return n !== undefined && Number.isInteger(n) && n >= 0 ? BigInt(n) : undefined;
 }
@@ -252,14 +277,18 @@ function readTx(tx: RpcParsedTransaction, provider: ProviderId): TxView {
   if (!Array.isArray(rawKeys) || rawKeys.length === 0) throw malformed(provider, 'accountKeys missing');
   const keys: string[] = [];
   const signers = new Set<string>();
-  for (const k of rawKeys) {
+  // String-only keys (non-parsed encodings) carry no signer flags: the first
+  // header.numRequiredSignatures static keys sign.
+  const header: unknown = (tx.transaction.message as { header?: unknown }).header;
+  const requiredSignatures = isRecord(header) ? num(header.numRequiredSignatures) : undefined;
+  rawKeys.forEach((k: unknown, i: number) => {
     const pubkey = keyOf(k);
     if (!pubkey) throw malformed(provider, 'account key without pubkey');
     keys.push(pubkey);
-    if (isRecord(k) && k.signer === true) signers.add(pubkey);
-  }
+    if (isRecord(k) ? k.signer === true : requiredSignatures !== undefined && i < requiredSignatures) signers.add(pubkey);
+  });
   const feePayer = keys[0] as string;
-  // String-only keys (non-parsed encodings) carry no signer flags; the fee payer always signs.
+  // The fee payer always signs.
   signers.add(feePayer);
 
   if (!Array.isArray(meta.preBalances) || !Array.isArray(meta.postBalances)) throw malformed(provider, 'pre/postBalances missing');
@@ -559,10 +588,20 @@ function solCounterparty(view: TxView, wallet: string, sol: bigint): string | un
  * balances; else the signer whose balance of `mint` changed; else (no signer
  * moved it) the non-PDA owner with the largest |delta|. Owners equal to
  * `opts.pool` are never the trader. Side always comes from the trader's
- * balance delta. Quote: the trader's SOL delta (native + WSOL, fee/rent
- * excluded) when it has the opposite sign, else a USDC/USDT (or unique other)
- * token leg of opposite sign. Null when there is no counter-leg (a transfer is
- * not a trade), unless a SOL-quoted pump.fun TradeEvent proves the trade.
+ * balance delta (never from instruction names).
+ *
+ * Quote: the trader's own leg moving against `mint` — its SOL delta (native +
+ * WSOL, fee/rent excluded, ≥ 0.000001 SOL) or a token leg (a unique USDC/USDT
+ * leg, else a unique leg). When both a SOL and a token leg qualify (e.g. a
+ * USDC-quoted buy that also paid a SOL tip) the one the other side of the
+ * trade (the pool / curve) moved by a comparable amount wins; if that cannot
+ * decide, or the trader also moved other tokens in the same direction as
+ * `mint` (two buys in one tx), the quote is ambiguous and left undefined
+ * rather than guessed — the trade is still returned.
+ *
+ * Null when the trader has no counter-leg at all (a transfer is not a trade),
+ * unless a SOL-quoted pump.fun TradeEvent proves the trade (then only
+ * `venueSolAmount` / `priceQuote` carry its value).
  * Timestamp: blockTime, else the TradeEvent timestamp; null without either.
  */
 export function deriveTradeForMint(tx: RpcParsedTransaction, mint: string, opts: { pool?: string } = {}): DerivedTrade | null {
@@ -588,34 +627,84 @@ export function deriveTradeForMint(tx: RpcParsedTransaction, mint: string, opts:
   const side = trader.raw > 0n ? 'buy' : 'sell';
   const tokenAmount = toUi(abs(trader.raw), trader.decimals);
   const trade: DerivedTrade = { signature: view.signature, timestamp, side, wallet: trader.owner, tokenAmount };
-  const program = detectProgram(tx);
+  const programs = programLabels(tx);
+  const program = programs.aggregator ?? programs.venue;
   if (program) trade.program = program;
+  if (programs.venue) trade.venue = programs.venue;
   const venueSol = fromEvent && event ? toUi(event.solAmount, LAMPORTS_DECIMALS) : undefined;
   if (venueSol !== undefined) trade.venueSolAmount = venueSol;
 
-  const lamports = walletLamports(view, trader.owner, deltas);
-  if (abs(lamports.sol) >= DUST_LAMPORTS && (lamports.sol > 0n) !== (trader.raw > 0n)) {
-    trade.solAmount = toUi(abs(lamports.sol), LAMPORTS_DECIMALS);
-    trade.priceQuote = trade.solAmount / tokenAmount;
+  const quote = resolveQuote(view, deltas, trader, mint);
+  if (quote && quote !== 'ambiguous') {
+    const amount = toUi(abs(quote.raw), quote.decimals);
+    if (quote.mint === WSOL) trade.solAmount = amount;
+    else {
+      trade.quoteMint = quote.mint;
+      trade.quoteAmount = amount;
+    }
+    trade.priceQuote = amount / tokenAmount;
     return trade;
   }
-
-  const counter = tokenLegsOf(deltas, trader.owner).filter((t) => t.mint !== mint && (t.raw > 0n) !== (trader.raw > 0n));
-  const stables = counter.filter((t) => STABLE_MINTS.has(t.mint));
-  const quote = stables.length === 1 ? stables[0] : stables.length === 0 && counter.length === 1 ? counter[0] : undefined;
-  if (quote) {
-    trade.quoteMint = quote.mint;
-    trade.quoteAmount = toUi(abs(quote.raw), quote.decimals);
-    trade.priceQuote = trade.quoteAmount / tokenAmount;
-    return trade;
-  }
-
   if (venueSol !== undefined && venueSol > 0) {
-    // The curve event proves the trade even though the trader's own SOL leg is not visible (e.g. paid by a router).
+    // The curve event proves the trade even when the trader's own SOL leg is not visible (e.g. paid by a router).
     trade.priceQuote = venueSol / tokenAmount;
     return trade;
   }
-  return null;
+  return quote === 'ambiguous' ? trade : null;
+}
+
+/** A quote leg of the trader: `mint` is WSOL for its SOL (native + WSOL) leg. */
+interface QuoteLeg {
+  mint: string;
+  raw: bigint;
+  decimals: number;
+}
+
+function resolveQuote(view: TxView, deltas: OwnerDeltas, trader: { owner: string } & MintDelta, mint: string): QuoteLeg | 'ambiguous' | undefined {
+  const traderUp = trader.raw > 0n;
+  const others = tokenLegsOf(deltas, trader.owner).filter((t) => t.mint !== mint);
+  const counter = others.filter((t) => (t.raw > 0n) !== traderUp);
+  const sol = walletLamports(view, trader.owner, deltas).sol;
+  const solLeg: QuoteLeg | undefined = abs(sol) >= DUST_LAMPORTS && (sol > 0n) !== traderUp ? { mint: WSOL, raw: sol, decimals: LAMPORTS_DECIMALS } : undefined;
+  const legs: QuoteLeg[] = solLeg ? [solLeg, ...counter] : counter;
+  if (legs.length === 0) return undefined;
+  // Another token moved the same way as `mint`: the quote paid / received cannot be attributed to `mint` alone.
+  if (others.some((t) => (t.raw > 0n) === traderUp)) return 'ambiguous';
+  if (legs.length === 1) return legs[0];
+
+  const matched = legs.filter((leg) => otherSideMoved(view, deltas, trader, mint, leg));
+  if (matched.length === 1) return matched[0];
+  if (!solLeg) {
+    const stables = counter.filter((t) => STABLE_MINTS.has(t.mint));
+    if (stables.length === 1) return stables[0];
+  }
+  return 'ambiguous';
+}
+
+/**
+ * True when an owner on the other side of the trade (its `mint` delta opposes
+ * the trader's: the pool vault owner, the bonding curve) moved `leg`'s asset
+ * against the trader's leg by a comparable amount (the trader's leg is at
+ * least half of it, which tolerates router/bot fees but rejects a SOL tip or a
+ * dust leftover next to the real quote).
+ */
+function otherSideMoved(view: TxView, deltas: OwnerDeltas, trader: { owner: string; raw: bigint }, mint: string, leg: QuoteLeg): boolean {
+  for (const [owner, byMint] of deltas) {
+    if (owner === trader.owner) continue;
+    const d = byMint.get(mint)?.raw ?? 0n;
+    if (d === 0n || (d > 0n) === (trader.raw > 0n)) continue;
+    const moved = leg.mint === WSOL ? ownerSol(view, deltas, owner) : (byMint.get(leg.mint)?.raw ?? 0n);
+    if (moved !== 0n && (moved > 0n) !== (leg.raw > 0n) && abs(leg.raw) * 2n >= abs(moved)) return true;
+  }
+  return false;
+}
+
+/** Raw SOL movement of any owner: its own lamports (fee added back when it paid it) + its WSOL token accounts. */
+function ownerSol(view: TxView, deltas: OwnerDeltas, owner: string): bigint {
+  const index = view.keys.indexOf(owner);
+  let native = index >= 0 ? (view.post[index] as bigint) - (view.pre[index] as bigint) : 0n;
+  if (index === 0) native += view.fee;
+  return native + (deltas.get(owner)?.get(WSOL)?.raw ?? 0n);
 }
 
 function pickTrader<T extends { owner: string; raw: bigint }>(candidates: T[], signers: ReadonlySet<string>): T | undefined {
@@ -649,13 +738,13 @@ function consistentTradeEvent(events: PumpTradeEvent[]): ConsistentEvent | undef
   return out;
 }
 
-/** Best-effort venue label from program ids invoked in the transaction. */
-export function detectProgram(tx: RpcParsedTransaction): string | undefined {
+/** Aggregator (first one invoked) and AMM / curve venue (first one invoked) of the transaction. */
+function programLabels(tx: RpcParsedTransaction): { aggregator?: string; venue?: string } {
   let keys: unknown[] = [];
   if (isRecord(tx) && isRecord(tx.transaction) && isRecord(tx.transaction.message) && Array.isArray(tx.transaction.message.accountKeys)) {
     keys = tx.transaction.message.accountKeys;
   }
-  let venue: string | undefined;
+  const out: { aggregator?: string; venue?: string } = {};
   for (const ix of orderedInstructions(tx)) {
     let programId: string | undefined = typeof ix.programId === 'string' ? ix.programId : undefined;
     if (!programId) {
@@ -664,11 +753,17 @@ export function detectProgram(tx: RpcParsedTransaction): string | undefined {
       programId = index !== undefined ? keyOf(keys[index]) : undefined;
     }
     if (!programId) continue;
-    const aggregator = AGGREGATORS.get(programId);
-    if (aggregator) return aggregator;
-    venue ??= VENUES.get(programId);
+    out.aggregator ??= AGGREGATORS.get(programId);
+    out.venue ??= VENUES.get(programId);
+    if (out.aggregator && out.venue) break;
   }
-  return venue;
+  return out;
+}
+
+/** Best-effort venue label from program ids invoked in the transaction (an aggregator wins over the AMM it routed through). */
+export function detectProgram(tx: RpcParsedTransaction): string | undefined {
+  const { aggregator, venue } = programLabels(tx);
+  return aggregator ?? venue;
 }
 
 // ---------------------------------------------------------------------------
@@ -679,14 +774,52 @@ const INVOKE_RE = /^Program ([1-9A-HJ-NP-Za-km-z]{32,44}) invoke \[\d+\]$/;
 const EXIT_RE = /^Program ([1-9A-HJ-NP-Za-km-z]{32,44}) (?:success|failed)/;
 
 /**
- * Decode pump.fun TradeEvents from `Program data:` logs emitted while the
- * pump program is executing (other programs' identical-looking logs are
- * ignored). Stops at 'Log truncated'. Returns [] when logs are missing.
+ * Decode the pump.fun TradeEvents of a successful transaction ([] for a
+ * failed one: its events were rolled back).
+ *
+ * Primary source: pump's `emit_cpi!` self-invocations in innerInstructions
+ * (EVENT_IX_TAG ‖ event bytes, signed by pump's event authority). Inner
+ * instructions are never truncated, unlike logs. Fallback (older program
+ * versions, or a transaction without innerInstructions): `Program data:` logs
+ * emitted while pump is the executing program (other programs' look-alike
+ * logs are ignored), up to 'Log truncated'.
  * Layout per pump's IDL (verified on live fixtures); trailing fields added
  * over time (quote_mint, quote_amount…) are read only when present.
  */
 export function decodePumpTradeEvents(tx: RpcParsedTransaction): PumpTradeEvent[] {
-  const logs = isRecord(tx) && isRecord(tx.meta) && Array.isArray(tx.meta.logMessages) ? tx.meta.logMessages : [];
+  if (!isRecord(tx) || !isRecord(tx.meta)) return [];
+  if (tx.meta.err !== null && tx.meta.err !== undefined) return [];
+  const fromCpi = tradeEventsFromSelfCpi(tx.meta.innerInstructions);
+  return fromCpi.length > 0 ? fromCpi : tradeEventsFromLogs(tx.meta.logMessages);
+}
+
+function tradeEventsFromSelfCpi(groups: unknown): PumpTradeEvent[] {
+  if (!Array.isArray(groups)) return [];
+  const ordered = groups
+    .filter((g): g is { index: unknown; instructions: unknown[] } => isRecord(g) && Array.isArray(g.instructions))
+    .map((g) => ({ index: num(g.index) ?? Number.MAX_SAFE_INTEGER, instructions: g.instructions }))
+    .sort((a, b) => a.index - b.index);
+  const out: PumpTradeEvent[] = [];
+  for (const group of ordered) {
+    for (const ix of group.instructions) {
+      if (!isRecord(ix) || ix.programId !== PROGRAMS.PUMP || typeof ix.data !== 'string') continue;
+      if (!Array.isArray(ix.accounts) || ix.accounts.length !== 1 || ix.accounts[0] !== PUMP_EVENT_AUTHORITY) continue;
+      let bytes: Uint8Array;
+      try {
+        bytes = Uint8Array.from(getBase58Encoder().encode(ix.data));
+      } catch {
+        continue;
+      }
+      if (bytes.length < EVENT_IX_TAG.length || EVENT_IX_TAG.some((b, i) => bytes[i] !== b)) continue;
+      const event = decodeTradeEventBytes(bytes.subarray(EVENT_IX_TAG.length));
+      if (event) out.push(event);
+    }
+  }
+  return out;
+}
+
+function tradeEventsFromLogs(logs: unknown): PumpTradeEvent[] {
+  if (!Array.isArray(logs)) return [];
   const stack: string[] = [];
   const out: PumpTradeEvent[] = [];
   for (const line of logs) {
@@ -702,20 +835,20 @@ export function decodePumpTradeEvents(tx: RpcParsedTransaction): PumpTradeEvent[
       continue;
     }
     if (line.startsWith('Program data: ') && stack[stack.length - 1] === PROGRAMS.PUMP) {
-      const event = decodeTradeEventData(line.slice('Program data: '.length).split(' ')[0] ?? '');
+      let bytes: Uint8Array;
+      try {
+        bytes = Uint8Array.from(getBase64Encoder().encode(line.slice('Program data: '.length).split(' ')[0] ?? ''));
+      } catch {
+        continue;
+      }
+      const event = decodeTradeEventBytes(bytes);
       if (event) out.push(event);
     }
   }
   return out;
 }
 
-function decodeTradeEventData(base64: string): PumpTradeEvent | undefined {
-  let bytes: Uint8Array;
-  try {
-    bytes = Uint8Array.from(getBase64Encoder().encode(base64));
-  } catch {
-    return undefined;
-  }
+function decodeTradeEventBytes(bytes: Uint8Array): PumpTradeEvent | undefined {
   // discriminator 8 + mint 32 + sol_amount 8 + token_amount 8 + is_buy 1 + user 32 + timestamp 8
   if (bytes.length < 97 || TRADE_EVENT_DISCRIMINATOR.some((b, i) => bytes[i] !== b)) return undefined;
   const isBuyByte = bytes[56];
@@ -732,9 +865,19 @@ function decodeTradeEventData(base64: string): PumpTradeEvent | undefined {
   const timestamp = Number(data.getBigInt64(89, true));
   if (timestamp > 0) event.timestamp = timestamp;
 
-  // reserves 4×8, fee_recipient 32, fee_bps 8, fee 8, creator 32, creator_fee_bps 8, creator_fee 8,
-  // track_volume 1, total_unclaimed 8, total_claimed 8, current_sol_volume 8, last_update_timestamp 8
-  let o = 97 + 32 + 32 + 16 + 32 + 16 + 1 + 32;
+  // virtual_sol, virtual_token, real_sol, real_token reserves 4×u64 @97
+  if (bytes.length < 129) return event;
+  event.virtualSolReserves = data.getBigUint64(97, true);
+  event.virtualTokenReserves = data.getBigUint64(105, true);
+  event.realSolReserves = data.getBigUint64(113, true);
+  event.realTokenReserves = data.getBigUint64(121, true);
+  // fee_recipient 32 @129, fee_basis_points u64 @161, fee u64 @169, creator 32 @177, creator_fee_basis_points u64 @209, creator_fee u64 @217
+  if (bytes.length < 225) return event;
+  event.fee = data.getBigUint64(169, true);
+  event.creatorFee = data.getBigUint64(217, true);
+
+  // track_volume 1, total_unclaimed_tokens 8, total_claimed_tokens 8, current_sol_volume 8, last_update_timestamp 8
+  let o = 225 + 1 + 32;
   if (bytes.length < o + 4) return event;
   const nameLength = data.getUint32(o, true);
   o += 4;

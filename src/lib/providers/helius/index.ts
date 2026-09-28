@@ -9,4 +9,14 @@ export {
   pumpBondingCurvePda,
 } from './adapter';
 export type { HeliusAdapter, HeliusOptions } from './adapter';
+export {
+  AMM_AUTHORITY_LABELS,
+  AMM_PROGRAM_LABELS,
+  BONDING_CURVE_LABEL,
+  bondingCurvePdaOf,
+  DISTRIBUTION_NOTE,
+  holderDistribution,
+  PUMPSWAP_POOL_LABEL,
+  staticLiquidityLabel,
+} from './labels';
 export { assetToTokenMeta } from './parse';

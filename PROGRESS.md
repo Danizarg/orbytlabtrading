@@ -130,14 +130,13 @@ Per-IP rate limits drive where each call runs.
 
 ## Next concrete step
 
-Stage 2 is launched from `docs/build/stage2-features.workflow.js` (2026-09-29 ~00:20). It has 8 slices, each followed by an adversarial reviewer:
-- stage1-swaps: swap parser tests and review
-- stage1-keyed: Birdeye fix, Solana Tracker tests, keyed review
-- api-routes
-- shell
-- discover
-- pulse
-- trade
-- wallet-tracker
+The stage 2 run (2026-09-29 00:20–01:20) stopped at the session usage limit. Its state:
+- **Finished builds:** stage1-swaps (swap parser fixed, 70 tests, full suite 1063 tests passing), stage1-keyed (Birdeye fix, Solana Tracker tests), api-routes, shell.
+- **Review status:** shell was reviewed. The reviews of stage1-swaps, stage1-keyed and api-routes did NOT run.
+- **Failed mid-build (files may be partial or placeholder):** discover, pulse, trade, wallet-tracker.
 
-If a session ends mid-run, check which slices left files with `git status`. Re-run only the unfinished slices by editing SLICES in a copy of the script, then continue with Integration (see the build log).
+Next session:
+1. Run `npm run check` and fix anything broken.
+2. Finish the discover, pulse, trade and wallet-tracker slices per their specs in `docs/build/stage2-features.workflow.js`. Inspect the partial files first and complete them rather than rewriting.
+3. Review api-routes.
+4. Integration: `npm run build`, browser verification with live data, README, then merge to main.

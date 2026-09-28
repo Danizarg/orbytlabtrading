@@ -1,0 +1,52 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. trades[0] is copied verbatim from the official 'Get token trades' OpenAPI example 'Default: swaps only' (time in MILLISECONDS). trades[1] is copied verbatim from the same page's 'events=liquidity' example (an add_liquidity row, kept here to prove liquidity rows never become trades). trades[2] was constructed from the documented TokenTrade schema (tx, amount, priceUsd, volume, volumeSol, type, wallet, time, program, pools[]); its values are illustrative. In the docs each example belongs to a different request.",
+  "source": "https://docs.solanatracker.io/data-api/trades/get-token-trades.md ; https://docs.solanatracker.io/data-api/openapi.json (#/paths/~1trades~1{tokenAddress})",
+  "request": "GET https://data.solanatracker.io/trades/6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN?limit=100&sortDirection=DESC&hideArb=true (header x-api-key)",
+  "response": {
+    "trades": [
+      {
+        "tx": "5V4apVkgHf49J5acYPiuh5rB89EGsF8ocSysgnD9vFfZsTtDamhN3MFDKJSq7Dn7Z6Y5XhjghuVYuvvYWnSFpnvW",
+        "amount": 90,
+        "priceUsd": 6,
+        "volume": 540,
+        "volumeSol": 3,
+        "type": "sell",
+        "wallet": "F7R61te4Ac8xZ4pfkJUdF6iaaHy9tnM8nVRUPv8H8EMi",
+        "time": 1789722000000,
+        "program": "pumpfun-amm",
+        "pools": ["9d9mb8kooFfaD3SctgZtkxQypkshx6ezhbKio89ixyy2"]
+      },
+      {
+        "tx": "5V4apVkgHf49J5acYPiuh5rB89EGsF8ocSysgnD9vFfZsTtDamhN3MFDKJSq7Dn7Z6Y5XhjghuVYuvvYWnSFpnvW",
+        "type": "add_liquidity",
+        "program": "pumpfun-amm",
+        "programId": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+        "instruction": "deposit",
+        "pool": "9d9mb8kooFfaD3SctgZtkxQypkshx6ezhbKio89ixyy2",
+        "wallet": "F7R61te4Ac8xZ4pfkJUdF6iaaHy9tnM8nVRUPv8H8EMi",
+        "time": 1789722000000,
+        "slot": 370000000,
+        "amountBasis": "transfer",
+        "tokens": [
+          { "address": "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN", "amount": "123.000001", "amountRaw": "123000001", "decimals": 6 },
+          { "address": "So11111111111111111111111111111111111111112", "amount": "9.000000001", "amountRaw": "9000000001", "decimals": 9 }
+        ]
+      },
+      {
+        "tx": "3RVpxfaDscntzr4abnmjkkN1cDPthzpxG3Pgt6PksmvhzNDFXxCPPxnKByjPJK4vsmXueD3zxuhYq5PpwCuyigLR",
+        "amount": 12.5,
+        "priceUsd": 5.94,
+        "volume": 74.25,
+        "volumeSol": 0.41,
+        "type": "buy",
+        "wallet": "5e2qRc1DNEXmyxP8qwPwJhRWjef7usLyi7v5xjqLr5G7",
+        "time": 1789721940000,
+        "program": "meteora-dlmm",
+        "pools": ["9d9mb8kooFfaD3SctgZtkxQypkshx6ezhbKio89ixyy2"]
+      }
+    ],
+    "nextCursor": null,
+    "hasNextPage": false,
+    "sortDirection": "DESC"
+  }
+}

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ProviderId } from '@/lib/core/providers';
-import { isSolanaAddress } from '@/lib/core/solana';
+import { isSolanaAddress, PROGRAMS } from '@/lib/core/solana';
 import { isProviderError, ProviderError } from '@/lib/net/errors';
 import type { JsonFetcher, JsonRequest } from '@/lib/net/types';
 import { createHelius, HELIUS_ASSET_BATCH_LIMIT, isProgramDerivedOwner, pumpBondingCurvePda } from './index';
@@ -16,6 +16,8 @@ const MINT = '7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump';
 const CURVE_PDA = '9ZZuz4cVoYhbAFomLMHJjpPijY7EXryqHRjY79f9VC7A';
 const RAYDIUM_AUTHORITY = '5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1';
 const WALLET = 'DHpRzLRuACd8i1BVGZh8rGQWaQsP7b4spBZFWbzW5WSb';
+/** A PumpSwap pool account (Birdeye trades doc example `pool_id`): off-curve, not a static authority. */
+const PUMPSWAP_POOL = 'D45QQMsxGhohYXGZKDJEowMv2HArrKAsw5V3JnyDZWeS';
 
 function load(rel: string): Record<string, unknown> {
   return JSON.parse(readFileSync(path.join(process.cwd(), 'tests/fixtures', rel), 'utf8')) as Record<string, unknown>;
@@ -87,6 +89,24 @@ async function rejectionOf(promise: Promise<unknown>): Promise<ProviderError> {
   throw new Error('expected rejection');
 }
 
+/** Copy of a jsonParsed getMultipleAccounts payload with one token account's owner replaced. */
+function withOwner(payload: unknown, index: number, owner: string): unknown {
+  const copy = structuredClone(payload) as { result: { value: Array<{ data: { parsed: { info: { owner: string } } } } | null> } };
+  const row = copy.result.value[index];
+  if (row) row.data.parsed.info.owner = owner;
+  return copy;
+}
+
+/** getMultipleAccounts (base64, empty slice) answer: owning program per requested key, null when unknown. */
+function programsOf(programs: Record<string, string>, params: unknown): unknown {
+  const [keys] = params as [string[]];
+  return {
+    jsonrpc: '2.0',
+    id: 1,
+    result: { context: { slot: 1 }, value: keys.map((k) => (programs[k] ? { owner: programs[k], data: ['', 'base64'], lamports: 1, executable: false } : null)) },
+  };
+}
+
 const HOLDER_ROUTES = { getTokenLargestAccounts: LARGEST, getTokenSupply: SUPPLY, getMultipleAccounts: OWNERS };
 
 // ---------------------------------------------------------------------------
@@ -134,8 +154,12 @@ describe('helius getHolders', () => {
     expect(pool?.label).toBe('Raydium AMM');
     expect(pool?.isProgramAccount).toBe(true);
 
-    expect(res.data.distribution?.top10Pct).toBeCloseTo(60.3185974343956 + 2 + 0.5, 9);
-    expect(res.data.distribution && 'top11to20Pct' in res.data.distribution).toBe(false);
+    // The curve vault and the pool are liquidity, not holders: only the wallet counts (the list is complete: 5 rows < 20).
+    expect(res.data.distribution).toEqual({ top10Pct: expect.closeTo(2, 10) });
+    expect(res.notes).toEqual(['Top-holder shares exclude bonding-curve and pool accounts.']);
+
+    // Every PDA owner was labelled without a lookup: no extra RPC call.
+    expect(calls.map((c) => c.method).sort()).toEqual(['getMultipleAccounts', 'getTokenLargestAccounts', 'getTokenSupply']);
 
     // Owners are resolved only for the non-zero accounts, in upstream order, jsonParsed.
     const owners = calls.find((c) => c.method === 'getMultipleAccounts');
@@ -168,7 +192,90 @@ describe('helius getHolders', () => {
     const helius = createHelius({ apiKey: API_KEY, fetcher });
     const res = await helius.getHolders(MINT, 1);
     expect(res.data.top).toHaveLength(1);
-    expect(res.data.distribution?.top10Pct).toBeCloseTo(62.8185974343956, 9);
+    expect(res.data.top[0]?.label).toBe('Bonding curve');
+    expect(res.data.distribution?.top10Pct).toBeCloseTo(2, 10);
+  });
+
+  it('labels program-wide vault authorities without a knownPools map', async () => {
+    const { fetcher, calls } = fakeRpc(HOLDER_ROUTES);
+    const res = await createHelius({ apiKey: API_KEY, fetcher }).getHolders(MINT);
+    // 5Q544f… is PDA(['amm authority'], Raydium AMM v4).
+    expect(res.data.top[2]?.label).toBe('Raydium pool');
+    expect(res.data.distribution?.top10Pct).toBeCloseTo(2, 10);
+    expect(calls).toHaveLength(3);
+  });
+
+  it('labels other program-owned owners by their owning program and excludes them from concentration', async () => {
+    expect(isProgramDerivedOwner(PUMPSWAP_POOL)).toBe(true);
+    const owners = withOwner(OWNERS, 2, PUMPSWAP_POOL);
+    const { fetcher, calls } = fakeRpc({
+      ...HOLDER_ROUTES,
+      getMultipleAccounts: (params: unknown) =>
+        (params as [string[], { encoding: string }])[1].encoding === 'jsonParsed' ? owners : programsOf({ [PUMPSWAP_POOL]: PROGRAMS.PUMP_AMM }, params),
+    });
+    const res = await createHelius({ apiKey: API_KEY, fetcher }).getHolders(MINT);
+    expect(res.data.top[2]).toMatchObject({ owner: PUMPSWAP_POOL, label: 'PumpSwap pool', isProgramAccount: true });
+    expect(res.data.distribution?.top10Pct).toBeCloseTo(2, 10);
+
+    // Only the unlabelled PDA owner is looked up, with a zero-length data slice.
+    const lookup = calls.filter((c) => c.method === 'getMultipleAccounts')[1];
+    expect(lookup?.params).toEqual([[PUMPSWAP_POOL], { encoding: 'base64', dataSlice: { offset: 0, length: 0 }, commitment: 'confirmed' }]);
+  });
+
+  it('leaves PDA owners of unknown programs unlabelled and counted', async () => {
+    const owners = withOwner(OWNERS, 2, PUMPSWAP_POOL);
+    const { fetcher } = fakeRpc({
+      ...HOLDER_ROUTES,
+      getMultipleAccounts: (params: unknown) =>
+        (params as [string[], { encoding: string }])[1].encoding === 'jsonParsed' ? owners : programsOf({ [PUMPSWAP_POOL]: 'Stake11111111111111111111111111111111111111' }, params),
+    });
+    const res = await createHelius({ apiKey: API_KEY, fetcher }).getHolders(MINT);
+    expect(res.data.top[2]?.label).toBeUndefined();
+    expect(res.data.distribution?.top10Pct).toBeCloseTo(2.5, 10);
+    expect(res.notes).toEqual(['Top-holder shares exclude bonding-curve and pool accounts.']);
+  });
+
+  it('omits concentration (with a note) when pool detection fails', async () => {
+    const owners = withOwner(OWNERS, 2, PUMPSWAP_POOL);
+    const { fetcher } = fakeRpc({
+      ...HOLDER_ROUTES,
+      getMultipleAccounts: (params: unknown) =>
+        (params as [string[], { encoding: string }])[1].encoding === 'jsonParsed' ? owners : new ProviderError('helius', 'timeout', 'helius: timeout'),
+    });
+    const res = await createHelius({ apiKey: API_KEY, fetcher }).getHolders(MINT);
+    expect(res.data.top).toHaveLength(3);
+    expect(res.data.top[2]?.label).toBeUndefined();
+    expect(res.data.supply).toBe(1_000_000_000);
+    expect('distribution' in res.data).toBe(false);
+    expect(res.notes).toEqual(['Pool detection unavailable; top-holder shares omitted.']);
+  });
+
+  it('reports the 11–20 bucket only when the 20-account list can fill it', async () => {
+    const accounts = Array.from({ length: 20 }, (_, i) => ({ address: fakeAddress(i + 1), amount: String((30 - i) * 1e12), decimals: 6, uiAmountString: String((30 - i) * 1e6) }));
+    const walletOwners = accounts.map((_, i) => fakeAddress(100 + i));
+    const largest = { jsonrpc: '2.0', id: 1, result: { context: { slot: 1 }, value: accounts } };
+    const parsed = {
+      jsonrpc: '2.0',
+      id: 1,
+      result: { context: { slot: 1 }, value: walletOwners.map((owner) => ({ data: { parsed: { type: 'account', info: { owner } } } })) },
+    };
+    const run = async (owners: typeof parsed) => {
+      const { fetcher } = fakeRpc({ ...HOLDER_ROUTES, getTokenLargestAccounts: largest, getMultipleAccounts: owners });
+      return createHelius({ apiKey: API_KEY, fetcher }).getHolders(MINT);
+    };
+    // 20 plain wallets: both buckets are exact.
+    const full = await run(parsed);
+    expect(full.data.top).toHaveLength(20);
+    expect(full.data.distribution?.top10Pct).toBeCloseTo(((30 + 21) * 10) / 2 / 10, 9);
+    expect(full.data.distribution?.top11to20Pct).toBeCloseTo(((20 + 11) * 10) / 2 / 10, 9);
+
+    // The largest account is the bonding curve: holders #11–20 are missing their tail, so that bucket is omitted.
+    const withCurve = structuredClone(parsed);
+    (withCurve.result.value[0] as { data: { parsed: { info: { owner: string } } } }).data.parsed.info.owner = CURVE_PDA;
+    const partial = await run(withCurve);
+    expect(partial.data.top[0]?.label).toBe('Bonding curve');
+    expect(partial.data.distribution?.top10Pct).toBeCloseTo(((29 + 20) * 10) / 2 / 10, 9);
+    expect(partial.data.distribution && 'top11to20Pct' in partial.data.distribution).toBe(false);
   });
 
   it('omits percentages (with a note) when the supply call fails', async () => {
@@ -245,6 +352,19 @@ describe('helius error mapping', () => {
     expect(err.code).toBe('network');
     expect(err.message).not.toContain(API_KEY);
     expect(String(err.cause ?? '')).not.toContain(API_KEY);
+  });
+
+  it('drops transport causes, which may embed the keyed URL', async () => {
+    const cause = new TypeError(`fetch failed for https://mainnet.helius-rpc.com/?api-key=${API_KEY}`);
+    const { fetcher } = fakeRpc({ getAssetBatch: new ProviderError('helius', 'network', 'helius: network error', { cause }) });
+    const err = await rejectionOf(createHelius({ apiKey: API_KEY, fetcher }).getMetadata([MINT]));
+    expect(err.code).toBe('network');
+    expect(err.cause).toBeUndefined();
+
+    const unauthorized = new ProviderError('helius', 'http', 'helius: HTTP 401', { status: 401, cause });
+    const e401 = await rejectionOf(createHelius({ apiKey: API_KEY, fetcher: fakeRpc({ getAssetBatch: unauthorized }).fetcher }).getMetadata([MINT]));
+    expect(e401.code).toBe('not_configured');
+    expect(e401.cause).toBeUndefined();
   });
 
   it('redacts the key from ProviderError messages built with the URL', async () => {

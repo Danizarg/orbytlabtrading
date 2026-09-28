@@ -11,8 +11,9 @@ import 'server-only';
  * - callers should still cache route responses (see the report for budgets).
  *
  * Endpoints: /tokens/multi/all (Pulse), /tokens/{mint} (risk),
- * /chart/{mint}[/{pool}] (candles), /trades/{mint}[/{pool}] (trades),
- * /tokens/{mint}/holders (top 100 + total holder count).
+ * /chart/{mint}[/{pool}] (USD candles), /trades/{mint}[/{pool}]?hideArb=true
+ * (swaps involving the token only), /tokens/{mint}/holders?enrich=identity
+ * (top 100 + total holder count + pool/dev/bot/KOL labels).
  */
 
 import { address as toAddress, isOffCurveAddress } from '@solana/kit';
@@ -40,6 +41,7 @@ import {
 } from '@/lib/core/types';
 import { isAbortError, isProviderError, ProviderError } from '@/lib/net/errors';
 import type { JsonFetcher } from '@/lib/net/types';
+import { bondingCurvePdaOf, DISTRIBUTION_NOTE, staticLiquidityLabel } from '@/lib/providers/helius/labels';
 import { parseCandles, parseHolders, parsePulseToken, parseRiskReport, parseTrade, PULSE_KEYS, rec, text, tradeRows, type Rec } from './parse';
 
 export const SOLANATRACKER_BASE_URL = 'https://data.solanatracker.io';
@@ -140,8 +142,10 @@ function clampInt(value: number | undefined, fallback: number, min: number, max:
   return Math.max(min, Math.min(n, max));
 }
 
-function sourced<T>(data: T, fetchedAt: number, freshness: Freshness): Sourced<T> {
-  return { data, source: PROVIDER, fetchedAt, freshness };
+function sourced<T>(data: T, fetchedAt: number, freshness: Freshness, notes?: string[]): Sourced<T> {
+  const out: Sourced<T> = { data, source: PROVIDER, fetchedAt, freshness };
+  if (notes?.length) out.notes = notes;
+  return out;
 }
 
 function malformed(what: string): ProviderError {
@@ -264,7 +268,9 @@ export function createSolanaTracker(opts: SolanaTrackerOptions): SolanaTrackerAd
     const since = query.since !== undefined && Number.isFinite(query.since) ? query.since : undefined;
     const body = await get(
       pool ? `/trades/${mint}/${pool}` : `/trades/${mint}`,
-      { limit: clampInt(query.limit, DEFAULT_TRADES, 1, SOLANATRACKER_MAX_TRADES), sortDirection: 'DESC' },
+      // hideArb: "keep swap legs involving the requested token" — a multi-hop leg between
+      // two other tokens would otherwise carry another token's amount and price.
+      { limit: clampInt(query.limit, DEFAULT_TRADES, 1, SOLANATRACKER_MAX_TRADES), sortDirection: 'DESC', hideArb: true },
       signal,
     );
     const fetchedAt = Date.now();
@@ -282,11 +288,13 @@ export function createSolanaTracker(opts: SolanaTrackerOptions): SolanaTrackerAd
     assertMint(mint);
     const max = clampInt(limit, DEFAULT_HOLDERS, 1, SOLANATRACKER_MAX_HOLDERS);
     // Top 100 plus the total holder count in one request (the /holders/top variant has no total).
-    const body = await get(`/tokens/${mint}/holders`, {}, signal);
+    // enrich=identity labels pool, developer, bot and KOL wallets (no extra request).
+    const [body, curvePda] = await Promise.all([get(`/tokens/${mint}/holders`, { enrich: 'identity' }, signal), bondingCurvePdaOf(mint)]);
     const fetchedAt = Date.now();
-    const snapshot = parseHolders(body, mint, max, fetchedAt, isProgramOwner);
-    if (!snapshot) throw malformed('holders');
-    return sourced(snapshot, fetchedAt, 'indexed');
+    const parsed = parseHolders(body, mint, max, fetchedAt, isProgramOwner, (owner) => staticLiquidityLabel(owner, curvePda));
+    if (!parsed) throw malformed('holders');
+    const notes = parsed.snapshot.distribution && parsed.liquidity ? [DISTRIBUTION_NOTE] : [];
+    return sourced(parsed.snapshot, fetchedAt, 'indexed', notes);
   }
 
   return { id: PROVIDER, intervals: SOLANATRACKER_INTERVALS, getPulse, getRisk, getCandles, getTrades, getHolders };

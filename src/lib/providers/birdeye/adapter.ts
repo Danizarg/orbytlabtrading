@@ -8,9 +8,12 @@ import 'server-only';
  * `{ success, data }` envelope; `success: false` is surfaced as an error, never
  * as empty data.
  *
- * Endpoints (docs verified 2026-09-28, data.birdeye.so/docs):
- * - GET /defi/v3/ohlcv, /defi/v3/ohlcv/pair — up to 5,000 candles; 1s kept 2 weeks, 15s 3 months;
+ * Endpoints (docs verified 2026-09-28/29, data.birdeye.so/docs):
+ * - GET /defi/v3/ohlcv — token-level USD candles, up to 5,000; 1s kept 2 weeks, 15s 3 months;
  *   empty buckets are not padded. `mode=count` takes time_from OR time_to (not both).
+ *   The pair endpoint (/defi/v3/ohlcv/pair) is deliberately NOT used: it prices the pair's
+ *   base in its quote currency (SOL for most memecoin pools) with no USD option, and the
+ *   base is not necessarily the requested token, so its candles cannot be labelled USD.
  * - GET /defi/v3/token/txs — ≤100 per call, block_unix_time in seconds.
  * - GET /defi/v3/token/holder — ≤100 per call (token-account rows), total holder count.
  * - GET /defi/token_security (Lite+) + GET /token/v1/holder-profile (Standard+).
@@ -19,6 +22,7 @@ import 'server-only';
 
 import { address, isOffCurveAddress } from '@solana/kit';
 import { fillMissing } from '@/lib/core/chain';
+import { bondingCurvePdaOf, staticLiquidityLabel } from '@/lib/providers/helius/labels';
 import type {
   CandlesQuery,
   ChartDataProvider,
@@ -202,12 +206,11 @@ export function createBirdeye(opts: BirdeyeOptions): BirdeyeAdapter {
     }
     assertMint(query.mint);
     const limit = clampInt(query.limit, DEFAULT_CANDLES, 1, BIRDEYE_MAX_CANDLES);
-    const pool = query.pool && isSolanaAddress(query.pool) ? query.pool : undefined;
-    const path = pool ? '/defi/v3/ohlcv/pair' : '/defi/v3/ohlcv';
+    const path = '/defi/v3/ohlcv';
     const before = query.before !== undefined && Number.isFinite(query.before) ? Math.floor(query.before) : undefined;
     const timeTo = before !== undefined ? before - 1 : Math.floor(Date.now() / 1000);
-    // Token candles are requested in USD explicitly; the pair endpoint prices in the pair's quote.
-    const common: Params = { address: pool ?? query.mint, type: BIRDEYE_OHLCV_TYPE[interval], ...(pool ? {} : { currency: 'usd' }) };
+    // Always token-level USD (see the header): a requested pool is not honoured, and the series says so.
+    const common: Params = { address: query.mint, type: BIRDEYE_OHLCV_TYPE[interval], currency: 'usd' };
 
     let data: Rec;
     let countMode = true;
@@ -227,13 +230,12 @@ export function createBirdeye(opts: BirdeyeOptions): BirdeyeAdapter {
     let candles = before !== undefined ? parsed.candles.filter((c) => c.time < before) : parsed.candles;
     if (candles.length > limit) candles = candles.slice(-limit);
     const series: CandleSeries = { interval, candles };
-    if (pool) series.pool = pool;
     // In count mode a short page means history is exhausted before `time_to`.
     if (countMode) series.hasMore = parsed.candles.length >= limit;
 
-    const notes: string[] = [];
-    const nonUsd = parsed.currencies.filter((c) => c !== 'usd');
-    if (nonUsd.length) notes.push(`Candle prices are in ${nonUsd.join('/')} (pair quote), not USD.`);
+    // USD was requested: candles priced in anything else must not reach a USD chart.
+    if (parsed.currencies.some((c) => c !== 'usd')) throw malformed('ohlcv currency');
+    const notes = query.pool ? ['Birdeye candles aggregate all pools of the token (USD).'] : [];
     return sourced(series, fetchedAt, 'fast', notes);
   }
 
@@ -268,11 +270,19 @@ export function createBirdeye(opts: BirdeyeOptions): BirdeyeAdapter {
   async function getHolders(mint: string, limit = DEFAULT_HOLDERS, signal?: AbortSignal): Promise<Sourced<HolderSnapshot>> {
     assertMint(mint);
     const max = clampInt(limit, DEFAULT_HOLDERS, 1, BIRDEYE_MAX_HOLDERS);
-    const data = await get('/defi/v3/token/holder', { address: mint, offset: 0, limit: max }, signal);
+    const [data, curvePda] = await Promise.all([
+      get('/defi/v3/token/holder', { address: mint, offset: 0, limit: max }, signal),
+      bondingCurvePdaOf(mint),
+    ]);
     const fetchedAt = Date.now();
-    const snapshot = parseHolderSnapshot(data, mint, max, fetchedAt, isProgramOwner);
+    const snapshot = parseHolderSnapshot(data, mint, max, fetchedAt, isProgramOwner, (owner) => staticLiquidityLabel(owner, curvePda));
     if (!snapshot) throw malformed('holders');
-    return sourced(snapshot, fetchedAt, 'indexed');
+    // Birdeye's own top-10 share is over token accounts; say so when curve / pool vaults are among them.
+    const notes =
+      snapshot.distribution && snapshot.top.slice(0, 10).some((h) => h.label)
+        ? ['Top-10 share from Birdeye; it may include bonding-curve or pool accounts.']
+        : [];
+    return sourced(snapshot, fetchedAt, 'indexed', notes);
   }
 
   async function getRisk(mint: string, signal?: AbortSignal): Promise<Sourced<RiskReport>> {
@@ -297,7 +307,7 @@ export function createBirdeye(opts: BirdeyeOptions): BirdeyeAdapter {
     }
     if (profile.status === 'fulfilled') {
       // token_security wins for overlapping fields (top10, creator holding); tags add snipers/bundlers/insiders.
-      report = fillMissing(report, parseHolderProfile(profile.value));
+      report = fillMissing<RiskReport>(report, parseHolderProfile(profile.value));
     } else {
       notes.push(`Holder profile unavailable (${describeError(profile.reason)}).`);
     }
