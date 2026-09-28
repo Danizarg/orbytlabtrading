@@ -1,0 +1,15 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. Copied verbatim from the official Birdeye 'OHLCV V3' reference example (response example 'Solana', token So111...112, type 15m). No API key was available to capture a live response.",
+  "source": "https://data.birdeye.so/docs/data-api/price-ohlcv/get-defi-v3-ohlcv.md",
+  "request": "GET https://public-api.birdeye.so/defi/v3/ohlcv?address=So11111111111111111111111111111111111111112&type=15m&currency=usd&mode=count&count_limit=...&time_to=... (headers X-API-KEY, x-chain: solana)",
+  "response": {
+    "success": true,
+    "data": {
+      "is_scaled_ui_token": false,
+      "items": [
+        { "o": 128.27328370924414, "h": 128.6281001340782, "l": 127.91200927364626, "c": 127.97284640184616, "v": 58641.16636665621, "v_usd": 7506048, "unix_time": 1726670700, "address": "So11111111111111111111111111111111111111112", "type": "15m", "currency": "usd" },
+        { "o": 127.97284640184616, "h": 128.49450996585105, "l": 127.89354285873108, "c": 128.04188346328968, "v": 47861.13031539581, "v_usd": 7506048, "unix_time": 1726671600, "address": "So11111111111111111111111111111111111111112", "type": "15m", "currency": "usd" }
+      ]
+    }
+  }
+}

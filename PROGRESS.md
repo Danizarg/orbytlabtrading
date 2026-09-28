@@ -1,85 +1,132 @@
-# Orbyt AI Trading — progress and assistant handoff
+# ORBYT — progress, plan and handoff
 
-Last updated: 2026-09-28 (Europe/Madrid).
+Last updated: 2026-09-29 (Europe/Madrid). Working branch: **`feat/live-solana-terminal`**. `main` still holds the old static site and must not be touched until the new app is complete and verified.
 
-## Start here in Claude, ChatGPT, or another coding assistant
+## Start here (any machine, any assistant)
 
-Clone https://github.com/Danizarg/orbytlabtrading.git, then read this file and `README.md`. Treat this repository as the source of truth. The app is ordinary HTML, CSS, and JavaScript: it has no dependency on the originating assistant, its account, or its hosting service. Give a new assistant access to the repository or upload the complete project folder, not just this file, when asking it to edit the application.
+```bash
+git clone https://github.com/Danizarg/orbytlabtrading.git
+cd orbytlabtrading
+git checkout feat/live-solana-terminal
+npm install
+npm run check        # typecheck (next typegen + tsc) + eslint + vitest
+npm run dev          # http://localhost:3000 → redirects to /discover
+```
 
-Suggested continuation prompt:
+Before you change anything, read these files in this order:
+1. `AGENTS.md`: continuity rules. The deposit address belongs to the owner and is never changed.
+2. `docs/REQUIREMENTS.md`: the owner's full specification. It is the source of truth.
+3. This file: status, architecture and next steps.
+4. `docs/DESIGN_BRIEF.md`: UI and UX direction for every page.
+5. `docs/research/*.json`: live-verified provider research from 2026-09-28. It covers endpoints, exact field names, units, rate limits, CORS, terms and gotchas. Trust it over memory.
+6. `docs/build/*.workflow.js`: the Claude Code workflow scripts used to build each stage. They double as detailed specs per module and slice.
 
-> Continue work on Orbyt AI Trading in this repository. Read AGENTS.md, PROGRESS.md, and README.md first. Preserve the real-data-only behavior and configured public deposit address. Check Git status and current Vercel deployment before changing anything. Complete outstanding tasks, run npm run check, and update PROGRESS.md with verified results. Never claim deployment or DNS setup succeeded without checking it.
+Node 24.x is pinned via `engines`. No keys are needed to run. `.env.example` documents the optional keys.
 
-## User requirements and decisions
+## Owner rules (non-negotiable)
 
-- A dark, Axiom-inspired memecoin market website, branded **Orbyt AI Trading**.
-- Real, live Solana tokens, prices, candlesticks, and on-chain transactions; the initial simulated prototype was explicitly rejected.
-- User chose **Live markets + editable deposit address**, rather than wallet-connected swaps.
-- Repository: `https://github.com/Danizarg/orbytlabtrading.git`.
-- Hosting requested: **Vercel**. Intended primary domain: `https://www.orbytai.org`.
-- The receiving address was configured by the user in `dist/config.js` and must be preserved. It is a public address, not a secret.
-- Include this progress file so development can move between assistants/accounts.
+- The ONLY repository is https://github.com/Danizarg/orbytlabtrading.git. Do not deploy, do not create new repos, and do not create Vercel projects. The owner redeploys manually.
+- Use real data only: no fabricated, random, simulated or static "live" data. Unknown values render "—".
+- Keep API keys in env vars only. Server-only keys never get the `NEXT_PUBLIC_` prefix, and no secrets are committed.
+- The deposit address `8dbTV2UQXUbhAjpQ8Hf9mcpuJX7LaBWs3FDAqC2rTfc3` is in `src/config/site.ts` and belongs to the owner. Never change it.
+- ORBYT displays market data and read-only quotes. It does not execute trades, hold funds or sign transactions.
+- Before finishing, `next build`, typecheck and lint must all pass, `.env.example` must be complete, and the repo must be Vercel-compatible.
 
-## Implemented
+## Architecture (what exists on the branch)
 
-- Responsive dark terminal with Orbyt branding, a custom favicon, title, and canonical domain metadata.
-- GeckoTerminal public API: trending Solana pools, new pools, token/address search, pool statistics, OHLCV candles, and recent trades.
-- Chart intervals: 1m, 5m, 15m, 1h, 4h, and 1D. Source timestamps and real transaction links to Solscan.
-- Automatic 30-second refresh while the tab is visible, manual refresh, pause, request caching/deduplication, timeout handling, and rate-limit backoff.
-- No fabricated data on API failure. Provider failures and delayed updates are explicitly shown.
-- Gainers sorts the current trending-pool sample; it is not an exhaustive network-wide ranking. Tokens may have several pools, which are tracked by unique pool address.
-- Device-local watchlist of up to 30 pools, refreshed through the multi-pool API.
-- Deposit panel: editable public Solana address, 32-byte base58 validation, copy, and Solscan link. Local overrides are labeled as browser-only.
-- Site-wide default receiving address is in `dist/config.js` as `window.ORBYT_CONFIG.depositAddress`.
-- Dependency-free local server and syntax checks, Vercel static output configuration, and assistant handoff instructions.
+**Stack:** Next.js 16.3 (App Router, Turbopack), React 19.3, TypeScript 5.9 strict (with `noUncheckedIndexedAccess`), Tailwind v4, Vitest 5, TanStack Query 5, zustand 5, lightweight-charts 5.2 (TradingView, Apache-2.0), @solana/kit 8.4 and zod 4. TypeScript 7 and ESLint 10 are deliberately not used because eslint-config-next isn't compatible with them yet.
 
-## Architecture and file map
+### Data architecture (decided after live research)
 
-| File | Purpose |
+Per-IP rate limits drive where each call runs.
+
+- **Browser-direct, keyless.** GeckoTerminal (about 10 calls/min per IP; its 429 carries no CORS header), DEX Screener, Jupiter keyless (5 requests per 10 s per IP), publicnode Solana RPC (browser-allowed, light reads), and the PumpPortal free WebSocket (new pump.fun launches and migrations). Each visitor spends their own IP quota. Calls go through `src/lib/net/browser.ts` (per-provider budgets, cooldowns, dedupe, short cache).
+- **Server-side, in Next.js route handlers under `/api/v1/*`.** The public Solana RPC lives here because it answers 403 to any browser Origin. So do every keyed provider (Helius, Birdeye, Solana Tracker, CoinGecko Demo/Pro, Jupiter key) and immutable transaction parsing. Calls go through `src/lib/server/http.ts` (budgets, retries, 429 cooldown, dedupe, health) plus Vercel CDN caching via `s-maxage`.
+- **Isomorphic adapters.** Every adapter is a factory that takes a `JsonFetcher`, so the same code runs in the browser (keyless) and on the server (keyed).
+- **Failover and capabilities.** `runChain` (`src/lib/core/chain.ts`) handles failover. The root layout computes a capabilities object from the env (`src/lib/config/capabilities.ts`) that says which keyed server routes exist. When a keyed server route is available, the client prefers it; otherwise it falls back to keyless browser sources. A route with no configured provider returns 501 and is skipped silently.
+- **Normalized models and interfaces.** Models are in `src/lib/core/types.ts`. Interfaces (TokenDiscovery, Metadata, MarketData, Price, Liquidity, Transaction, Chart, Holder, Risk, Launchpad, BondingCurve, WalletActivity, Portfolio, Trading) are in `src/lib/core/providers.ts`. Every result is `Sourced<T>` with `freshness: 'stream' | 'realtime' | 'fast' | 'indexed'`, which drives the LIVE / "Updated Xs ago" badges.
+- **Vercel constraints.** No persistent processes. Live data comes from browser WebSockets (PumpPortal, publicnode logs/account subscriptions), CDN-cached polling of route handlers, and on-chain reads. Persistent server-side ingestion (for example a paid PumpPortal trade feed, Helius LaserStream or CoinGecko WS) would need an external always-on worker. That is documented as future infrastructure and is not required.
+
+### Directory map
+
+| Path | Purpose |
 | --- | --- |
-| `dist/index.html` | Page structure, metadata, address dialog |
-| `dist/style.css` | Responsive terminal styling |
-| `dist/app.js` | Live API integration, charts, watchlists, address settings |
-| `dist/config.js` | Public, site-wide receiving address |
-| `dist/favicon.svg` | Orbyt mark |
-| `scripts/serve.cjs` | Local static server, port 4173 by default |
-| `package.json` | `dev`, `check`, and `build` scripts |
-| `vercel.json` | Static deployment, output directory `dist` |
-| `AGENTS.md` | Continuity instructions |
+| `src/lib/core/` | Models, provider interfaces, failover chain, DEX normalization, Solana helpers, formatters, API envelope and routes |
+| `src/lib/net/` | Isomorphic `JsonFetcher` types, `ProviderError`, browser transport |
+| `src/lib/server/` | Server transport, TTL cache, response helpers (`okSourced`, `upstreamFailure`, CDN cache policies), env and capabilities, *(todo)* `registry.ts` |
+| `src/lib/providers/geckoterminal` | Keyless GT plus CoinGecko Demo/Pro: discovery, search, markets, pools, OHLCV, trades, token info/risk/holder summary, launchpad graduation % |
+| `src/lib/providers/dexscreener` | Secondary enrichment: pairs, token rows, search, migration detection |
+| `src/lib/providers/jupiter` | Tokens V2 discovery/rows/search, Price V3, Ultra search (bonding %, snipers/insiders/bundlers), holdings, read-only quotes (Metis / Jupiter Ultra labels) |
+| `src/lib/providers/solana` | JSON-RPC client (tx v1), pump.fun bonding-curve PDA + decoder, mint info, RPC portfolio, RPC trades, RPC wallet activity |
+| `src/lib/providers/{helius,birdeye,solanatracker}` | Keyed, server-only adapters (holders, metadata, candles incl. 1s, trades, risk, Pulse lists) |
+| `src/lib/streams/` | Reconnecting socket, PumpPortal client (free subscriptions only), Solana PubSub client, status store |
+| `src/lib/analytics/` | Swap/transfer derivation from parsed txs, FIFO SOL-denominated PnL, candle aggregation + live ticks, trade merging, pump.fun bonding math |
+| `src/client/` | API client, capabilities context, hooks (useNow, useFlash, useHydrated, usePumpPortal, useSolanaSubscriptions, useStreamStatus), preferences store (watchlist, tracked wallets, browser-local deposit override) |
+| `src/components/ui/` | Panel, Tabs, Skeleton, EmptyState, Change, FreshnessBadge, TokenAvatar (progress ring), CopyButton, WalletLink/TxLink |
+| `src/components/shell/` | AppShell, Logo, NavLinks, DepositDialog |
+| `src/app/` | Layout (fonts, capabilities, providers). Route pages are placeholders until stage 2. |
+| `tests/fixtures/` | Real provider responses captured 2026-09-28 (plus clearly labelled doc examples for keyed APIs). Used only in tests. |
+| `docs/` | Requirements, design brief, research, build workflow scripts |
 
-No runtime API keys, backend database, wallet connection, or paid dependencies are required. Google Fonts and token-provider images are loaded remotely. GeckoTerminal data is subject to its cache, availability, CORS policy, and rate limits. API documentation: https://api.geckoterminal.com/docs/index.html.
+## Status against `docs/REQUIREMENTS.md`
 
-## Financial behavior: preserve these boundaries
+| Area | Status |
+| --- | --- |
+| Repo / Vercel / no deploy | Done. The Next.js app lives in this repo. `vercel.json` sets framework nextjs and output `.next` (this overrides the old "Other/dist" dashboard settings) with `fluid: true`. Node 24.x. The old `dist/` static site has been removed on the branch. |
+| Provider research | Done: `docs/research`. |
+| Normalized provider architecture | Done: foundation plus all stage-1 adapters. |
+| Resilience (dedupe, cache, backoff, failover, cooldown) | Done in the transports and chains. Error boundaries and loading states come in stage 2 UI. |
+| API keys / `.env.example` | Done. Every variable is optional and documented with provider, feature and where to get it. |
+| Server API routes `/api/v1/*` | TODO (stage 2 slice `api-routes`). |
+| /discover, /watchlist | TODO (stage 2 slice `discover`). |
+| /pulse (New / Final Stretch / Migrated) | TODO (stage 2 slice `pulse`). Stream client and bonding decoder are done. |
+| /trade/[mint] (real chart, trades, holders, risk, quote) | TODO (stage 2 slice `trade`). |
+| /wallet/[address] + /tracker | TODO (stage 2 slice `wallet-tracker`). PnL engine, activity parser and streams are done. |
+| Global shell (search, SOL price, stream status, status bar) | TODO (stage 2 slice `shell`). |
+| Freshness badges | Primitive done. Wiring comes in stage 2. |
+| Production build + verification with live data | TODO (after stage 2). |
+| README / PROGRESS final docs | TODO (final step). |
 
-The website displays market information and a receiving address. It **does not execute swaps, hold funds, monitor/verify deposits, create user accounts, credit trading balances, or process withdrawals**. The brand includes “AI” because the user requested that name; no AI model or automated trading system is implemented. Do not imply otherwise in the UI or handoff.
+## Build log
 
-## Validation completed before the hosting migration
+- **Stage 0 (done, 2026-09-28).** Research workflow: 7 agents, live-tested providers, saved fixtures. Foundation committed (`9f26f50`, `46871a8`). Deposit address rule added (`7a05529`).
+- **Stage 1 (implemented, 2026-09-28/29).** Provider adapters, on-chain decoders, streams and analytics were written by 8 parallel agents (`docs/build/stage1-providers.workflow.js`). The session was interrupted before the per-module review passes ran. State at interruption: 27 test files, 640 tests passing, lint clean, one type error in `src/lib/providers/birdeye/adapter.ts`. Missing tests: `src/lib/analytics/swaps.test.ts` (swap parser) and `src/lib/providers/solanatracker`. The `formatPrice` rounding-carry bug found by tests has been fixed (2026-09-29).
+- **Stage 1 review (next).** An independent adversarial review-and-fix pass per module. It completes the missing tests and fixes the Birdeye type error. Reviewers must keep exported APIs stable.
+- **Glue (next, lead).** `src/lib/server/registry.ts` (lazy server provider instances from env, SOL/USD price helper), `src/data/sources.ts` (browser adapter singletons + server-proxy adapters implementing the same interfaces via `/api/v1/*`), `src/data/query.ts`, `src/data/hooks/useSolPrice.ts`, `src/components/ui/ErrorBoundary.tsx`.
+- **Stage 2 (then).** Six vertical slices with reviewers, per `docs/build/stage2-features.workflow.js`: api-routes, shell, discover, pulse, trade, wallet-tracker.
+- **Integration (then).**
+  - `npm run check` and `npm run build`.
+  - `npm run dev`, then verify every page in a browser against live data: Discover rows, Pulse stream, a real mint's chart/trades, a real wallet's holdings/activity/PnL, the tracker live feed.
+  - Mobile layout check.
+  - A final multi-dimension review (real-data integrity, security, Vercel, accessibility).
+- **Release (last).** Update README, PROGRESS and AGENTS. Merge `feat/live-solana-terminal` → `main` only when everything passes. The owner then redeploys on Vercel. The project settings may still say Framework "Other" / output `dist`; the committed `vercel.json` overrides them.
 
-- Verified live API responses for trending pools, candlesticks, recent trades, and saved-pool lookup.
-- Browser verified live tokens/prices, candlestick rendering, real transaction links, token selection, interval switching, pool statistics, and live token search.
-- Invalid receiving-address input was rejected; existing receiving address preserved.
-- Mobile viewport checked with no page-level horizontal overflow.
-- Browser console reported no JavaScript errors during checks.
-- Syntax checks passed on the live-data app.
+## How to continue with Claude Code on another machine
 
-## GitHub, Vercel, and domain status
+1. Clone, check out the branch, and run `npm install` (see Start here). Run `npm run check` to confirm a green baseline.
+2. Ask Claude Code to "continue ORBYT from PROGRESS.md". It should read the files listed in Start here.
+3. For multi-agent stages, the workflow scripts in `docs/build/` can be run with the Workflow tool. They already use repo-relative paths (`docs/research`, `docs/DESIGN_BRIEF.md`). Stage 2 expects the glue files listed above to exist first.
+4. After meaningful work, update this file (status table, build log, validation) and push the branch.
 
-- GitHub repository was reachable and empty when cloned on 2026-09-28.
-- Local branch: `main`; remote `origin` points to the requested GitHub repository.
-- GitHub initial push: pending at this checkpoint.
-- Vercel authentication, project creation/linking, production deploy, Git integration, and custom-domain attachment: pending at this checkpoint.
-- `www.orbytai.org` and apex DNS records have not yet been changed. Do not assume the canonical HTML metadata configures DNS.
-- An earlier prototype was registered with the original assistant's Sites service; its registration is deliberately omitted from this Vercel project. Vercel is the requested host going forward.
+## Validation log
 
-## Next steps
+- 2026-09-28: foundation passed `tsc --noEmit` and `eslint`.
+- 2026-09-29: after stage 1, the full suite passes (640 tests) and lint is clean. One type error remains (Birdeye), to be fixed in the stage 1 review. The formatter tests pass after the fix.
+- Live verification of the app in a browser: pending (stage 2).
 
-1. Run `npm run check` in this repository; commit and push `main` to the requested GitHub remote.
-2. Authenticate with Vercel using the user's own account if necessary. Do not request access tokens in chat or commit credentials.
-3. Import/connect `Danizarg/orbytlabtrading` to Vercel. Framework: Other; output: `dist`; build: `npm run build`.
-4. Deploy production and verify the returned deployment URL and live-data loading.
-5. Add `www.orbytai.org` to the project. Use the exact DNS values Vercel supplies; inspect existing DNS first and preserve unrelated email/TXT records. Optionally redirect the apex only after confirming the desired domain setup.
-6. Update this file with actual deployment URLs, completed steps, remaining DNS requirements, and verification evidence; commit and push that update.
+## Known risks and decisions to keep in mind
 
-## Continue locally
+- **Keyless limits.** GeckoTerminal about 10 calls/min per IP and 30–60 s cached. Jupiter keyless 5 requests per 10 s. The public RPC allows 10 getTransaction per 10 s per IP and blocks getTokenLargestAccounts. Without keys:
+  - Trades on the token page come from GeckoTerminal, about 30 s delayed and labelled as such.
+  - Holder lists and sub-minute native candles need a keyed provider. 1s/5s/15s candles are instead built from real trades, with the covered window stated.
+  - Wallet PnL analysis is slow; `HELIUS_API_KEY` makes it fast.
+- **publicnode WS** drops messages, so the tracker also reconciles by polling.
+- **PumpPortal** trade and account subscriptions are paid (API key plus a funded wallet) and are not used. The free stream covers creates and migrations.
+- **Terms.** DEX Screener forbids products whose primary purpose competes directly with it, so it is used only for secondary enrichment with a text attribution and no logo. Jupiter requires the router label ("Metis" / "Jupiter Ultra") on quotes, and its clause 3.2(g) about combining data may need legal review. GeckoTerminal attribution text goes near its data. TradingView attribution stays on in charts.
+- **Vercel Hobby** is for non-commercial use only; a commercial site needs Pro.
+- **Transaction v1** is live on mainnet. Every getTransaction call sends `maxSupportedTransactionVersion: 1`.
+- Every pump.fun progress value is decoded on-chain (`real_token_reserves` of 793.1M). Mayhem-mode and non-SOL-quote curves are handled (supply from the mint; quote mint from the curve).
 
-Use Node.js 20 or later. Run `npm run dev` and open the printed local URL. No dependencies need installing. Run `npm run check` before committing. Edits to static files require a browser refresh. A receiving-address override is local to one origin/browser and does not travel with the repo; the default in `dist/config.js` does.
+## Next concrete step
+
+Run the stage-1 review workflow, then write the glue files, then run stage 2.

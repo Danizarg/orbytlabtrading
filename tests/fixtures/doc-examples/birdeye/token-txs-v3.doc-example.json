@@ -1,0 +1,89 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. items[] combines the official Birdeye 'Trades - Token (V3)' reference examples TokenTxsSwap, TokenTxsSell, TokenTxsAddLiquid and SolanaScaledUIAmount (ZUMI, pump_amm) into one list; each item is copied verbatim. In the docs each example belongs to a different request, so side/tx_type are relative to whichever token was queried there.",
+  "source": "https://data.birdeye.so/docs/data-api/transactions/get-defi-v3-token-txs.md",
+  "request": "GET https://public-api.birdeye.so/defi/v3/token/txs?address=<mint>&offset=0&limit=50&tx_type=swap&sort_type=desc",
+  "response": {
+    "data": {
+      "items": [
+        {
+          "tx_type": "buy",
+          "tx_hash": "3fqsirN8vbhBLHS2cVAaCXTdsCcCua75LgcBX6Z2G2yupM9cDEsmo2TP5AhXvEUBZ91xyy3KWiuDdHxoFVnp1R88",
+          "ins_index": 2,
+          "inner_ins_index": 0,
+          "block_unix_time": 1740380278,
+          "block_number": 322728531,
+          "volume_usd": 0.0005729458359923133,
+          "volume": 1733.23946,
+          "owner": "8bP4FJNXwN5Q4a6EybtHwsiAnxFFWb93sY38mYdo6Pr2",
+          "signers": ["8bP4FJNXwN5Q4a6EybtHwsiAnxFFWb93sY38mYdo6Pr2"],
+          "source": "raydium",
+          "side": "buy",
+          "alias": null,
+          "price_pair": 486318591.4702581,
+          "from": { "symbol": "PEPEAI", "address": "7nM97F8takLArrKLJdT62L54jTtX1e7h7qPSjtBrsMQA", "decimals": 6, "price": 3.5071289483955604e-7, "amount": "1733239460", "ui_amount": 1733.23946, "ui_change_amount": -1733.23946 },
+          "to": { "symbol": "SOL", "address": "So11111111111111111111111111111111111111112", "decimals": 9, "price": 160.7592132413898, "amount": "3564", "ui_amount": 0.000003564, "ui_change_amount": 0.000003564 },
+          "pool_id": "8aTXVUjPcUSwSLAbUegaKTQdB6SaNosSKQkURvpbLCNC"
+        },
+        {
+          "tx_type": "sell",
+          "tx_hash": "MCUsTrq9kxxLncqYLPEEBBhnB6qQ8xzpFQ61v9WDpHuLWhKhpPk3Y72KDB8ZaYFAF4sQ1ePmMpeyv8XajRhHGgL",
+          "ins_index": 2,
+          "inner_ins_index": 0,
+          "block_unix_time": 1741033247,
+          "block_number": 324378317,
+          "volume_usd": 2.1354753332522916,
+          "volume": 0.01491951,
+          "owner": "DYQjtsirB7yK78ivZRa8xMvAjmGo2zqsBqmW1Aek67h5",
+          "signers": ["DYQjtsirB7yK78ivZRa8xMvAjmGo2zqsBqmW1Aek67h5"],
+          "source": "raydium_cp",
+          "side": "sell",
+          "alias": null,
+          "price_pair": 253778.18630672188,
+          "from": { "symbol": "SOL", "address": "So11111111111111111111111111111111111111112", "decimals": 9, "price": 143.13307429347824, "amount": 14919510, "ui_amount": 0.01491951, "ui_change_amount": -0.01491951 },
+          "to": { "symbol": "TRM", "address": "E8ks5e8tegXXR2w4Rr2Bd4mvKEwfwdmEVKUjc4iEusdt", "decimals": 9, "price": 0.0005936932412742374, "amount": 3786246188385, "ui_amount": 3786.246188385, "ui_change_amount": 3786.246188385 },
+          "pool_id": "8HiHe9KtMQhjXNKpcEoLRRfn3xSU8TUbAi2xCR5QJWCc"
+        },
+        {
+          "tx_type": "add",
+          "tx_hash": "4YQCb9m5RCTKVqrXVyBV67wQzn9gqJLy3f9UJY6MaeJFmFhMHqVtmru52iHt77PSFmBg7G3HbA8Lv9u1Urpr4jis",
+          "ins_index": 2,
+          "inner_ins_index": 0,
+          "block_unix_time": 1740380441,
+          "block_number": 322728946,
+          "volume_usd": 0,
+          "owner": "6rugaR3NysRzG42PDmJGMGDegzVALkXTSSEefQmPz17P",
+          "signers": ["6rugaR3NysRzG42PDmJGMGDegzVALkXTSSEefQmPz17P"],
+          "source": "pump_dot_fun",
+          "alias": null,
+          "pool_id": "8Wp84g9RsXzJAj1ScEeWb3oynRXjGKPyGPwXrua5gpEV",
+          "tokens": [
+            { "address": "9gNot3AX9Q5efNAMLEhaNwnxDWLV3jfUNHqyQTmdpump", "decimals": 6, "amount": "1000000000000000", "ui_amount": 1000000000 },
+            { "symbol": "SOL", "address": "So11111111111111111111111111111111111111112", "decimals": 9, "amount": 0, "ui_amount": 0 }
+          ]
+        },
+        {
+          "tx_type": "buy",
+          "tx_hash": "351zF2LEwyW9izUT9WeKEL4yr3Ej4fjwDgbuijWSMTsCZoXHVverNwUEh4YjggAcYAP8j2cv1BW9j2CFNWbXUGSh",
+          "ins_index": 2,
+          "inner_ins_index": null,
+          "block_unix_time": 1754884657,
+          "block_number": 359261557,
+          "volume_usd": 37.190281762690454,
+          "volume": 0.200754834,
+          "owner": "2s44dURNXwC65t7t9XSZfRWA9eyXJDfWTPHDv8jbDKNp",
+          "signers": ["2s44dURNXwC65t7t9XSZfRWA9eyXJDfWTPHDv8jbDKNp"],
+          "source": "pump_amm",
+          "interacted_program_id": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+          "side": "buy",
+          "alias": null,
+          "price_pair": 6458965.17052237,
+          "from": { "symbol": "ZUMI", "address": "H5UjPsXoxaJAkAcpkfs7Fds3T6oypK7BwLgTFUtTs6vy", "decimals": 6, "price": 0.000028681411107415812, "amount": "1296668480620", "ui_amount": 1296668.48062, "ui_change_amount": -1296668.48062, "is_scaled_ui_token": false, "multiplier": null },
+          "to": { "symbol": "SOL", "address": "So11111111111111111111111111111111111111112", "decimals": 9, "price": 185.25223538423216, "amount": "200754834", "ui_amount": 0.200754834, "ui_change_amount": 0.200754834, "is_scaled_ui_token": false, "multiplier": null },
+          "pool_id": "D45QQMsxGhohYXGZKDJEowMv2HArrKAsw5V3JnyDZWeS"
+        }
+      ],
+      "has_next": true
+    },
+    "success": true
+  }
+}

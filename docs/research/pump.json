@@ -1,0 +1,279 @@
+{
+ "provider": "pump.fun launch ecosystem: PumpPortal real-time WebSocket, pump.fun/PumpSwap on-chain programs (IDL + public RPC decode), pump.fun internal frontend APIs (status only), launchpad fields exposed by GeckoTerminal, DexScreener and Jupiter, and Moralis pump.fun endpoints",
+ "summary": "Status on 2026-09-28, all checked live today. (1) PumpPortal wss://pumpportal.fun/api/data still gives you subscribeNewToken and subscribeMigration for FREE with no API key. The handshake accepts a browser Origin (101 with Origin https://www.orbytai.org), so a Vercel app can open it straight from the browser. subscribeTokenTrade and subscribeAccountTrade are rejected without a key. They need an API key plus a linked wallet holding at least 0.02 SOL, billed at 0.01 SOL per 10,000 messages. That covers PumpSwap/pump-amm trades too, so you cannot get a free trade feed. The same free stream also carries pool='bonk' (LetsBonk/LaunchLab) create events in a different schema. Measured throughput: about 42 pump.fun launches per minute and 2 migrations in 77 s. PumpPortal has no historical data. (2) On-chain facts, checked against the pump-public-docs IDL (refreshed 2026-09-12) and live mainnet accounts. Programs: pump 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P, PumpSwap pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA. Bonding-curve PDA seeds are ['bonding-curve', mint]. Global initial values: virtual tokens 1,073,000,000e6, virtual SOL 30e9 lamports, real tokens 793,100,000e6, supply 1e15. Tokens have 6 decimals. A curve is complete when real_token_reserves reaches 0. That takes 85.005 SOL net into the curve, and market cap at that point is about 410.9 SOL. Migration to the canonical PumpSwap pool followed within about 80 ms (observed). The BondingCurve account has grown since older layouts: the SOL fields are renamed to *_quote_reserves, and quote_mint, is_mayhem_mode, creator_fee_bps and is_holder_reward were added. Coins can now be paired with USDC or custom quote mints; I saw one live coin paired with the PUMP token. Mayhem-mode coins have a 2B mint supply and agent-adjusted virtual reserves. PumpSwap pools now carry a non-zero virtual_quote_reserves (17.58 SOL observed), so price has to use effective quote reserves. (3) pump.fun has no official hosted API. frontend-api-v3.pump.fun is internal: it returns 403 'Not allowed by CORS' to foreign Origins, and its old /coins/{mint} route now returns 404. frontend-api.pump.fun and advanced-api-v2 are dead (Cloudflare 1016). pump.fun's ToS section 21(h) bans bots and scrapers. Do not rely on these hosts. (4) GeckoTerminal token info exposes launchpad_details (graduation_percentage, completed, completed_at, migrated_destination_pool_address) and lists launchpad dex ids. Jupiter tokens/v2 exposes launchpad, metaLaunchpad, partnerConfig, graduatedPool and graduatedAt, but no bondingCurve field was present today. DexScreener lists bonding curves as dexId 'pumpfun', with pairAddress set to the bonding-curve PDA and no liquidity or progress fields. (5) Moralis REMOVED all of its Solana pump.fun discovery endpoints (/exchange/{exchange}/new, /bonding, /graduated and /{address}/bonding-status) on 2026-07-31; all four return 404 today. The replacement is a paid 'Data Feeds' sync into your own database. Moralis token swaps (50 CU) still exists behind X-API-Key. Bottom line for ORBYT: use the free PumpPortal stream in the browser for Pulse New Pairs and Migrated. For the Final Stretch column, progress and price, read bonding-curve and pool accounts through a server-side RPC proxy (Vercel function; the public RPC blocks browser Origins with 403) or a keyed RPC. Per-token trade feeds need a paid feed: a PumpPortal key, Helius/other RPC logs subscriptions, or a similar service.",
+ "auth": "PumpPortal data WS: none for subscribeNewToken, subscribeMigration and unsubscribeNewToken. For subscribeTokenTrade and subscribeAccountTrade you connect as wss://pumpportal.fun/api/data?api-key=<KEY> (query param). The key's linked wallet must hold at least 0.02 SOL and is charged 0.01 SOL per 10,000 trade messages received. There is no free trade tier; without a key the server answers with an error message and sends nothing. Solana public RPC (api.mainnet-beta.solana.com): no key, x-ratelimit-tier 'free', server-side only. pump.fun frontend-api-v3: no key, but it is an internal API that is CORS-locked and against ToS; do not use. GeckoTerminal, DexScreener and Jupiter lite-api: no key. Moralis: header X-API-Key: <key> on https://solana-gateway.moralis.io. The pump endpoints are removed. Data Feeds needs a separate 'cm_live_…' key with continuum:read scope on a paid plan. The 2026 pricing doc lists Starter $149 (2M CU/month, 40 RPS), Pro $249 (100M CU), Business $749 (500M CU) and does not list a free plan (treat free tier as UNCERTAIN).",
+ "base_urls": [
+  "wss://pumpportal.fun/api/data",
+  "https://pumpportal.fun (docs: /data-api/real-time/, /data-api/bonk-fun-data-api/, /FAQ/, /legal/)",
+  "https://api.mainnet-beta.solana.com (JSON-RPC; server-side only)",
+  "https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/ (idl/pump.json, idl/pump_amm.json, idl/pump_fees.json, docs/*.md)",
+  "https://frontend-api-v3.pump.fun (internal, undocumented; NOT recommended)",
+  "https://api.geckoterminal.com/api/v2",
+  "https://api.dexscreener.com",
+  "https://lite-api.jup.ag/tokens/v2 (docs now point to https://api.jup.ag with x-api-key)",
+  "https://solana-gateway.moralis.io"
+ ],
+ "cors": "PumpPortal WS: the handshake with Origin https://www.orbytai.org returned HTTP 101 Switching Protocols, and the Node 24 WebSocket with that Origin header received data. Browsers can connect directly, and the docs pages send Access-Control-Allow-Origin: *. Solana public RPC https://api.mainnet-beta.solana.com: when any browser Origin is present, both HTTP POST and the WebSocket upgrade return HTTP 403 {\"code\":403,\"message\":\"Access forbidden\"}, with access-control-allow-origin: * on the error. Without an Origin header it returns 200 with access-control-allow-origin: 'backend_traffic'. So it cannot be called from the browser; proxy it through a Vercel function or use a keyed RPC that allows your origin. pump.fun frontend-api-v3: 403 {\"message\":\"Not allowed by CORS\"} for Origin https://www.orbytai.org, so there is no browser use. GeckoTerminal: access-control-allow-origin: *. DexScreener: access-control-allow-origin: *. Jupiter lite-api: reflects the Origin (Access-Control-Allow-Origin: https://www.orbytai.org). Moralis gateway: Access-Control-Allow-Origin: * on 401 and 404, but it needs a secret key, so keep it server-side.",
+ "rate_limits": "PumpPortal (FAQ, 2026): trading endpoints are limited to 25 req/s. Data WS rules: use ONE connection per client and send new subscribe messages on it (subscriptions accumulate, so there is no need to resend the list). Send no more than 200 subscription messages per second and no more than 5000 addresses per message. Opening many connections at once gets you temporarily banned, and bans expire hourly. Disconnects happen when servers rebalance, so add reconnect logic. Data is at 'processed' commitment, less than 100 ms behind gRPC if you run from NY. No rate-limit headers are sent on the WS. Solana public RPC headers observed without Origin: x-ratelimit-tier: free; x-ratelimit-rps-limit: 250; x-ratelimit-method-limit: 50 for getAccountInfo and getMultipleAccounts, 150 for getTokenSupply; x-ratelimit-conn-limit: 40; x-ratelimit-connrate-limit: 40; x-ratelimit-pubsub-limit: 10; x-ratelimit-endpoint-limit: unlimited. GeckoTerminal: returned HTTP 429 several times today (shared IP with parallel research). Its responses carry Cache-Control: max-age=30, public, s-maxage=60, so back off and cache. DexScreener: Cache-Control: public, max-age=30. Jupiter lite-api: Cache-Control public, max-age=10 (search) and max-age=5 (recent). Moralis: CU-metered (token swaps 50 CU, token price 10 CU, OHLC 150 CU per docs); plan RPS 40/80/200.",
+ "endpoints": [
+  {
+   "name": "PumpPortal WS connect (keyless)",
+   "request": "WebSocket wss://pumpportal.fun/api/data  (optionally ?api-key=KEY). Send JSON text frames {\"method\":\"...\",\"keys\":[...]}",
+   "status": "VERIFIED",
+   "purpose": "Single long-lived connection for launch/migration events (free) and token/account trades (keyed).",
+   "response_shape": "All frames are JSON text. Control frames: {message:string} or {errors:string}. Data frames: objects with txType ('create' | 'migrate' | trade 'buy'/'sell'). No envelope, no channel field, and no timestamp field: stamp receipt time yourself or fetch blockTime by signature. Route messages by txType and pool.",
+   "params_limits": "One connection per client. At most 200 subscribe msgs/s and 5000 addresses per message. Unlimited subscriptions per connection. Hourly ban expiry.",
+   "freshness": "processed commitment; ack arrived ~115 ms after send; first create 1 s after subscribe",
+   "auth": "none for free methods",
+   "sample_file": "tests/fixtures/pump/pumpportal_ws_raw_session_log_2026-09-28.jsonl"
+  },
+  {
+   "name": "PumpPortal subscribeNewToken (pool=pump)",
+   "request": "send {\"method\":\"subscribeNewToken\"}",
+   "status": "VERIFIED",
+   "purpose": "Pulse 'New Pairs' column: every pump.fun create (plus bonk creates on the same stream).",
+   "response_shape": "Ack: {message:'Successfully subscribed to token creation events.'}. Event (pool='pump'): {signature:string (base58 tx sig), mint:string, traderPublicKey:string (tx signer = creator/first buyer), txType:'create', initialBuy:number (UI tokens, 6-dec already applied; 0 when no dev buy), solAmount:number (SOL, NOT lamports; net SOL into curve excl. fees; equals vSolInBondingCurve-30), bondingCurveKey:string (bonding-curve PDA; WRONG in 1/40 events: re-derive), vTokensInBondingCurve:number (UI tokens after create+initial buy; initialBuy+vTokens == 1,073,000,000 exactly), vSolInBondingCurve:number (SOL; 30 + solAmount), marketCapSol:number (= vSol/vTokens*1e9, i.e. assumes 1B supply), name?:string, symbol?:string, uri?:string (metadata JSON URL, ipfs/https; name/symbol/uri ABSENT in 1/39 events), is_mayhem_mode:boolean, pool:'pump'}. There is no image field (fetch uri JSON), no decimals, no quote_mint, no timestamp. In 7/39 creates the mint did not end in 'pump'.",
+   "params_limits": "no params; unsubscribe with {\"method\":\"unsubscribeNewToken\"} -> {message:'Unsubscribed.'}",
+   "freshness": "real-time (~42 pump creates/min observed)",
+   "auth": "none (free)",
+   "sample_file": "tests/fixtures/pump/pumpportal_ws_subscribeNewToken_pump_create_events.json"
+  },
+  {
+   "name": "PumpPortal subscribeNewToken (pool=bonk)",
+   "request": "same subscription as above; events arrive with pool='bonk'",
+   "status": "VERIFIED",
+   "purpose": "LetsBonk/Raydium LaunchLab creates on the same free stream.",
+   "response_shape": "{signature, traderPublicKey, txType:'create', mint, tokensInPool:number, initialBuy:number, solAmount:number, newTokenBalance:number, marketCapSol:number, pool:'bonk'}. It has NO name/symbol/uri/bondingCurveKey/vTokens/vSol. The only bonk event seen today (Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8) was the SpaceX xStock (SPCXx, 8 decimals, created 2026-06-01, per Jupiter), i.e. a pool creation mislabelled as a launch. Validate before listing.",
+   "params_limits": "n/a",
+   "freshness": "real-time; only 1 bonk event vs 39 pump in 65 s",
+   "auth": "none",
+   "sample_file": "tests/fixtures/pump/pumpportal_ws_subscribeNewToken_bonk_create_events.json"
+  },
+  {
+   "name": "PumpPortal subscribeMigration",
+   "request": "send {\"method\":\"subscribeMigration\"}",
+   "status": "VERIFIED",
+   "purpose": "Pulse 'Migrated' column: bonding curve completed and liquidity moved to PumpSwap.",
+   "response_shape": "Ack: {message:\"Subscribed to 'migration' events.\"}. Event: {signature:string, mint:string, txType:'migrate', pool:'pump-amm'}. Those are the ONLY fields: no pool address, reserves or timestamp. Derive the PumpSwap pool: pool_authority=PDA(['pool-authority',mint], pump); pool=PDA(['pool', u16le(0), pool_authority, mint, WSOL], pAMM) (verified 2/2 against Jupiter graduatedPool and GeckoTerminal migrated_destination_pool_address).",
+   "params_limits": "There is NO unsubscribeMigration: sending it returns {errors:\"Invalid message. 'method' must be 'subscribeNewToken', 'subscribeTokenTrade', 'subscribeAccountTrade', or 'subscribeMigration'.\"}",
+   "freshness": "real-time; migrate event arrived ~80 ms after the completing create+buy",
+   "auth": "none (free)",
+   "sample_file": "tests/fixtures/pump/pumpportal_ws_subscribeMigration_events.json"
+  },
+  {
+   "name": "PumpPortal subscribeTokenTrade",
+   "request": "wss://pumpportal.fun/api/data?api-key=KEY then send {\"method\":\"subscribeTokenTrade\",\"keys\":[\"<mint>\",...]}; unsubscribe {\"method\":\"unsubscribeTokenTrade\",\"keys\":[...]}",
+   "status": "DOCUMENTED",
+   "purpose": "Per-token live trade feed (bonding curve AND PumpSwap/pump-amm trades per docs).",
+   "response_shape": "Keyless (VERIFIED today, for fresh bonding mints AND an active PumpSwap mint): the only reply was {message:\"'subscribeTokenTrade' and 'subscribeAccountTrade' methods are only available when connecting with an API key funded with at least 0.02 SOL.\"}, and no trades. Keyed trade event (UNCERTAIN, from community samples): {signature, mint, traderPublicKey, txType:'buy'|'sell', tokenAmount:number (UI), solAmount:number (SOL), newTokenBalance:number (trader's UI balance after), bondingCurveKey, vTokensInBondingCurve, vSolInBondingCurve, marketCapSol, pool:'pump'|'pump-amm'|'bonk'}. PumpSwap-trade field set not verified.",
+   "params_limits": "keys = mint addresses, max 5000 per message; billed 0.01 SOL / 10,000 messages",
+   "freshness": "processed commitment",
+   "auth": "api-key query param + funded linked wallet (>=0.02 SOL)"
+  },
+  {
+   "name": "PumpPortal subscribeAccountTrade",
+   "request": "wss://pumpportal.fun/api/data?api-key=KEY then {\"method\":\"subscribeAccountTrade\",\"keys\":[\"<wallet>\",...]}; unsubscribeAccountTrade",
+   "status": "DOCUMENTED",
+   "purpose": "Wallet tracker live trades.",
+   "response_shape": "Keyless: same rejection message as subscribeTokenTrade (VERIFIED). Keyed: trade events with the same shape as token trades (UNCERTAIN).",
+   "params_limits": "<=5000 wallets per message; metered 0.01 SOL/10k msgs",
+   "freshness": "processed",
+   "auth": "api-key + funded wallet"
+  },
+  {
+   "name": "Solana RPC getAccountInfo: pump BondingCurve",
+   "request": "POST https://api.mainnet-beta.solana.com {\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getAccountInfo\",\"params\":[\"<PDA(['bonding-curve',mint], 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P)>\",{\"encoding\":\"base64\",\"commitment\":\"confirmed\"}]} (or getMultipleAccounts with up to 100 keys). Server-side only (403 with browser Origin).",
+   "status": "VERIFIED",
+   "purpose": "Authoritative price, market cap, bonding progress, complete flag, creator, quote mint and mayhem flag for bonding-curve tokens (Final Stretch column, token page header).",
+   "response_shape": "result.value.{data:[base64,'base64'], owner:'6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', lamports, space:125|151}. Decoded little-endian layout: [0..8] discriminator 23,183,248,55,96,216,172,96; [8] virtual_token_reserves u64 (raw, 6 dec); [16] virtual_quote_reserves u64 (lamports for SOL coins; quote-mint base units otherwise; formerly virtual_sol_reserves); [24] real_token_reserves u64; [32] real_quote_reserves u64 (formerly real_sol_reserves); [40] token_total_supply u64 (=1e15 even for mayhem coins whose mint supply is 2e15); [48] complete bool; [49] creator pubkey; [81] is_mayhem_mode bool; [82] is_cashback_coin bool; [83] quote_mint pubkey ('11111111111111111111111111111111' = default = SOL; one live coin had pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn = PUMP token, 6 dec); [115] creator_fee_bps u64 (300 on the PUMP-paired coin, else 0); [123] can_edit_creator_fee bool; [124] is_holder_reward bool. Older accounts can be shorter: read missing trailing fields as defaults. Derived: price_quote_per_token = (vQ/10^quoteDecimals)/(vT/1e6); marketCap = vQ*supply/vT (pump SDK bondingCurveMarketCap); progress% = (793,100,000e6 - real_token_reserves)/793,100,000e6*100, which equals 100 when complete (clamp 0..100: mayhem coins went to -1.2%). Invariant verified on SOL, PUMP and mayhem coins: vT - rT = 279,900,000e6. After migration all four reserves are 0 and complete=true. Cross-check: PDA equalled the stream bondingCurveKey 4/5; the stream's at-create vTokens/vSol/marketCapSol follow the same formula exactly.",
+   "params_limits": "getMultipleAccounts <=100 pubkeys; public tier method-limit 50",
+   "freshness": "confirmed commitment; poll or accountSubscribe (keyed RPC WS) for live",
+   "auth": "none (public RPC, server-side)",
+   "sample_file": "tests/fixtures/pump/pump_bonding_curve_decoded_rpc_2026-09-28.json"
+  },
+  {
+   "name": "Solana RPC getAccountInfo: pump Global config",
+   "request": "POST getAccountInfo [\"4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf\",{\"encoding\":\"base64\"}] (PDA ['global'])",
+   "status": "VERIFIED",
+   "purpose": "Initial curve parameters for progress math.",
+   "response_shape": "Decoded (1087 bytes, disc 167,232,232,177,200,108,114,127): initial_virtual_token_reserves=1073000000000000, initial_virtual_sol_reserves=30000000000 (30 SOL), initial_real_token_reserves=793100000000000, token_total_supply=1000000000000000, fee_basis_points=95, creator_fee_basis_points=5 (legacy; the pump_fees FeeConfig tiers override it: docs say 0.95% protocol + 0.30% creator = 1.25% on the curve), enable_migrate=true, pool_migration_fee=15000001 lamports, create_v2_enabled=true, mayhem_mode_enabled=true, is_cashback_enabled=true (deprecated for new coins), buyback_basis_points=5000, initial_virtual_quote_reserves=4292000000 (non-SOL quotes, e.g. USDC 6 dec = 4,292 USDC). Field order is in idl/pump.json types.Global.",
+   "params_limits": "single account",
+   "freshness": "changes only via admin set_params",
+   "auth": "none",
+   "sample_file": "tests/fixtures/pump/pump_bonding_curve_decoded_rpc_2026-09-28.json"
+  },
+  {
+   "name": "Solana RPC: PumpSwap canonical pool + vaults",
+   "request": "Derive pool_authority=PDA(['pool-authority',mint],6EF8...), pool=PDA(['pool',u16le(0),pool_authority,mint,So111...112],pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA); getAccountInfo(pool, base64); then getMultipleAccounts([pool_base_token_account,pool_quote_token_account],{encoding:'jsonParsed'})",
+   "status": "VERIFIED",
+   "purpose": "Price and liquidity for Migrated tokens without a third-party API; canonical-pool detection.",
+   "response_shape": "Pool (301 bytes): [8] pool_bump u8; [9] index u16 (0 = canonical); [11] creator pubkey (== pool_authority for canonical pump pools); [43] base_mint; [75] quote_mint; [107] lp_mint; [139] pool_base_token_account; [171] pool_quote_token_account; [203] lp_supply u64; [211] coin_creator; [243] is_mayhem_mode; [244] is_cashback_coin; [245] virtual_quote_reserves i128 (NON-ZERO today: 17584505288 lamports on 8HbgiXui... despite README saying 0); [261] creator_fee_bps u64; [269] can_edit_creator_fee; [270] is_holder_reward. Vaults: value[i].data.parsed.info.tokenAmount.{amount,decimals,uiAmount,uiAmountString}; the base vault is Token-2022 for new coins. price = (quote_vault + virtual_quote_reserves)/10^9 / (base_vault/1e6). Verified: 1.788e-8 SOL vs DexScreener priceNative 1.765e-8. Raw vault only (0.202 SOL) would be 88x too low.",
+   "params_limits": "2-3 RPC calls per pool",
+   "freshness": "confirmed",
+   "auth": "none (server-side)",
+   "sample_file": "tests/fixtures/pump/pumpswap_canonical_pool_decoded_rpc_2026-09-28.json"
+  },
+  {
+   "name": "Solana RPC getTokenSupply (mayhem check)",
+   "request": "POST {\"method\":\"getTokenSupply\",\"params\":[\"<mint>\"]}",
+   "status": "VERIFIED",
+   "purpose": "Real circulating/total supply for market cap; mayhem coins have 2B.",
+   "response_shape": "result.value.{amount:'2000000000000000', decimals:6, uiAmount:2000000000, uiAmountString} for the mayhem coin GJNV...; 1e15 for a regular coin. Mayhem mint = Token-2022 with metadataPointer+tokenMetadata extensions, mintAuthority null.",
+   "params_limits": "1 mint per call",
+   "freshness": "confirmed",
+   "auth": "none",
+   "sample_file": "tests/fixtures/pump/solana_public_rpc_supply_and_origin_403_samples.json"
+  },
+  {
+   "name": "pump-public-docs IDLs",
+   "request": "GET https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/idl/pump.json | idl/pump_amm.json | idl/pump_fees.json",
+   "status": "VERIFIED",
+   "purpose": "Authoritative account and event layouts (Anchor IDL).",
+   "response_shape": "idl.address; idl.accounts[{name,discriminator}]; idl.types[name=BondingCurve|Global|Pool|GlobalConfig|TradeEvent|CreateEvent|CompleteEvent|CompletePumpAmmMigrationEvent|BuyEvent|SellEvent|CreatePoolEvent].type.fields[{name,type}]. TradeEvent: mint, sol_amount u64 (lamports), token_amount u64 (raw), is_buy, user, timestamp i64 (unix SECONDS), virtual_sol_reserves, virtual_token_reserves, real_sol_reserves, real_token_reserves, fee_recipient, fee_basis_points, fee, creator, creator_fee_basis_points, creator_fee, …, ix_name, mayhem_mode, …, quote_mint, quote_amount, virtual_quote_reserves, real_quote_reserves, holder_rewards_bps, holder_rewards. CreateEvent: name, symbol, uri, mint, bonding_curve, user, creator, timestamp, virtual_token_reserves, virtual_sol_reserves, real_token_reserves, token_total_supply, token_program, is_mayhem_mode, is_cashback_enabled, quote_mint, virtual_quote_reserves, creator_fee_bps, is_holder_reward. CompletePumpAmmMigrationEvent: user, mint, mint_amount, sol_amount, pool_migration_fee, bonding_curve, timestamp, pool, quote_mint.",
+   "params_limits": "repo last commit 2026-09-14",
+   "freshness": "static",
+   "auth": "none"
+  },
+  {
+   "name": "pump.fun frontend-api-v3 (internal)",
+   "request": "GET https://frontend-api-v3.pump.fun/coins/{mint} ; GET https://frontend-api-v3.pump.fun/coins?offset=0&limit=2&sort=created_timestamp&order=DESC&includeNsfw=false",
+   "status": "BROKEN",
+   "purpose": "Unofficial pump.fun web-app backend. NOT a public API.",
+   "response_shape": "With Origin https://www.orbytai.org: 403 {statusCode:403,timestamp,path,message:'Not allowed by CORS',error:'Forbidden'}. Without Origin: /coins/{mint} gives 404 {statusCode:404,message:'Cannot GET /coins/<mint>',error:'Not Found'} (route changed; headers access-control-allow-credentials:true, access-control-expose-headers:X-Degraded). frontend-api.pump.fun and advanced-api-v2.pump.fun: HTTP 530 'error code: 1016' (dead).",
+   "params_limits": "undocumented; changes without notice",
+   "freshness": "n/a",
+   "auth": "none; ToS §6.1/§21(h) prohibit bots/scrapers",
+   "sample_file": "tests/fixtures/pump/pumpfun_frontend_api_probe_2026-09-28.json"
+  },
+  {
+   "name": "GeckoTerminal token info launchpad_details",
+   "request": "GET https://api.geckoterminal.com/api/v2/networks/solana/tokens/{mint}/info",
+   "status": "VERIFIED",
+   "purpose": "Bonding progress, graduation time and destination pool for launchpad tokens (cross-check or fallback).",
+   "response_shape": "data.attributes.launchpad_details.{graduation_percentage:number (0-100), completed:boolean, completed_at:ISO string|null, migrated_destination_pool_address:string|null}. Graduated 4ov9...: {100, true, '2026-09-28T20:47:01.000Z', '8HbgiXuiNbHRcxiNG8UBD8GLewoy6QVDnPFPgjFGmszf'}. Bonding dB98...: graduation_percentage 0.0 while on-chain was 0.56%, so it is coarse or lagging. Also data.attributes.{address,name,symbol,decimals,image_url,image.{thumb,small,large},websites[],twitter_handle,telegram_handle,description,gt_score,gt_score_details,holders.{count,distribution_percentage,last_updated},mint_authority,freeze_authority,is_honeypot,developer_address,developer_holding_percentage}.",
+   "params_limits": "1 token per call; frequent 429 on free tier",
+   "freshness": "Cache-Control max-age=30, s-maxage=60",
+   "auth": "none",
+   "sample_file": "tests/fixtures/pump/geckoterminal_token_info_launchpad_details_graduated_2026-09-28.json"
+  },
+  {
+   "name": "GeckoTerminal launchpad dex ids + pump-fun pools",
+   "request": "GET https://api.geckoterminal.com/api/v2/networks/solana/dexes ; GET https://api.geckoterminal.com/api/v2/networks/solana/dexes/pump-fun/pools?page=1",
+   "status": "VERIFIED",
+   "purpose": "Discover bonding-curve pools per launchpad; dex ids to filter.",
+   "response_shape": "dexes: data[].{id,type:'dex',attributes.name}. Single page of 35 ids; launchpad-type ids: pump-fun, pumpswap, raydium-launchlab, letsbonk-fun, meteora-dbc, bags-fm, moonshot, moonit, boop-fun, heaven, daos-fun, virtuals-solana, token-mill, wavebreak, zora, clanker-solana, printr-v2, stonkfun, easya-kickstart, metadao. Pools: data[] (20/page) .id 'solana_<bondingCurvePDA>', attributes.{address,name,pool_created_at,base_token_price_usd,base_token_price_native_currency,fdv_usd,market_cap_usd(null),price_change_percentage,transactions,volume_usd,reserve_in_usd}, relationships.{base_token,quote_token,dex}. No progress field on pools.",
+   "params_limits": "20 pools/page",
+   "freshness": "30-60 s cache",
+   "auth": "none",
+   "sample_file": "tests/fixtures/pump/geckoterminal_dex_pump-fun_bonding_pools_trimmed_2026-09-28.json"
+  },
+  {
+   "name": "DexScreener tokens/v1 for launch tokens",
+   "request": "GET https://api.dexscreener.com/tokens/v1/solana/{mint1,mint2,...}",
+   "status": "VERIFIED",
+   "purpose": "Price, volume and txns for bonding-curve and PumpSwap pairs.",
+   "response_shape": "[] of pairs: {chainId,dexId:'pumpfun' (bonding curve) | 'pumpswap',url,pairAddress (= bonding-curve PDA for pumpfun),baseToken{address,name,symbol},quoteToken{address,name,symbol} (PUMP for PUMP-paired coins),priceNative:string,priceUsd:string,txns.{m5,h1,h6,h24}.{buys,sells},volume.{h24,h6,h1,m5},priceChange.{m5,h1,h6,h24},liquidity? (ABSENT on pumpfun pairs; {usd,base,quote} on pumpswap, where quote = RAW vault, excluding virtual reserves),fdv,marketCap,pairCreatedAt (ms)}. No progress or complete fields.",
+   "params_limits": "up to 30 mints per call",
+   "freshness": "Cache-Control public, max-age=30",
+   "auth": "none",
+   "sample_file": "tests/fixtures/pump/dexscreener_tokens_v1_pump_bonding_vs_pumpswap_2026-09-28.json"
+  },
+  {
+   "name": "Jupiter tokens/v2 search + recent (launchpad fields)",
+   "request": "GET https://lite-api.jup.ag/tokens/v2/search?query=<mint1,mint2,...> ; GET https://lite-api.jup.ag/tokens/v2/recent",
+   "status": "VERIFIED",
+   "purpose": "Launchpad attribution, graduation pool and time, new-token list across launchpads.",
+   "response_shape": "[] of {id,name,symbol,icon,decimals,dev,circSupply,totalSupply,tokenProgram,launchpad ('pump.fun'|'met-dbc'|'stonkfun'…),metaLaunchpad? ('met-dbc'|'raydium-launchlab'),partnerConfig? (DBC/LaunchLab config pubkey identifying the platform),graduatedPool? (e.g. '8HbgiXui…' = derived PumpSwap pool),graduatedAt? (ISO),holderCount,fdv,mcap,usdPrice,priceBlockId,liquidity,stats5m|1h|6h|24h.{priceChange,holderChange,liquidityChange,volumeChange,buyVolume,sellVolume,numBuys,numSells,numTraders,numNetBuyers},firstPool.{id,createdAt},audit.{mintAuthorityDisabled,freezeAuthorityDisabled,topHoldersPercentage,devBalancePercentage,devMints,devMigrations},organicScore,organicScoreLabel,tags[],createdAt,updatedAt}. No bondingCurve (progress) field appeared on any of 34 tokens. recent: 30 items, 25 pump.fun, 2 met-dbc, 1 stonkfun/raydium-launchlab.",
+   "params_limits": "search up to 100 mints per docs; recent returns 30",
+   "freshness": "max-age=10 (search), 5 (recent)",
+   "auth": "none on lite-api today; official docs now describe api.jup.ag with x-api-key",
+   "sample_file": "tests/fixtures/pump/jupiter_lite_tokens_v2_recent_launchpad_mix_trimmed_2026-09-28.json"
+  },
+  {
+   "name": "Moralis pump.fun new / bonding / graduated / bonding-status",
+   "request": "GET https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new|bonding|graduated?limit=&cursor= ; GET https://solana-gateway.moralis.io/token/mainnet/{mint}/bonding-status  (header X-API-Key)",
+   "status": "BROKEN",
+   "purpose": "(Was) hosted Pulse-style lists and bonding progress.",
+   "response_shape": "REMOVED 2026-07-31 (Moralis product update 'Token Holders and Solana Token Discovery Endpoints Removed'). Keyless requests today return 404 {message:'Resource not found. Please check out the API documentation: https://docs.moralis.com/'}, while live routes return 401 'Missing api key.'. Historical fields (tokenAddress, name, symbol, logo, decimals, priceNative, priceUsd, liquidity, fullyDilutedValuation, createdAt, bondingCurveProgress, graduatedAt; bonding-status: bondingProgress, graduatedAt) are no longer relevant. Replacement is the paid Data Feeds template 'Token Bonding Status (Solana Launchpads)', which syncs tables fact_launchpad_events (token_address, exchange_address, launchpad_platform, event_type created|traded|migrated, progress_percentage, pool_address, token_name, token_symbol, token_uri, trade_direction, token_amount, native_amount, block_number, log_index, event_ts, tx_hash) and fact_token_bonding_status (token_address, progress_percentage, event_type) into your own ClickHouse/Postgres/MySQL.",
+   "params_limits": "n/a (removed); Data Feeds ~8.7 GB/month Solana P50",
+   "freshness": "n/a",
+   "auth": "X-API-Key (Data API); Data Feeds key cm_live_… scope continuum:read",
+   "sample_file": "tests/fixtures/pump/moralis_solana_gateway_keyless_probe_2026-09-28.json"
+  },
+  {
+   "name": "Moralis token swaps",
+   "request": "GET https://solana-gateway.moralis.io/token/mainnet/{tokenAddress}/swaps?limit=100&cursor=&order=DESC&fromDate=&toDate=&transactionTypes=buy,sell  (header X-API-Key)",
+   "status": "DOCUMENTED",
+   "purpose": "Historical trades for a token (trade table backfill), incl. pump.fun/PumpSwap.",
+   "response_shape": "Route alive (keyless gives 401 {message:'Missing api key.'}). Docs: {page, pageSize, cursor, result[]:{transactionHash, transactionIndex, transactionType:'buy'|'sell', blockNumber, blockTimestamp (ISO), subCategory, walletAddress, pairAddress, pairLabel, exchangeAddress, exchangeName, exchangeLogo, baseToken, quoteToken, bought{address,name,symbol,logo,amount (decimal string),usdPrice,usdAmount,tokenType}, sold{…same}, baseQuotePrice (string), totalValueUsd}}.",
+   "params_limits": "limit 1-100 (default 100); fromDate/toDate in seconds or date string; 50 CU per call",
+   "freshness": "indexed (not streaming)",
+   "auth": "X-API-Key header"
+  }
+ ],
+ "streaming": [
+  {
+   "name": "PumpPortal data WebSocket (free: new tokens + migrations)",
+   "url": "wss://pumpportal.fun/api/data",
+   "status": "VERIFIED 2026-09-28 (77 s session, Node 24 global WebSocket with Origin https://www.orbytai.org; curl handshake 101)",
+   "auth": "none",
+   "subscribe_message": "{\"method\":\"subscribeNewToken\"} and {\"method\":\"subscribeMigration\"}; unsubscribe {\"method\":\"unsubscribeNewToken\"} (no unsubscribeMigration exists)",
+   "event_shape": "create (pool pump): {signature,mint,traderPublicKey,txType:'create',initialBuy,solAmount,bondingCurveKey,vTokensInBondingCurve,vSolInBondingCurve,marketCapSol,name?,symbol?,uri?,is_mayhem_mode,pool:'pump'}; create (pool bonk): {signature,traderPublicKey,txType:'create',mint,tokensInPool,initialBuy,solAmount,newTokenBalance,marketCapSol,pool:'bonk'}; migrate: {signature,mint,txType:'migrate',pool:'pump-amm'}; acks {message:'Successfully subscribed to token creation events.'} / {message:\"Subscribed to 'migration' events.\"} / {message:'Unsubscribed.'}; errors {errors:'Invalid message. …'}",
+   "notes": "All amounts are floats already decimal-adjusted (tokens 6 dec, SOL not lamports). No timestamp field. One connection per browser tab; add reconnect with backoff. Suitable for browser-side use on Vercel (no key needed). About 42 pump creates/min, so throttle UI rendering."
+  },
+  {
+   "name": "PumpPortal data WebSocket (paid: trades)",
+   "url": "wss://pumpportal.fun/api/data?api-key=<KEY>",
+   "status": "DOCUMENTED (keyless rejection VERIFIED)",
+   "auth": "api-key query param + linked wallet >=0.02 SOL; 0.01 SOL per 10,000 messages",
+   "subscribe_message": "{\"method\":\"subscribeTokenTrade\",\"keys\":[mints]} / {\"method\":\"subscribeAccountTrade\",\"keys\":[wallets]}; unsubscribeTokenTrade / unsubscribeAccountTrade with keys",
+   "event_shape": "UNCERTAIN: {signature,mint,traderPublicKey,txType:'buy'|'sell',tokenAmount,solAmount,newTokenBalance,bondingCurveKey,vTokensInBondingCurve,vSolInBondingCurve,marketCapSol,pool}",
+   "notes": "The key is secret and tied to a funded wallet, so it cannot ship to the browser. It needs a persistent server process (not Vercel serverless) that fans out to clients, or use RPC logsSubscribe on a keyed provider instead."
+  },
+  {
+   "name": "Solana public RPC WebSocket (accountSubscribe on bonding curve)",
+   "url": "wss://api.mainnet-beta.solana.com",
+   "status": "BROKEN for browsers (upgrade with Origin https://www.orbytai.org returned HTTP 403)",
+   "auth": "none",
+   "subscribe_message": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"accountSubscribe\",\"params\":[\"<bondingCurvePDA>\",{\"encoding\":\"base64\",\"commitment\":\"confirmed\"}]}",
+   "event_shape": "accountNotification params.result.value.data[0] (base64 BondingCurve, decode as above)",
+   "notes": "Server-side pubsub limit header x-ratelimit-pubsub-limit: 10. For live curve updates in the browser use a keyed RPC that allows your origin."
+  }
+ ],
+ "orbyt_fit": [
+  "Pulse > New Pairs: PumpPortal subscribeNewToken (free, browser-side WS). Use mint, name, symbol, uri (fetch the JSON for the image), traderPublicKey as dev, initialBuy/solAmount as dev buy, and marketCapSol times the SOL/USD price from another source for MC. Stamp receipt time, since there is no timestamp. Re-derive the bonding-curve PDA instead of trusting bondingCurveKey. Treat pool='bonk' events as unverified (today's was an existing xStock).",
+  "Pulse > Final Stretch: there is no free push feed of progress. Batch-poll bonding-curve accounts with server-side getMultipleAccounts (up to 100 PDAs per call) for recently created mints and compute progress = (793.1M - real_token_reserves)/793.1M. Rank by progress, clamped 0-100, showing complete=true as 100. GeckoTerminal launchpad_details.graduation_percentage works as a coarse fallback (it was 0.0 vs 0.56% on-chain).",
+  "Pulse > Migrated: PumpPortal subscribeMigration (free). Derive the canonical PumpSwap pool deterministically (verified to match Jupiter graduatedPool and GeckoTerminal migrated_destination_pool_address). Enrich with Jupiter tokens/v2/search (graduatedAt, graduatedPool) or GeckoTerminal launchpad_details.completed_at.",
+  "Token metadata: PumpPortal create name/symbol/uri. For Token-2022 pump mints, getAccountInfo jsonParsed exposes the tokenMetadata extension. Jupiter search provides icon, dev, audit and tags.",
+  "Price/market cap (bonding): the on-chain BondingCurve (vQ/vT). Divide the quote amount by the quote mint's decimals (SOL 9, PUMP/USDC 6). Use getTokenSupply for supply because mayhem coins have 2B. DexScreener pumpfun pairs give priceNative/priceUsd with 30 s cache.",
+  "Price/liquidity (graduated): PumpSwap pool vaults plus Pool.virtual_quote_reserves (effective reserves). DexScreener pumpswap pair priceNative matches effective reserves, but its liquidity.quote is the raw vault.",
+  "Trades feed / chart candles: NOT available for free from PumpPortal (keyed, metered). Options: a PumpPortal key on a persistent server, a keyed RPC logsSubscribe for the program plus TradeEvent decoding (IDL provided; timestamps i64 seconds, amounts raw), or GeckoTerminal/DexScreener/Moralis swaps for history (Moralis token swaps 50 CU, keyed). Build candles from trades yourself or use GeckoTerminal OHLCV (other agent).",
+  "Wallet activity / tracker: PumpPortal subscribeAccountTrade (keyed, metered) or RPC; Moralis token swaps is by token, not wallet (wallet swaps is a separate Moralis endpoint).",
+  "Risk flags: is_mayhem_mode (agent trades for 24 h, 2B supply, virtual reserves changed by the agent), quote_mint != default (custom pair; creator_fee_bps up to 300), is_holder_reward, Jupiter audit fields, dev share (the live 4ov9 dev bought the whole curve for 85 SOL, graduated, then price fell 99.7% within ~10 min).",
+  "Discover table launchpad badge: Jupiter launchpad/metaLaunchpad/partnerConfig, GeckoTerminal dex id (pump-fun, raydium-launchlab, letsbonk-fun, meteora-dbc, bags-fm, moonshot, boop-fun, heaven…), DexScreener dexId (pumpfun/pumpswap verified).",
+  "Holders/PnL: nothing pump-specific here. The Moralis Solana holders endpoints were also removed on 2026-07-31."
+ ],
+ "gotchas": [
+  "subscribeTokenTrade and subscribeAccountTrade are NOT free in 2026. Without a key the server replies only with: 'subscribeTokenTrade' and 'subscribeAccountTrade' methods are only available when connecting with an API key funded with at least 0.02 SOL. This applies to both bonding-curve and PumpSwap (pump-amm) mints.",
+  "There is no 'unsubscribeMigration' method; sending it returns an {errors:…} frame. Only unsubscribeNewToken, unsubscribeTokenTrade and unsubscribeAccountTrade exist.",
+  "PumpPortal frames have no timestamp, no decimals, no quote mint and no image. Amounts are JS floats already scaled (tokens / 1e6, SOL / 1e9). marketCapSol assumes a 1B supply, so it is wrong by 2x for mayhem coins (2B mint supply) and meaningless for non-SOL-quote coins.",
+  "PumpPortal bondingCurveKey was wrong in 1 of 40 creates: a mayhem coin reported BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s (the mayhem/whitelist PDA, a System-owned account holding 56k SOL). Always derive PDA(['bonding-curve', mint], 6EF8…).",
+  "Custom quote pairs are live. EVQSX4EQ…V7Qzpump has quote_mint = pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn (PUMP token, 6 decimals) and creator_fee_bps 300. Its virtual_quote_reserves 841456831993 means 841,456.83 PUMP, not 841 SOL. PumpPortal still labels its values as vSolInBondingCurve/marketCapSol in SOL units. DexScreener shows quoteToken PUMP. Always read BondingCurve.quote_mint (default pubkey '11111111111111111111111111111111' = SOL).",
+  "BondingCurve fields were renamed: virtual_sol_reserves became virtual_quote_reserves and real_sol_reserves became real_quote_reserves (same offsets). Accounts come in different lengths (125 and 151 bytes observed; older ones shorter), so decode trailing fields only if bytes exist.",
+  "Mayhem coins: the mint supply is 2,000,000,000 (getTokenSupply) while BondingCurve.token_total_supply still says 1e15. The mayhem agent calls set_mayhem_virtual_params, so virtual_quote_reserves can drop far below 30 SOL (1.64 to 7.09 SOL observed) and real_token_reserves can exceed 793.1M, making progress negative (clamp to 0). SOL-based progress (real_sol/85) is invalid for these coins. The unsold agent tokens are burned after 24 h.",
+  "Token-side identity that held for every coin tested (SOL, PUMP-paired, mayhem): virtual_token_reserves - real_token_reserves = 279,900,000e6. From stream data, progress% = (1 - (vTokensInBondingCurve - 279,900,000)/793,100,000) * 100.",
+  "Completion: 'complete' is set at the end of the buy that makes real_token_reserves == 0 (85.005359 SOL net into a standard SOL curve, vSol 115.005, market cap ~410.88 SOL). migrate is permissionless and idempotent, and ran ~80 ms later in the live sample. Afterwards all BondingCurve reserves read 0.",
+  "PumpSwap Pool.virtual_quote_reserves is NOT zero despite the README saying so: 17.58 SOL on pool 8HbgiXui… with only 0.202 SOL in the real quote vault. Price with the raw vault would be 88x too low. Use effective_quote_reserves = vault + virtual_quote_reserves. It is an i128 at offset 245.",
+  "The canonical PumpSwap pool has index 0 and pool.creator == PDA(['pool-authority', mint], pump program). Fee tiers only apply to canonical pools. Non-canonical pools are plain 0.30%.",
+  "Fees (pump.fun docs 2026): bonding curve 1.25% total (0.95% protocol + 0.30% creator) for SOL and USDC; PumpSwap canonical tiers from 1.25% (0-420 SOL mcap) down to 0.30% (98,240+ SOL); migration fee 0.015 SOL. Global.fee_basis_points on-chain = 95; the legacy creator_fee_basis_points = 5 is superseded by the pump_fees FeeConfig (program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ).",
+  "Newer pump mints (create_v2) are Token-2022 (TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb) with on-mint metadata. Associated token accounts must use the matching token program. 7 of 39 new pump mints did not end in 'pump', so do not filter by suffix.",
+  "The Solana public RPC rejects any request carrying a browser Origin header with HTTP 403 (both HTTP and WS). Call it only from Vercel functions and cache aggressively; its per-method limit is 50 for getAccountInfo.",
+  "pump.fun frontend-api-v3 is CORS-locked (403 'Not allowed by CORS'), its routes change (the old /coins/{mint} now returns 404), older hosts are dead (Cloudflare 1016), and pump.fun ToS section 21(h) bans bots and scrapers. There is no official hosted API; use on-chain data plus aggregators.",
+  "Moralis pump.fun endpoints (/token/{network}/exchange/{exchange}/new|bonding|graduated and /token/{network}/{address}/bonding-status) were removed on 2026-07-31 and return 404 today. Old tutorials and SDK examples still reference them.",
+  "GeckoTerminal launchpad_details.graduation_percentage is coarse or lagging (0.0 vs 0.56% on-chain). The GT free tier returned 429 repeatedly, so do not build a Pulse column on polling GT.",
+  "DexScreener pumpfun (bonding) pairs have no liquidity object and no progress. pairAddress is the bonding-curve PDA; pairCreatedAt is in ms.",
+  "Jupiter tokens/v2 exposes launchpad/metaLaunchpad/partnerConfig/graduatedPool/graduatedAt but NO bondingCurve progress field today. Its official docs now point to api.jup.ag with x-api-key; lite-api still answered keyless today.",
+  "Rugs happen fast: the migrated sample (4ov9…) went from $645k market cap to $2.1k (-99.69% in 5 min) because its dev held 79% after buying the whole curve. Show dev holdings and risk flags prominently."
+ ],
+ "terms_and_risks": "PumpPortal is a third party ('NOT AFFILIATED… WITH PUMP.FUN OR RAYDIUM'). Its ToS grant a 'single, personal, limited license' and state 'you may not copy, modify, adapt, rent, license, sell, publish, distribute, or otherwise permit any third party to access or use the Interface or any of its contents' unless expressly authorized. Relaying PumpPortal data to ORBYT users from our own server is therefore a redistribution risk. Having each user's browser connect directly is lower risk but still worth written permission for a commercial product. PumpPortal also has binding arbitration and no uptime or accuracy warranty, and today its data showed errors: a wrong bondingCurveKey, a mislabelled bonk create, and SOL units on a PUMP-quoted coin. pump.fun's own ToS (section 6.1 and section 21(h)) ban bots, crawlers and scripts on the Pump Platform except where expressly permitted, and section 21(k) bans reverse engineering. Its frontend-api hosts are internal, CORS-locked and unstable, so do not use them. On-chain data (programs 6EF8…/pAMM…, public IDL on GitHub) is the safe primary source. The public Solana RPC is rate-limited, blocks browsers, and is not meant for production. Budget a keyed RPC (Helius/Triton/QuickNode) server-side. Moralis removed its launchpad endpoints; relying on vendor launchpad endpoints carries deprecation risk. pump.fun can change fees and parameters at any time ('may change these fees at any time, without notice') and keeps adding fields (quote mints, mayhem, holder rewards), so decoders must tolerate appended fields. Memecoin data is extremely volatile and manipulable (e.g. dev full-curve buys then dumps); display it as-is and never fabricate values."
+}
