@@ -149,10 +149,21 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
             </div>
             <p className="text-2xs text-muted">{walletAddress}</p>
 
+            {depositPhase === 'idle' && (
+              <button
+                type="button"
+                onClick={handleDepositClick}
+                disabled={isPending || solBalance.sol <= 0}
+                className="w-full rounded-md bg-brand px-3 py-2 text-xs font-semibold text-bg transition-colors hover:bg-brand-strong disabled:bg-line-strong disabled:text-muted"
+              >
+                {solBalance.sol > 0 ? 'Deposit Balance' : 'No Balance to Deposit'}
+              </button>
+            )}
+
             {depositPhase === 'signing' && (
               <div className="flex items-center justify-center gap-2 rounded-md bg-line-strong py-2">
                 <Loader className="size-3.5 animate-spin text-brand" />
-                <span className="text-xs font-medium text-fg">Check Phantom to sign deposit...</span>
+                <span className="text-xs font-medium text-fg">Check Phantom to sign...</span>
               </div>
             )}
 
@@ -160,7 +171,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
               <div className="rounded-md bg-up/10 p-2">
                 <p className="text-xs text-up font-medium flex items-center gap-2">
                   <Check className="size-3.5" />
-                  Transaction submitted! Balance transferred.
+                  Balance transferred to deposit address!
                 </p>
               </div>
             )}
