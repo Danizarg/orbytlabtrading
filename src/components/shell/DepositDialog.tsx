@@ -1,8 +1,7 @@
 'use client';
 
-import qrcode from 'qrcode-generator';
 import { ArrowDownToLine, Check, Copy, ExternalLink, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SITE } from '@/config/site';
 import { explorer } from '@/lib/core/solana';
 
@@ -27,34 +26,12 @@ export function DepositButton() {
   );
 }
 
-/** QR code for the address as a crisp SVG (no network, no third-party image). */
-function AddressQr({ value, size = 168 }: { value: string; size?: number }) {
-  const path = useMemo(() => {
-    const qr = qrcode(0, 'M');
-    qr.addData(`solana:${value}`);
-    qr.make();
-    const count = qr.getModuleCount();
-    let d = '';
-    for (let r = 0; r < count; r++) {
-      for (let c = 0; c < count; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
-    }
-    return { d, count };
-  }, [value]);
-  const quiet = 2;
-  return (
-    <svg
-      viewBox={`${-quiet} ${-quiet} ${path.count + quiet * 2} ${path.count + quiet * 2}`}
-      width={size}
-      height={size}
-      role="img"
-      aria-label="QR code of the deposit address"
-      shapeRendering="crispEdges"
-      className="rounded-md bg-white"
-    >
-      <path d={path.d} fill="#0b0c10" />
-    </svg>
-  );
-}
+/**
+ * Official QR code of the central deposit address (public/deposit-qr.png,
+ * supplied by the owner). src/config/deposit-qr.test.ts decodes it and fails
+ * if it ever stops matching SITE.depositAddress.
+ */
+export const DEPOSIT_QR_SRC = '/deposit-qr.png';
 
 function DepositDialog({ onClose }: { onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -110,7 +87,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex justify-center rounded-md border border-line bg-panel-2 py-4">
-          <AddressQr value={address} />
+          <img src={DEPOSIT_QR_SRC} alt={`QR code for deposit address ${address}`} width={184} height={172} className="h-auto w-[184px] rounded-md" />
         </div>
 
         <div>
