@@ -1,13 +1,28 @@
 'use client';
 
-import { ArrowDownToLine, Check, Copy, ExternalLink, X } from 'lucide-react';
+import { ArrowDownToLine, Check, Copy, ExternalLink, X, Loader } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { SITE } from '@/config/site';
 import { explorer } from '@/lib/core/solana';
+import { useWalletAddress, useWallet } from '@/lib/wallet/store';
+import { useWalletBalances } from '@/data/hooks/useWalletBalances';
+import { MINTS } from '@/lib/core/solana';
+import { buildSolTransferTransaction } from '@/lib/deposit/build-transaction';
+
+/**
+ * Build and prepare a transfer transaction for signing.
+ */
+async function buildAndSignDepositTransaction(from: string, to: string, amountSol: number): Promise<Uint8Array> {
+  const txBytes = await buildSolTransferTransaction(from, to, amountSol);
+  return txBytes;
+}
 
 /**
  * Deposit panel showing ORBYT's central deposit address, the same fixed public
  * Solana address for every visitor. It cannot be edited in the UI.
+ *
+ * When a wallet is connected, shows the wallet's SOL balance and allows the user
+ * to deposit it by signing a transaction.
  */
 export function DepositButton() {
   const [open, setOpen] = useState(false);
@@ -36,6 +51,12 @@ export const DEPOSIT_QR_SRC = '/deposit-qr.png';
 function DepositDialog({ onClose }: { onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [copied, setCopied] = useState(false);
+  const walletAddress = useWalletAddress();
+  const { sol: solBalance, solPending } = useWalletBalances(walletAddress, MINTS.SOL);
+  const signTransaction = useWallet((s) => s.signTransaction);
+  const [depositPhase, setDepositPhase] = useState<'idle' | 'signing' | 'submitted'>('idle');
+  const [depositError, setDepositError] = useState<string | null>(null);
+
   const address = SITE.depositAddress;
 
   useEffect(() => {
@@ -53,6 +74,33 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
     }
   }
 
+  async function handleDepositClick() {
+    if (!walletAddress || !solBalance) return;
+
+    setDepositPhase('signing');
+    setDepositError(null);
+
+    try {
+      // Build a transfer transaction
+      const txBytes = await buildAndSignDepositTransaction(walletAddress, address, solBalance.sol);
+
+      // Sign the transaction with the wallet
+      await signTransaction(txBytes);
+
+      setDepositPhase('submitted');
+
+      // Transaction is signed; the wallet will handle submission
+      // The wallet extension will show a confirmation for sending the transaction
+    } catch (e) {
+      setDepositPhase('idle');
+      const message = e instanceof Error ? e.message : 'Failed to sign transaction';
+      setDepositError(message);
+    }
+  }
+
+  const showWalletBalance = walletAddress && solBalance;
+  const isPending = solPending || depositPhase !== 'idle';
+
   return (
     <dialog
       ref={ref}
@@ -67,12 +115,66 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
         <h2 id="deposit-title" className="text-sm font-semibold">
           Deposit
         </h2>
-        <button type="button" aria-label="Close" onClick={() => ref.current?.close()} className="rounded p-1 text-muted hover:bg-hover hover:text-fg">
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={() => ref.current?.close()}
+          disabled={isPending}
+          className="rounded p-1 text-muted hover:bg-hover hover:text-fg disabled:text-muted/50"
+        >
           <X className="size-4" />
         </button>
       </div>
 
       <div className="space-y-4 p-4">
+        {/* Wallet Balance Section (when connected) */}
+        {showWalletBalance && (
+          <div className="space-y-3 rounded-md border border-line bg-panel-2 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted">Connected Wallet Balance</span>
+              {solPending && <Loader className="size-3.5 animate-spin text-muted" />}
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-lg font-semibold text-fg">{solBalance.sol.toFixed(6)}</span>
+              <span className="text-sm text-muted">SOL</span>
+            </div>
+            <p className="text-2xs text-muted">{walletAddress}</p>
+
+            {depositPhase === 'idle' && (
+              <button
+                type="button"
+                onClick={handleDepositClick}
+                disabled={isPending || solBalance.sol <= 0}
+                className="w-full rounded-md bg-brand px-3 py-2 text-xs font-semibold text-bg transition-colors hover:bg-brand-strong disabled:bg-line-strong disabled:text-muted"
+              >
+                {solBalance.sol > 0 ? 'Deposit Balance' : 'No Balance to Deposit'}
+              </button>
+            )}
+
+            {depositPhase === 'signing' && (
+              <div className="flex items-center justify-center gap-2 rounded-md bg-line-strong py-2">
+                <Loader className="size-3.5 animate-spin text-brand" />
+                <span className="text-xs font-medium text-fg">Waiting for wallet signature...</span>
+              </div>
+            )}
+
+            {depositPhase === 'submitted' && (
+              <div className="rounded-md bg-up/10 p-2">
+                <p className="text-xs text-up font-medium flex items-center gap-2">
+                  <Check className="size-3.5" />
+                  Transaction submitted. Check wallet for confirmation.
+                </p>
+              </div>
+            )}
+
+            {depositError && (
+              <div className="rounded-md bg-down/10 p-2">
+                <p className="text-xs text-down font-medium">{depositError}</p>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-2 text-2xs">
           <div className="rounded-md border border-line bg-panel-2 px-3 py-2">
             <div className="text-muted">Network</div>
