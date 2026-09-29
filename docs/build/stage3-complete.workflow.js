@@ -82,7 +82,7 @@ const REVIEW_SCHEMA = {
   required: ['defects_found', 'verification', 'remaining_risks', 'foundation_requests'],
 }
 
-const MODES = { 'stage1-swaps': 'review', 'stage1-keyed': 'review', 'api-routes': 'review', discover: 'complete', pulse: 'complete', trade: 'build', 'wallet-tracker': 'build' }
+const MODES = { 'stage1-swaps': 'review', 'stage1-keyed': 'review', 'api-routes': 'review', discover: 'complete', pulse: 'complete', trade: 'complete', 'wallet-tracker': 'complete' }
 
 const SLICES = [
   {
@@ -136,7 +136,8 @@ Every response goes through okSourced/ok with sources + notes; every failure thr
   {
     key: 'discover',
     owned: ['src/app/discover/**', 'src/app/watchlist/**', 'src/components/discover/**', 'src/data/hooks/useDiscover.ts', 'src/data/hooks/useTokenRows.ts', 'src/lib/services/discover.ts', 'src/lib/services/discover.test.ts'],
-    spec: `Build /discover and /watchlist per the design brief.
+    spec: `OWNER (2026-09-29 09:00): do not add disclaimer copy anywhere (no 'No custody', 'Not financial advice', 'read-only', 'does not hold funds', 'no trade execution' lines); remove any you find in your owned files. src/lib/services/discover.test.ts currently fails because discover.ts changed the default list: keep code and tests consistent.
+Build /discover and /watchlist per the design brief.
 Data (src/lib/services/discover.ts = isomorphic pure composition + src/data/hooks):
 - useDiscover(list: 'trending'|'top'|'organic'|'new'|'gainers', window): base list via runChain [server discover proxy (only if capabilities.serverDiscover), jup.discover, gecko.discover] ('organic' has no GeckoTerminal fallback; 'gainers' = the 'trending' list re-sorted client-side by the selected window's priceChangePct — label it "sorted sample of trending tokens"). Poll base list every 15 s.
 - Enrichment query keyed on the current mints (≤100): jup.getUltraInfo (snipers/insiders/bundlers/bot holders + bonding progress; deprecated endpoint → tolerate failure) every 60 s, and dex.getRows for pool/DEX label + socials/image fallback every 60 s (chunked by 30, skip if the base rows already carry pool info). Merge with fillMissing — never overwrite a primary value, never invent. Row market data may also be refreshed by the base poll only (don't add extra per-row calls).
@@ -165,7 +166,8 @@ Tests: reducer/merge/selectors/pruning/progress precedence in pulse.test.ts.`,
   {
     key: 'trade',
     owned: ['src/app/trade/**', 'src/components/trade/**', 'src/components/chart/**', 'src/data/hooks/useTokenOverview.ts', 'src/data/hooks/usePools.ts', 'src/data/hooks/useTrades.ts', 'src/data/hooks/useCandles.ts', 'src/data/hooks/useHolders.ts', 'src/data/hooks/useRisk.ts', 'src/data/hooks/useQuote.ts', 'src/data/hooks/useBondingCurve.ts', 'src/data/hooks/useMintInfo.ts', 'src/lib/services/token.ts', 'src/lib/services/token.test.ts'],
-    spec: `Build /trade/[mint], the token trading page, per the design brief. Must load the ACTUAL token for the mint (validate with isSolanaAddress; invalid → notFound()). generateMetadata: title "Trade <short mint>" (no upstream fetch in metadata).
+    spec: `OWNER (2026-09-29 09:00): do not add disclaimer copy anywhere (no 'No custody', 'Not financial advice', 'read-only', 'does not hold funds', 'no trade execution' lines); remove any you find in your owned files. src/lib/services/discover.test.ts currently fails because discover.ts changed the default list: keep code and tests consistent.
+Build /trade/[mint], the token trading page, per the design brief. Must load the ACTUAL token for the mint (validate with isSolanaAddress; invalid → notFound()). generateMetadata: title "Trade <short mint>" (no upstream fetch in metadata).
 Data hooks:
 - useTokenOverview(mint): meta+market via runChain [server tokens proxy (capabilities.serverDiscover), jup.getRows([mint]), gecko.getRows, dex.getRows] every 10 s; pools via usePools(mint): runChain [dex.getPools, gecko.getPools] every 60 s → primaryPool = most liquid non-frozen active pool (exclude the frozen post-graduation pumpfun pair; for bonding tokens the pumpfun curve pair IS the pool). Allow ?pool= search param to override (Pools tab selection). Metadata merge via fillMissing (Jupiter primary; GeckoTerminal info for socials/description).
 - useMintInfo(mint): server proxy /api/v1/onchain/mint (supply/decimals/authorities; long staleTime).
@@ -182,7 +184,8 @@ Tests (token.test.ts): primary pool selection, overview merge precedence, MC-at-
   {
     key: 'wallet-tracker',
     owned: ['src/app/wallet/**', 'src/app/tracker/**', 'src/components/wallet/**', 'src/components/tracker/**', 'src/data/hooks/usePortfolio.ts', 'src/data/hooks/useWalletActivity.ts', 'src/data/hooks/useWalletPnl.ts', 'src/data/hooks/useTrackerFeed.ts', 'src/lib/services/wallet.ts', 'src/lib/services/wallet.test.ts'],
-    spec: `Build /wallet/[address] (wallet analytics) and /tracker (live wallet tracker) per the design brief. Validate addresses (isSolanaAddress; invalid → notFound()).
+    spec: `OWNER (2026-09-29 09:00): do not add disclaimer copy anywhere (no 'No custody', 'Not financial advice', 'read-only', 'does not hold funds', 'no trade execution' lines); remove any you find in your owned files. src/lib/services/discover.test.ts currently fails because discover.ts changed the default list: keep code and tests consistent.
+Build /wallet/[address] (wallet analytics) and /tracker (live wallet tracker) per the design brief. Validate addresses (isSolanaAddress; invalid → notFound()).
 Data hooks:
 - usePortfolio(address): runChain [server portfolio proxy (/api/v1/wallet/[a]/portfolio — RPC, always available), jup.getPortfolio (keyless browser fallback)] every 30 s; then price unpriced tokens in the browser: jup.getPrices (≤50 per call; price at most the first 150 mints — prefer ones with metadata; note if more were skipped) + SOL via useSolPrice; metadata (symbol/name/logo) via jup.getRows (≤100). Compute valueUsd/totalUsd only from priced holdings; pricedCount/unpricedCount honest.
 - useWalletActivity(address): useInfiniteQuery over the server activity proxy (page size 15; nextCursor → before); first page refetched every 20 s (merge by signature). Show "scanned N signatures" per page.

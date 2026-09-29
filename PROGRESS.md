@@ -130,9 +130,16 @@ Per-IP rate limits drive where each call runs.
 
 ## Next concrete step
 
-Stage 3 (`docs/build/stage3-complete.workflow.js`) launched 2026-09-29 ~08:10. Modes:
-- review-only: stage1-swaps, stage1-keyed, api-routes
-- complete: discover, pulse
-- build: trade (Axiom-style trade panel + TradingView Lightweight Charts), wallet-tracker
+Stage 3 (`docs/build/stage3-complete.workflow.js`) was resumed at 2026-09-29 09:00 (run wf_15f42718-4ae).
 
-Owner feedback applied 2026-09-29: deposit address is central/read-only (per-browser override removed), Inter typography, "every memecoin" discovery universe, working tracker, faster loads, stronger connections, institutional look. After stage 3: integration (`npm run build`, browser verification with live data), README, merge to main.
+- **Done and cached:** swap-parser review (pool-side quotes, 117 tests), keyed-provider review, Pulse completion.
+- **Re-running:** trade, wallet-tracker and discover, in completion mode (finishing the partial files), plus the api-routes and pulse reviews.
+
+Owner feedback applied on 2026-09-29:
+- The deposit address is central and read-only, shown with a QR code and a one-line network hint.
+- All disclaimer lines are removed ("Market data only · No custody …", deposit notes).
+- Typography is Inter.
+
+Then run stage 4 (`docs/build/stage4-integrate.workflow.js`): browser verification of every page with live data, plus audits for real-data integrity, security/Vercel, visual quality and performance. After that, `npm run build` and merge to main.
+
+**Note:** main currently contains PR #1 (the early foundation with placeholder pages) and is what the live site shows. Merge this branch as soon as the build is verified.
