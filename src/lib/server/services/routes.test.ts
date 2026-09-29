@@ -7,6 +7,7 @@ import { GET as health } from '@/app/api/v1/health/route';
 import { GET as holders } from '@/app/api/v1/holders/route';
 import { GET as curves } from '@/app/api/v1/onchain/curves/route';
 import { GET as mint } from '@/app/api/v1/onchain/mint/[mint]/route';
+import { GET as pools } from '@/app/api/v1/pools/route';
 import { GET as pulse } from '@/app/api/v1/pulse/route';
 import { GET as quote } from '@/app/api/v1/quote/route';
 import { GET as risk } from '@/app/api/v1/risk/route';
@@ -68,6 +69,8 @@ describe('input validation (400)', () => {
     ['discover with an unknown list', () => discover(req('/api/v1/discover?list=hot'))],
     ['discover with an unknown window', () => discover(req('/api/v1/discover?window=2h'))],
     ['tokens with an invalid mint', () => tokens(req(`/api/v1/tokens?mints=${MINT},nope`))],
+    ['pools without mint', () => pools(req('/api/v1/pools'))],
+    ['pools with a bad mint', () => pools(req('/api/v1/pools?mint=abc'))],
     ['quote with a zero amount', () => quote(req(`/api/v1/quote?inputMint=${SOL}&outputMint=${MINT}&amountRaw=0&inputDecimals=9&outputDecimals=6`))],
     ['quote without decimals', () => quote(req(`/api/v1/quote?inputMint=${SOL}&outputMint=${MINT}&amountRaw=1000`))],
     ['curves without mints', () => curves(req('/api/v1/onchain/curves'))],
@@ -86,12 +89,12 @@ describe('input validation (400)', () => {
 describe('keyed-only routes without keys (501, skipped silently by clients)', () => {
   it.each([
     ['trades', () => trades(req(`/api/v1/trades?mint=${MINT}&pool=${SOL}`))],
-    ['candles', () => candles(req(`/api/v1/candles?mint=${MINT}&interval=1m`))],
+    // Minute+ candles, token rows and pools answer keyless now; sub-minute candles still need a keyed source.
+    ['candles (sub-minute)', () => candles(req(`/api/v1/candles?mint=${MINT}&interval=5s`))],
     ['holders', () => holders(req(`/api/v1/holders?mint=${MINT}`))],
     ['risk', () => risk(req(`/api/v1/risk?mint=${MINT}`))],
     ['pulse', () => pulse(req('/api/v1/pulse?column=new'))],
     ['discover', () => discover(req('/api/v1/discover?list=trending&window=1h'))],
-    ['tokens', () => tokens(req(`/api/v1/tokens?mints=${MINT}`))],
     ['quote', () => quote(req(`/api/v1/quote?inputMint=${SOL}&outputMint=${MINT}&amountRaw=1000000000&inputDecimals=9&outputDecimals=6`))],
   ])('%s', async (_name, call) => {
     const body = await expectError(await call(), 501, 'not_configured');
@@ -109,6 +112,11 @@ describe('/api/v1/health', () => {
     expect(body.data.rpc).toBe('public');
     expect(body.data.capabilities.serverTrades).toBe(false);
     expect(body.data.capabilities.serverQuote).toBe(false);
+    expect(body.data.capabilities.serverCandles).toBe(false);
+    // Keyless server fallbacks exist on every deployment.
+    expect(body.data.capabilities.serverCandlesKeyless).toBe(true);
+    expect(body.data.capabilities.serverPools).toBe(true);
+    expect(body.data.capabilities.serverTokensKeyless).toBe(true);
     expect(Array.isArray(body.data.providers)).toBe(true);
     expect(body.meta.primary).toBe('orbyt');
     expect(JSON.stringify(body)).not.toMatch(/api-key|https?:\/\//i);

@@ -13,7 +13,8 @@ import { useTrades } from '@/data/hooks/useTrades';
 import type { LiveTick } from '@/lib/analytics/candles';
 import { formatCompact } from '@/lib/core/format';
 import type { HolderSnapshot, RiskReport, Sourced } from '@/lib/core/types';
-import { chainWinner, curvePriceUsd, curveQuoteSymbol, errorLines, isIndexedPool, parsePoolParam } from '@/lib/services/token';
+import { onchainHeaderPrice } from '@/lib/onchain/headerPrice';
+import { chainWinner, curveMarketCapUsd, curvePriceUsd, curveQuoteSymbol, errorLines, isIndexedPool, parsePoolParam } from '@/lib/services/token';
 import { ChartPanel } from './ChartPanel';
 import { HoldersPanel } from './HoldersPanel';
 import { InfoPanel } from './InfoPanel';
@@ -41,7 +42,9 @@ export function TradePage({ mint }: { mint: string }) {
   const t = useTokenOverview(mint, { pool: poolParam });
   const pool = t.primaryPool;
   const poolIndexed = isIndexedPool(pool);
-  const tradesState = useTrades(mint, pool?.address, { indexed: poolIndexed });
+  // A live pump.fun curve: its trades decode straight from the program logs (the curve PDA is the pool).
+  const pumpCurve = pool?.dex === 'pumpfun' && pool.isBondingCurve === true && !t.frozenPools.has(pool.address) && t.curve?.complete !== true;
+  const tradesState = useTrades(mint, pool?.address, { indexed: poolIndexed, pumpCurve, solUsd: t.solUsd, supply: t.supply });
   const [tab, setTab] = useState<Tab>('trades');
 
   // Saved trade-panel / chart preferences apply after mount so SSR and hydration markup match.
@@ -65,7 +68,16 @@ export function TradePage({ mint }: { mint: string }) {
     () => (curvePriceSol !== undefined && curvePriceSol > 0 && curveAt !== undefined ? { timeSec: Math.floor(curveAt / 1000), price: curvePriceSol } : undefined),
     [curvePriceSol, curveAt],
   );
-  const priceUsd = t.market?.priceUsd ?? curvePrice;
+  // No market provider prices the token yet (seconds old): the newer of the on-chain curve read and the last on-chain trade.
+  const curveMc = liveCurve ? curveMarketCapUsd(liveCurve, t.solUsd) : undefined;
+  const tradesList = tradesState.trades;
+  const supply = t.supply;
+  const onchainPrice = useMemo(
+    () => onchainHeaderPrice({ curve: { priceUsd: curvePrice, marketCapUsd: curveMc, at: curveAt }, trades: tradesList, supply }),
+    [curvePrice, curveMc, curveAt, tradesList, supply],
+  );
+  const marketPriced = t.market?.priceUsd !== undefined;
+  const priceUsd = t.market?.priceUsd ?? onchainPrice?.priceUsd;
   // Native candles need the charted pool to be indexed upstream (a curve decoded only on-chain has no OHLCV yet).
   const poolsAnswered = t.queries.pools.data !== undefined || t.queries.pools.isError;
   const hasPool = poolsAnswered ? poolIndexed : undefined;
@@ -101,7 +113,12 @@ export function TradePage({ mint }: { mint: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh-var(--shell-header-h)-var(--shell-footer-h))] lg:overflow-hidden">
       <ErrorBoundary label="Token header" resetKeys={[mint]}>
-        <TokenHeader state={t} priceUsd={priceUsd} />
+        <TokenHeader
+          state={t}
+          priceUsd={priceUsd}
+          priceSource={marketPriced ? undefined : onchainPrice?.label}
+          fallbackMarketCapUsd={t.market?.marketCapUsd === undefined ? onchainPrice?.marketCapUsd : undefined}
+        />
       </ErrorBoundary>
       {t.listed === false && t.isMint && (
         <p className="border-b border-line bg-warn-soft px-3 py-1 text-2xs text-warn">

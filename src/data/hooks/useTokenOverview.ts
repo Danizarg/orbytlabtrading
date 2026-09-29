@@ -4,14 +4,14 @@ import { keepPreviousData, queryOptions, useQuery, type QueryClient, type UseQue
 import { useMemo } from 'react';
 import { useCapabilities } from '@/client/capabilities';
 import type { Capabilities } from '@/lib/config/capabilities';
-import { runChain, type ChainAttempt, type ChainResult } from '@/lib/core/chain';
+import type { ChainAttempt, ChainResult } from '@/lib/core/chain';
 import type { ProviderId } from '@/lib/core/providers';
 import type { BondingCurveState, Freshness, LaunchpadState, MintInfo, PoolInfo, TokenMarket, TokenMeta, TokenRow } from '@/lib/core/types';
 import { isProviderError } from '@/lib/net/errors';
 import type { GeckoTokenInfo } from '@/lib/providers/geckoterminal';
 import { chainWinner, isDefinitelyAbsent, isPumpCandidate, mergeLaunchpad, mergeOverview, pollForWinner } from '@/lib/services/token';
 import { POLL } from '../query';
-import { dex, gecko, jup, server } from '../sources';
+import { dex, gecko, isServerStale, jup, runWithServerFallback, server } from '../sources';
 import { useBondingCurve } from './useBondingCurve';
 import { mintInfoOptions, useMintInfo } from './useMintInfo';
 import { poolsOptions, usePools } from './usePools';
@@ -19,16 +19,22 @@ import { useSolPrice } from './useSolPrice';
 
 /**
  * Token page snapshot: identity + market row (server tokens proxy when a
- * keyed discovery provider exists → Jupiter → GeckoTerminal → DEX Screener),
- * GeckoTerminal token info (socials, description, holder summary, risk),
- * the on-chain mint account, the decoded pump.fun curve and the pool list.
- * Every request starts in parallel; nothing waits for another response.
+ * keyed discovery provider exists → Jupiter → DEX Screener → GeckoTerminal →
+ * ORBYT's keyless tokens route when a browser source failed), GeckoTerminal
+ * token info (socials, description, holder summary, risk), the on-chain mint
+ * account, the decoded pump.fun curve and the pool list. Every request starts
+ * in parallel; nothing waits for another response.
  *
  * Keyless budget on this page: the row polls Jupiter (or the keyed server
- * route) every 10 s, 30 s when a browser-indexed source answered or no source
- * lists the token yet; token info
- * costs one GeckoTerminal call per two minutes (cached 5 min by the
- * transport), pools one DEX Screener call per minute.
+ * route) every 10 s, 30 s when an indexed source answered or no source lists
+ * the token yet; DEX Screener (300 req/min) is asked before GeckoTerminal so
+ * a Jupiter outage does not spend the 8 calls/min GeckoTerminal budget that
+ * candles and trades need. Token info costs one GeckoTerminal call per two
+ * minutes (cached 5 min by the transport), pools one DEX Screener call per
+ * minute.
+ *
+ * Stale-while-error: a failed refresh keeps the last good row on screen
+ * (React Query keeps `data`); `delayed` tells panels to show "Delayed".
  */
 
 export const tokenRowKey = (mint: string, serverDiscover: boolean) => ['token-row', mint, serverDiscover] as const;
@@ -36,17 +42,30 @@ export const tokenInfoKey = (mint: string) => ['token-info', mint] as const;
 
 /** The token's row, or `undefined` when every source answered but none lists the mint. */
 export async function loadTokenRow(mint: string, serverDiscover: boolean, signal?: AbortSignal): Promise<ChainResult<TokenRow | undefined>> {
-  const result = await runChain<TokenRow[]>(
+  const result = await runWithServerFallback<TokenRow[]>(
     'token',
     [
       serverDiscover && { id: 'orbyt', run: () => server.tokens.getRows([mint], signal) },
       { id: 'jupiter', run: () => jup.getRows([mint], signal) },
-      { id: 'geckoterminal', run: () => gecko.getRows([mint], signal) },
       { id: 'dexscreener', run: () => dex.getRows([mint], signal) },
+      { id: 'geckoterminal', run: () => gecko.getRows([mint], signal) },
     ],
+    // With a keyed route it already ran first (and falls back to keyless sources itself).
+    !serverDiscover && { id: 'orbyt', run: () => server.tokens.getRows([mint], signal) },
     { accept: (r) => r.data.some((row) => row.token.mint === mint), signal },
   );
   return { ...result, data: result.data.find((row) => row.token.mint === mint) };
+}
+
+/**
+ * Row poll cadence: the fast cadence when Jupiter (or ORBYT's route relaying
+ * a fast source) answered; an indexed source's cache age otherwise, including
+ * ORBYT relaying DEX Screener / GeckoTerminal data.
+ */
+export function tokenRowPollInterval(result: ChainResult<unknown> | undefined): number {
+  const winner = chainWinner(result);
+  if (winner === 'orbyt' && result?.freshness === 'indexed') return POLL.indexed;
+  return pollForWinner(winner, POLL.fast, POLL.indexed);
 }
 
 export function tokenRowOptions(mint: string, serverDiscover: boolean) {
@@ -54,7 +73,7 @@ export function tokenRowOptions(mint: string, serverDiscover: boolean) {
     queryKey: tokenRowKey(mint, serverDiscover),
     queryFn: ({ signal }) => loadTokenRow(mint, serverDiscover, signal),
     staleTime: 5_000,
-    refetchInterval: (query) => pollForWinner(chainWinner(query.state.data), POLL.fast, POLL.indexed),
+    refetchInterval: (query) => tokenRowPollInterval(query.state.data),
     placeholderData: keepPreviousData,
     retry: 1,
   });
@@ -113,6 +132,14 @@ export interface TokenOverviewState {
   fetchedAt?: number;
   attempts: ChainAttempt[];
   error: unknown;
+  /**
+   * The market row on screen is older than it should be: its last refresh
+   * failed (the previous row is kept) or ORBYT served its last good response.
+   * Panels show "Delayed" instead of an error while `market` is present.
+   */
+  delayed: boolean;
+  /** Same for the pool list (its last refresh failed; the previous list is kept). */
+  poolsDelayed: boolean;
   isPending: boolean;
   solUsd?: number;
   queries: {
@@ -185,6 +212,8 @@ export function useTokenOverview(mint: string, opts: { pool?: string } = {}): To
     fetchedAt: row.data?.fetchedAt,
     attempts: row.data?.attempts ?? [],
     error: row.error,
+    delayed: row.data !== undefined && (row.isRefetchError || isServerStale(row.data)),
+    poolsDelayed: pools.delayed,
     isPending: row.isPending && info.isPending && mintInfo.isPending,
     solUsd,
     queries: { row, info, mintInfo, curve: curveQuery, pools: pools.query },

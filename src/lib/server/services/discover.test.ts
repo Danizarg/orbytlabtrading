@@ -207,3 +207,116 @@ describe('loadTokenRows', () => {
     await expect(loadTokenRows([A], { jupiter: failing, coingecko: null })).rejects.toBeInstanceOf(ChainError);
   });
 });
+
+describe('loadTokenRows keyless fallback', () => {
+  function failing(id: ProviderId, calls: string[][]): TokenRowsProvider {
+    return {
+      id,
+      getRows: async (mints) => {
+        calls.push([...mints]);
+        throw new ProviderError(id, 'rate_limited', `${id}: HTTP 429`);
+      },
+    };
+  }
+
+  it('answers without any key: keyless Jupiter, then DEX Screener for the mints still missing', async () => {
+    const calls: string[][] = [];
+    const result = await loadTokenRows([A, B], {
+      jupiter: null,
+      coingecko: null,
+      jupiterKeyless: rowsProvider('jupiter', [A], 'fast', calls),
+      dex: rowsProvider('dexscreener', [B], 'indexed', calls),
+    });
+    expect(calls).toEqual([[A, B], [B]]);
+    expect(result.data.map((r) => r.token.mint)).toEqual([A, B]);
+    expect(result.source).toBe('jupiter');
+    expect(result.contributors).toEqual(['dexscreener']);
+    expect(result.freshness).toBe('indexed');
+    expect(result.keyless).toBe(true);
+  });
+
+  it('falls through a rate-limited keyless Jupiter to DEX Screener', async () => {
+    const calls: string[][] = [];
+    const result = await loadTokenRows([A], { jupiter: null, coingecko: null, jupiterKeyless: failing('jupiter', calls), dex: rowsProvider('dexscreener', [A], 'indexed', calls) });
+    expect(result.source).toBe('dexscreener');
+    expect(result.attempts.map((a) => [a.provider, a.ok])).toEqual([
+      ['jupiter', false],
+      ['dexscreener', true],
+    ]);
+  });
+
+  it('keyed sources cover everything: no keyless call, keyed cache lifetime', async () => {
+    const calls: string[][] = [];
+    const keyless: string[][] = [];
+    const result = await loadTokenRows([A], {
+      jupiter: rowsProvider('jupiter', [A], 'fast', calls),
+      coingecko: null,
+      jupiterKeyless: rowsProvider('jupiter', [A], 'fast', keyless),
+      dex: rowsProvider('dexscreener', [A], 'indexed', keyless),
+    });
+    expect(keyless).toEqual([]);
+    expect(result.keyless).toBe(false);
+  });
+
+  it('skips keyless Jupiter when the keyed Jupiter answered (same index), but still asks DEX Screener', async () => {
+    const keyedCalls: string[][] = [];
+    const keylessJup: string[][] = [];
+    const dexCalls: string[][] = [];
+    const result = await loadTokenRows([A, B], {
+      jupiter: rowsProvider('jupiter', [A], 'fast', keyedCalls),
+      coingecko: null,
+      jupiterKeyless: rowsProvider('jupiter', [B], 'fast', keylessJup),
+      dex: rowsProvider('dexscreener', [B], 'indexed', dexCalls),
+    });
+    expect(keylessJup).toEqual([]);
+    expect(dexCalls).toEqual([[B]]);
+    expect(result.data.map((r) => r.token.mint)).toEqual([A, B]);
+    expect(result.keyless).toBe(true);
+  });
+
+  it('uses keyless Jupiter when the keyed Jupiter failed', async () => {
+    const calls: string[][] = [];
+    const result = await loadTokenRows([A], {
+      jupiter: failing('jupiter', calls),
+      coingecko: null,
+      jupiterKeyless: rowsProvider('jupiter', [A], 'fast', calls),
+      dex: null,
+    });
+    expect(calls).toEqual([[A], [A]]);
+    expect(result.data).toHaveLength(1);
+    expect(result.attempts.map((a) => a.ok)).toEqual([false, true]);
+  });
+
+  it('no rows while an index failed is unknown, not unlisted: throws so the route serves its last good rows', async () => {
+    const calls: string[][] = [];
+    const error = await loadTokenRows([A], {
+      jupiter: null,
+      coingecko: null,
+      jupiterKeyless: failing('jupiter', calls),
+      dex: rowsProvider('dexscreener', [], 'indexed', calls),
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ChainError);
+    expect((error as ChainError).attempts.map((a) => [a.provider, a.ok])).toEqual([
+      ['jupiter', false],
+      ['dexscreener', true],
+    ]);
+  });
+
+  it('keeps an honest empty list when a failed keyed Jupiter is covered by keyless Jupiter answering', async () => {
+    const calls: string[][] = [];
+    const result = await loadTokenRows([A], {
+      jupiter: failing('jupiter', calls),
+      coingecko: null,
+      jupiterKeyless: rowsProvider('jupiter', [], 'fast', calls),
+      dex: rowsProvider('dexscreener', [], 'indexed', calls),
+    });
+    expect(result.data).toEqual([]);
+  });
+
+  it('throws a ChainError (never an empty success) when every keyless source fails', async () => {
+    const calls: string[][] = [];
+    await expect(
+      loadTokenRows([A], { jupiter: null, coingecko: null, jupiterKeyless: failing('jupiter', calls), dex: failing('dexscreener', calls) }),
+    ).rejects.toBeInstanceOf(ChainError);
+  });
+});

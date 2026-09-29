@@ -14,12 +14,14 @@ import {
   type RpcClient,
 } from '@/lib/providers/solana';
 import { createSolanaTracker, type SolanaTrackerAdapter } from '@/lib/providers/solanatracker';
-import type { BondingCurveProvider, PortfolioProvider, TransactionProvider, WalletActivityProvider } from '@/lib/core/providers';
+import type { BondingCurveProvider, PortfolioProvider, ProviderId, TransactionProvider, WalletActivityProvider } from '@/lib/core/providers';
 import type { MintInfo } from '@/lib/core/types';
 import { MINTS } from '@/lib/core/solana';
+import { ProviderError } from '@/lib/net/errors';
+import type { JsonFetcher, JsonRequest } from '@/lib/net/types';
 import { cached, TTL } from './cache';
 import { env, rpcKind, serverRpcUrl } from './env';
-import { serverFetcher } from './http';
+import { fetchJson, serverFetcher } from './http';
 
 /**
  * Server-side provider instances, built lazily from environment variables and
@@ -91,11 +93,52 @@ export const jupiterKeyed = memo<JupiterAdapter | null>(() => {
   return apiKey ? createJupiter({ fetcher: serverFetcher, apiKey }) : null;
 });
 
-/** Keyless Jupiter from the server: used sparingly (cached SOL price only). */
-const jupiterKeyless = memo<JupiterAdapter>(() => createJupiter({ fetcher: serverFetcher }));
+/**
+ * Local sliding-window cap in front of the server transport for keyless
+ * upstreams. It fails fast (rate_limited) instead of queueing, so a chain
+ * moves on to its next source at once, and it keeps a keyless caller below
+ * the per-IP limit even when a keyed caller shares the provider's budget in
+ * http.ts (both use the same ProviderId).
+ */
+export function limitedFetcher(limit: number, windowMs: number, base: JsonFetcher = serverFetcher): JsonFetcher {
+  const stamps: number[] = [];
+  return <T,>(provider: ProviderId, url: string, init?: JsonRequest): Promise<T> => {
+    const now = Date.now();
+    while (stamps.length && now - (stamps[0] ?? now) >= windowMs) stamps.shift();
+    if (stamps.length >= limit) {
+      return Promise.reject(new ProviderError(provider, 'rate_limited', `${provider}: keyless server budget exhausted`, { retryAfterMs: windowMs - (now - (stamps[0] ?? now)) }));
+    }
+    stamps.push(now);
+    return base<T>(provider, url, init);
+  };
+}
 
-/** Keyless GeckoTerminal from the server: last-resort SOL price only. */
-const geckoKeyless = memo<GeckoTerminalAdapter>(() => createGeckoTerminal({ fetcher: serverFetcher }));
+/**
+ * Keyless Jupiter from the server: the cached SOL price and the /api/v1/tokens
+ * fallback. Jupiter's keyless limit is 5 requests / 10 s per IP; this worker
+ * stays at 4 and fails fast beyond that.
+ */
+export const jupiterKeyless = memo<JupiterAdapter>(() => createJupiter({ fetcher: limitedFetcher(4, 10_000) }));
+
+/**
+ * Server transport for keyless GeckoTerminal with a bounded wait: when the
+ * 8 calls / min budget is spent, a call waits at most `budgetMs` for a slot
+ * (instead of the default 2 × timeout) and then fails fast as rate_limited.
+ * A route answers 503 or its last good response within seconds instead of
+ * queueing past its maxDuration (the candles route may need two calls).
+ */
+export const KEYLESS_GECKO_REQUEST = { budgetMs: 3_000, timeoutMs: 7_000 } as const;
+const keylessGeckoFetcher: JsonFetcher = (provider, url, init) =>
+  fetchJson(provider, url, { ...init, timeoutMs: init?.timeoutMs ?? KEYLESS_GECKO_REQUEST.timeoutMs, budgetMs: KEYLESS_GECKO_REQUEST.budgetMs });
+
+/**
+ * Keyless GeckoTerminal from the server: candles and pools fallbacks for
+ * visitors whose own GeckoTerminal quota is spent, plus the last-resort SOL
+ * price. Uses the conservative 'geckoterminal' budget in http.ts (8 calls /
+ * min per worker) with a bounded wait; routes put CDN s-maxage in front so
+ * one upstream call serves every visitor.
+ */
+export const geckoKeyless = memo<GeckoTerminalAdapter>(() => createGeckoTerminal({ fetcher: keylessGeckoFetcher }));
 
 export const dexServer = memo<DexScreenerAdapter>(() => createDexScreener({ fetcher: serverFetcher }));
 

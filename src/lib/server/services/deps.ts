@@ -1,13 +1,18 @@
 import 'server-only';
+import { ChainError } from '@/lib/core/chain';
 import { getMintInfo } from '@/lib/providers/solana';
 import type { MintInfo } from '@/lib/core/types';
 import { cached, TTL } from '@/lib/server/cache';
 import { env, rpcKind } from '@/lib/server/env';
+import { selectPrimaryPool } from '@/lib/services/token';
 import {
   birdeye,
+  dexServer,
   geckoKeyed,
+  geckoKeyless,
   helius,
   jupiterKeyed,
+  jupiterKeyless,
   mintInfo,
   serverActivity,
   serverCurves,
@@ -20,8 +25,10 @@ import {
 import type { ActivityDeps } from './activity';
 import type { CandlesDeps } from './candles';
 import type { DiscoverDeps, TokenRowsDeps } from './discover';
+import { withCache } from './envelope';
 import type { HoldersDeps } from './holders';
 import type { CurvesDeps, MintDeps } from './onchain';
+import { loadPools, POOLS_TTL_MS, type PoolsDeps } from './pools';
 import type { PortfolioDeps } from './portfolio';
 import type { PulseDeps } from './pulse';
 import type { QuoteDeps } from './quote';
@@ -57,7 +64,32 @@ export function tradesDeps(): TradesDeps {
 }
 
 export function candlesDeps(): CandlesDeps {
-  return { birdeye: birdeye(), solanaTracker: solanaTracker(), coingecko: geckoKeyed() };
+  return { birdeye: birdeye(), solanaTracker: solanaTracker(), coingecko: geckoKeyed(), geckoKeyless: geckoKeyless(), resolvePool: primaryPoolOf };
+}
+
+/** DEX Screener (cheap) and GeckoTerminal: keyed CoinGecko when configured, else keyless. */
+export function poolsDeps(): PoolsDeps {
+  return { dex: dexServer(), gecko: geckoKeyed() ?? geckoKeyless() };
+}
+
+/** Pool-list cache shared by /api/v1/pools and the candles pool lookup (same key, same lifetimes). */
+export function cachedPools(mint: string) {
+  return withCache(`pools:${mint}`, POOLS_TTL_MS, 5 * 60_000, () => loadPools(mint, poolsDeps()));
+}
+
+/**
+ * The pool the trade page would chart (most liquid active pool, or the curve), from the cached pool list.
+ * `undefined` only when every source answered and none lists a pool; a failed lookup (rate limit,
+ * timeout) throws, so the candles route reports a retryable failure instead of "not configured".
+ */
+export async function primaryPoolOf(mint: string): Promise<string | undefined> {
+  try {
+    const { value } = await cachedPools(mint);
+    return selectPrimaryPool(mint, value.data).primary?.address;
+  } catch (error) {
+    if (error instanceof ChainError && error.allNotFound) return undefined;
+    throw error;
+  }
 }
 
 export function holdersDeps(): HoldersDeps {
@@ -77,7 +109,7 @@ export function discoverDeps(): DiscoverDeps {
 }
 
 export function tokenRowsDeps(): TokenRowsDeps {
-  return { jupiter: jupiterKeyed(), coingecko: geckoKeyed() };
+  return { jupiter: jupiterKeyed(), coingecko: geckoKeyed(), jupiterKeyless: jupiterKeyless(), dex: dexServer() };
 }
 
 export function quoteDeps(): QuoteDeps {

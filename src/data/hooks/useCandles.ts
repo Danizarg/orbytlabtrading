@@ -1,7 +1,7 @@
 'use client';
 
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCapabilities } from '@/client/capabilities';
 import { candleSeriesFromTrades, mergeCandles, sanitizeCandles, type LiveTick } from '@/lib/analytics/candles';
 import { ChainError, runChain, type ChainAttempt, type ChainResult } from '@/lib/core/chain';
@@ -10,6 +10,7 @@ import { INTERVAL_SECONDS, type Candle, type CandleSeries, type Freshness, type 
 import { PUBLIC_ENDPOINTS } from '@/lib/config/capabilities';
 import { browserFetcher } from '@/lib/net/browser';
 import { ProviderError } from '@/lib/net/errors';
+import { onchainHistoryComplete, selectCandleSource, solChartTrades, withOnchainIntervals, type CandleFallbackReason } from '@/lib/onchain/candleFallback';
 import { GECKOTERMINAL_ACCEPT } from '@/lib/providers/geckoterminal';
 import { parseOhlcv } from '@/lib/providers/geckoterminal/parse';
 import {
@@ -20,7 +21,7 @@ import {
   intervalOptions,
   isGecko,
   pollForWinner,
-  solPricedTrades,
+  SECOND_INTERVALS,
   tradeTicks,
   usdToSol,
   type CandleSourceKind,
@@ -29,7 +30,7 @@ import {
   type IntervalOption,
 } from '@/lib/services/token';
 import { POLL } from '../query';
-import { gecko, jup, server } from '../sources';
+import { gecko, isServerStale, jup, runWithServerFallback, server } from '../sources';
 
 /**
  * Chart data for one pool and interval.
@@ -40,6 +41,14 @@ import { gecko, jup, server } from '../sources';
  *   history is paged on demand (`before` = first candle) into the query cache.
  * - Sub-minute intervals without a native source are aggregated by ORBYT from
  *   the real trade feed (`derivedFromTrades`, with provenance). Never synthetic.
+ * - On-chain fallback (trades from the on-chain feed): any interval charts
+ *   from real trades when the native source cannot (no indexed pool, "not
+ *   found", no candles, or a failure while ≥ 2 trades are in hand), or when
+ *   the on-chain history reaches back further than the native series (a pool
+ *   younger than the indexer's coverage). See selectCandleSource. For such
+ *   pools (and pump.fun curves / pools under 30 min old) the feed also pages
+ *   older history (up to ~300 transactions) so the chart covers the pool's
+ *   whole short life.
  * - SOL mode (SOL-quoted pools only): GeckoTerminal quote-token OHLCV, or
  *   trade-built bars priced by each trade's SOL / token amounts. USD bars are
  *   never converted with today's SOL price.
@@ -102,12 +111,16 @@ export function loadNativeCandles(
   if (kind === 'gecko-sol') {
     return runChain<CandleSeries>('candles', [{ id: 'geckoterminal', run: () => loadGeckoQuoteCandles({ mint, pool, interval, before }, signal) }], { signal });
   }
-  return runChain<CandleSeries>(
+  const geckoServes = gecko.intervals.includes(interval);
+  return runWithServerFallback<CandleSeries>(
     'candles',
     [
       kind === 'server' && { id: 'orbyt', run: () => server.candles.getCandles(query, signal) },
-      gecko.intervals.includes(interval) && { id: 'geckoterminal', run: () => gecko.getCandles(query, signal) },
+      geckoServes && { id: 'geckoterminal', run: () => gecko.getCandles(query, signal) },
     ],
+    // ORBYT's keyless candles route (GeckoTerminal fetched by the server, CDN-cached) after a real browser failure,
+    // e.g. this visitor's GeckoTerminal quota is spent; never after "not found" (the server would ask the same index).
+    kind === 'gecko' && geckoServes && server.candlesKeyless.intervals.includes(interval) && { id: 'orbyt', run: () => server.candlesKeyless.getCandles(query, signal) },
     { signal },
   );
 }
@@ -154,6 +167,8 @@ export interface CandlesInput {
   solUsd?: number;
   /** Accumulated trade feed (derived intervals and realtime ticks). */
   trades: readonly Trade[];
+  /** Exact SOL price per trade from the on-chain feed (signature → SOL): SOL bars on the basis of the USD ones. */
+  tradeSolPrices?: ReadonlyMap<string, number>;
   tradesEnabled: boolean;
   tradesRealtime: boolean;
   tradesFreshness?: Freshness;
@@ -172,8 +187,36 @@ export interface CandlesInput {
    * pinned a specific pool: its bars must only move with that pool's trades.
    */
   aggregateTicks?: boolean;
+  /**
+   * The trades come from the on-chain feed of the charted pool: they may stand
+   * in for native candles (see selectCandleSource) and page older history.
+   */
+  onchain?: OnchainCandleSource;
+  /** Pool creation time (ms) when a provider reports it: pools under 30 min load their older on-chain history. */
+  poolCreatedAt?: number;
   enabled?: boolean;
 }
+
+/** What useCandles needs from the on-chain trade feed (useTrades' `feed.onchain`). */
+export interface OnchainCandleSource {
+  /** The feed reads a pump.fun bonding curve (a young pool by nature). */
+  pumpCurve: boolean;
+  /** The listing reached the pool's first transaction. */
+  exhausted: boolean;
+  /** Every trade since the pool's first transaction is held. */
+  complete: boolean;
+  historyLoading: boolean;
+  /** The history walk finished (possibly capped before the pool's first transaction). */
+  historyDone: boolean;
+  /** Signatures listed so far. */
+  listed: number;
+  /** Listed successful transactions the feed could not load (> 0: the trades are a subset, never "complete"). */
+  missed?: number;
+  loadHistory: () => void;
+}
+
+/** Pools younger than this page their on-chain history for the chart. */
+export const YOUNG_POOL_MS = 30 * 60_000;
 
 export interface CandleFeed {
   candles: Candle[];
@@ -189,6 +232,16 @@ export interface CandleFeed {
   fetchedAt?: number;
   pool?: string;
   derivation?: { trades: number; from: number; to: number };
+  /** Why trade-built bars stand in for the native source (undefined: native, or a sub-minute trade interval). */
+  fallback?: CandleFallbackReason;
+  /** Trade-built bars come from the on-chain feed. */
+  fromOnchain: boolean;
+  /** On-chain transactions of the pool the feed listed but could not load: trade-built bars are drawn from a subset. */
+  missedTrades: number;
+  /** Older on-chain history is being fetched for this chart. */
+  historyLoading: boolean;
+  /** Native bars on screen are older than they should be (a failed refresh, or ORBYT served its last good response). */
+  delayed: boolean;
   liveSource?: 'trades' | 'curve' | 'price';
   isPending: boolean;
   error: unknown;
@@ -201,30 +254,36 @@ export interface CandleFeed {
 }
 
 export function useCandles(input: CandlesInput): CandleFeed {
-  const { mint, pool, hasPool, interval, trades, tradesEnabled, tradesRealtime, solUsd } = input;
+  const { mint, pool, hasPool, interval, trades, tradesEnabled, tradesRealtime, solUsd, onchain, poolCreatedAt } = input;
   const enabled = input.enabled ?? true;
   const { serverCandles, serverSecondIntervals } = useCapabilities();
   const client = useQueryClient();
+  const onchainOn = !!onchain && tradesEnabled;
 
   const options = useMemo(
-    () => intervalOptions({ serverCandles, serverSecondIntervals, geckoIntervals: gecko.intervals, hasPool, hasTradeFeed: tradesEnabled }),
-    [serverCandles, serverSecondIntervals, hasPool, tradesEnabled],
+    () =>
+      withOnchainIntervals(
+        intervalOptions({ serverCandles, serverSecondIntervals, geckoIntervals: gecko.intervals, hasPool, hasTradeFeed: tradesEnabled }),
+        onchainOn,
+      ),
+    [serverCandles, serverSecondIntervals, hasPool, tradesEnabled, onchainOn],
   );
   const option = options.find((o) => o.interval === interval);
-  const kind = option?.available ? option.kind : undefined;
+  /** Source configured for the interval; trade-built bars may still stand in for a native one (`decision`). */
+  const staticKind = option?.available ? option.kind : undefined;
 
   const currencyOption = useMemo(
-    () => chartCurrencyOption({ quoteIsSol: input.quoteIsSol ?? false, kind, interval, geckoIntervals: gecko.intervals }),
-    [input.quoteIsSol, kind, interval],
+    () => chartCurrencyOption({ quoteIsSol: input.quoteIsSol ?? false, kind: staticKind, interval, geckoIntervals: gecko.intervals }),
+    [input.quoteIsSol, staticKind, interval],
   );
   const currency: ChartCurrency = input.currency === 'sol' && currencyOption.available ? 'sol' : 'usd';
   const sol = currency === 'sol';
 
-  const nativeKind: NativeKind | undefined = kind === 'server' || kind === 'gecko' ? (sol ? 'gecko-sol' : kind) : undefined;
+  const nativeKind: NativeKind | undefined = staticKind === 'server' || staticKind === 'gecko' ? (sol ? 'gecko-sol' : staticKind) : undefined;
   // GeckoTerminal needs the pool address (it would spend a call finding one); the server route resolves it itself.
   const nativeEnabled = enabled && nativeKind !== undefined && (pool !== undefined || nativeKind === 'server');
 
-  const keyKind = nativeKind ?? kind ?? 'none';
+  const keyKind = nativeKind ?? staticKind ?? 'none';
   const historyKey = useMemo(() => candleHistoryKey(mint, pool, interval, keyKind), [mint, pool, interval, keyKind]);
 
   const latest = useQuery({
@@ -282,9 +341,50 @@ export function useCandles(input: CandlesInput): CandleFeed {
       });
   }, [nativeEnabled, nativeKind, firstTime, hasMore, mint, pool, interval, client, historyKey]);
 
-  // Trades in the shown currency (SOL mode: priced by their own SOL / token amounts, volume in SOL).
-  const pricedTrades = useMemo(() => (sol ? solPricedTrades(trades) : trades), [sol, trades]);
-  const derived = useMemo(() => (kind === 'trades' ? candleSeriesFromTrades(pricedTrades, interval, pool) : undefined), [kind, pricedTrades, interval, pool]);
+  // Trades in the shown currency (SOL mode: volume in SOL; priced by the on-chain feed's exact SOL price on the basis
+  // of the USD price, else by the trade's own SOL / token amounts).
+  const tradeSolPrices = input.tradeSolPrices;
+  const pricedTrades = useMemo(() => (sol ? solChartTrades(trades, tradeSolPrices) : trades), [sol, trades, tradeSolPrices]);
+  // Aggregated whenever trade-built bars are (or may become) the chart: a trade interval, or an on-chain feed standing by.
+  const tradeSeries = useMemo(
+    () => (staticKind === 'trades' || onchainOn ? candleSeriesFromTrades(pricedTrades, interval, pool) : undefined),
+    [staticKind, onchainOn, pricedTrades, interval, pool],
+  );
+
+  const nativePending = latest.isPending || latest.isPlaceholderData;
+  const nativeError = latest.error ?? undefined;
+  const onchainMissed = onchain?.missed ?? 0;
+  // Never "complete" while listed transactions are missing (a busy pool outran the RPC budget).
+  const onchainComplete = onchainHistoryComplete(onchain);
+  const onchainYoung = !!onchain && (onchain.pumpCurve || onchain.exhausted);
+  const decision = useMemo<{ source: 'native' | 'trades'; reason?: CandleFallbackReason }>(() => {
+    if (staticKind === 'trades') {
+      // A minute interval with no native source at all (no indexed pool) is itself a fallback.
+      return onchainOn && !SECOND_INTERVALS.includes(interval) ? { source: 'trades', reason: 'no-native' } : { source: 'trades' };
+    }
+    // Saved settings not applied yet, or no trades from the chain to stand in: the native source as configured.
+    if (!enabled || !onchainOn || nativeKind === undefined) return { source: 'native' };
+    return selectCandleSource(
+      { enabled: nativeEnabled, pending: nativePending, candles: nativeCandles, error: nativeError },
+      { available: true, count: tradeSeries?.derivation?.trades ?? 0, fromMs: tradeSeries?.derivation?.from, complete: onchainComplete, young: onchainYoung },
+    );
+  }, [staticKind, onchainOn, interval, enabled, nativeKind, nativeEnabled, nativePending, nativeCandles, nativeError, tradeSeries, onchainComplete, onchainYoung]);
+  const kind: CandleSourceKind | undefined = decision.source === 'trades' ? 'trades' : staticKind;
+  const derived = kind === 'trades' ? tradeSeries : undefined;
+
+  // Young pools (pump.fun curves, pools under 30 min, or any pool the indexer does not chart yet) page their older
+  // on-chain history so trade-built bars can cover the pool's whole life. Paced by the feed's RPC budget.
+  const loadHistory = onchain?.loadHistory;
+  const historyWanted = onchainOn && !(onchain?.complete ?? false) && !(onchain?.historyDone ?? false);
+  const historyBusy = onchain?.historyLoading ?? false;
+  const fallbackReason = decision.reason;
+  const pumpCurve = onchain?.pumpCurve ?? false;
+  useEffect(() => {
+    if (!enabled || !historyWanted || historyBusy || !loadHistory) return;
+    const young = pumpCurve || (poolCreatedAt !== undefined && Date.now() - poolCreatedAt < YOUNG_POOL_MS);
+    // Trade-built bars standing in for the indexer should cover as much of the pool's life as the budget allows.
+    if (young || fallbackReason !== undefined) loadHistory();
+  }, [enabled, historyWanted, historyBusy, loadHistory, pumpCurve, poolCreatedAt, fallbackReason]);
 
   const aggregateTicks = input.aggregateTicks ?? true;
   const curveTick = aggregateTicks ? (sol ? input.curveTickSol : input.curveTick) : undefined;
@@ -320,6 +420,10 @@ export function useCandles(input: CandlesInput): CandleFeed {
     return { candles: applyTicks(nativeCandles, ticks, intervalSec, { open: isGecko(seriesSource) ? 'previousClose' : 'tick' }), liveSource };
   }, [derived, nativeCandles, tradesRealtime, pricedTrades, seriesFetchedAt, curveTick, priceObservation, sol, solUsd, intervalSec, seriesSource]);
 
+  // Scrolling past the left edge of trade-built bars asks the on-chain feed for older history.
+  const tradesHasMore = kind === 'trades' && historyWanted;
+  const loadOlderTrades = useCallback(() => loadHistory?.(), [loadHistory]);
+
   return {
     candles,
     options,
@@ -333,17 +437,23 @@ export function useCandles(input: CandlesInput): CandleFeed {
     fetchedAt: derived ? input.tradesFetchedAt : seriesFetchedAt,
     pool: derived ? pool : (latestData?.data.pool ?? pool),
     derivation: derived?.derivation,
+    fallback: decision.reason,
+    fromOnchain: !!derived && onchainOn,
+    missedTrades: derived && onchainOn ? onchainMissed : 0,
+    historyLoading: !!derived && historyBusy,
+    delayed: kind !== 'trades' && nativeCandles.length > 0 && (latest.isRefetchError || isServerStale(latestData)),
     liveSource,
     // Still waiting also covers a native source that cannot start yet (pool or saved settings not known):
     // an empty chart must not read as "no candles" before anything was asked.
-    isPending: nativeKind !== undefined && (latest.isPending || latest.isPlaceholderData) && !nativeCandles.length,
-    // React Query reports `null` when there is no error.
-    error: nativeKind ? (latest.error ?? undefined) : undefined,
+    isPending: kind !== 'trades' && nativeKind !== undefined && nativePending && !nativeCandles.length,
+    // React Query reports `null` when there is no error. Trade-built bars in place of a failed native
+    // source are not an error state (the failure stays listed in `attempts`).
+    error: kind !== 'trades' && nativeKind ? nativeError : undefined,
     attempts: latestData?.attempts ?? (latest.error instanceof ChainError ? latest.error.attempts : []),
     notes: latestData?.notes ?? EMPTY_NOTES,
-    loadOlder,
-    hasMore,
-    loadingOlder,
+    loadOlder: kind === 'trades' ? loadOlderTrades : loadOlder,
+    hasMore: kind === 'trades' ? tradesHasMore : hasMore,
+    loadingOlder: kind === 'trades' ? historyBusy : loadingOlder,
     intervalSec,
   };
 }

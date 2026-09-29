@@ -977,6 +977,41 @@ function tradeEventsFromSelfCpi(groups: unknown): PumpTradeEvent[] {
   return out;
 }
 
+const PROGRAM_DATA_PREFIX = 'Program data: ';
+
+/**
+ * pump.fun TradeEvents from raw program log lines — the `logs` array of a
+ * `logsSubscribe` notification or a transaction's `meta.logMessages`. Only
+ * `Program data:` lines emitted while the pump program is the executing
+ * program count (another program's look-alike line is ignored); decoding
+ * stops at 'Log truncated'. The caller must drop failed transactions itself
+ * (a notification's `err`): their events were rolled back.
+ */
+export function decodePumpTradeEventsFromLogs(logs: readonly unknown[] | unknown): PumpTradeEvent[] {
+  return tradeEventsFromLogs(logs);
+}
+
+/**
+ * One `Program data: <base64>` log line → TradeEvent, or undefined when the
+ * line is not a TradeEvent. No program-context check: prefer
+ * `decodePumpTradeEventsFromLogs` for whole notifications.
+ */
+export function decodePumpTradeEventLogLine(line: string): PumpTradeEvent | undefined {
+  if (!line.startsWith(PROGRAM_DATA_PREFIX)) return undefined;
+  let bytes: Uint8Array;
+  try {
+    bytes = Uint8Array.from(getBase64Encoder().encode(line.slice(PROGRAM_DATA_PREFIX.length).split(' ')[0] ?? ''));
+  } catch {
+    return undefined;
+  }
+  return decodeTradeEventBytes(bytes);
+}
+
+/** True when the node cut the log list short (events after the cut are missing). */
+export function logsTruncated(logs: readonly unknown[]): boolean {
+  return logs.some((line) => typeof line === 'string' && line.startsWith('Log truncated'));
+}
+
 function tradeEventsFromLogs(logs: unknown): PumpTradeEvent[] {
   if (!Array.isArray(logs)) return [];
   const stack: string[] = [];
@@ -993,14 +1028,8 @@ function tradeEventsFromLogs(logs: unknown): PumpTradeEvent[] {
       stack.pop();
       continue;
     }
-    if (line.startsWith('Program data: ') && stack[stack.length - 1] === PROGRAMS.PUMP) {
-      let bytes: Uint8Array;
-      try {
-        bytes = Uint8Array.from(getBase64Encoder().encode(line.slice('Program data: '.length).split(' ')[0] ?? ''));
-      } catch {
-        continue;
-      }
-      const event = decodeTradeEventBytes(bytes);
+    if (stack[stack.length - 1] === PROGRAMS.PUMP) {
+      const event = decodePumpTradeEventLogLine(line);
       if (event) out.push(event);
     }
   }

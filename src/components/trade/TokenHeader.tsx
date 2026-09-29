@@ -29,11 +29,23 @@ function Pill({ label, children, title }: { label: string; children: React.React
   );
 }
 
-export function TokenHeader({ state, priceUsd }: { state: TokenOverviewState; priceUsd?: number }) {
+export function TokenHeader({
+  state,
+  priceUsd,
+  priceSource,
+  fallbackMarketCapUsd,
+}: {
+  state: TokenOverviewState;
+  priceUsd?: number;
+  /** Set when no market provider prices the token yet and the price comes from the chain (e.g. "pump.fun curve"). */
+  priceSource?: string;
+  /** Market cap from the same on-chain observation as `priceSource`. */
+  fallbackMarketCapUsd?: number;
+}) {
   const { meta, market, mint, launchpad, curve, solUsd } = state;
   const symbol = meta.symbol ?? shortAddress(mint);
   const flash = useFlash(priceUsd);
-  const mc = market?.marketCapUsd ?? (curve && !curve.complete ? curveMarketCapUsd(curve, solUsd) : undefined);
+  const mc = market?.marketCapUsd ?? fallbackMarketCapUsd ?? (curve && !curve.complete ? curveMarketCapUsd(curve, solUsd) : undefined);
   const progress = launchpad?.stage === 'bonding' ? launchpad.progressPct : undefined;
   const links = explorerLinks(mint, { pool: isIndexedPool(state.primaryPool) ? state.primaryPool?.address : undefined, launchpad: launchpad?.launchpad });
   const failures = visibleFailures(state.attempts);
@@ -111,16 +123,20 @@ export function TokenHeader({ state, priceUsd }: { state: TokenOverviewState; pr
         {priceUsd === undefined && rowPending ? (
           <Skeleton className="h-5 w-24" />
         ) : (
-          <span className={cn('rounded-sm px-0.5 font-display text-lg font-semibold tabular text-fg', FLASH[flash])} title={priceUsd === undefined ? 'No price reported' : 'Price in USD'}>
+          <span
+            className={cn('rounded-sm px-0.5 font-display text-lg font-semibold tabular text-fg', FLASH[flash])}
+            title={priceUsd === undefined ? 'No price reported' : priceSource ? `Price in USD from the ${priceSource}` : 'Price in USD'}
+          >
             {priceUsd === undefined ? <Dash /> : formatPrice(priceUsd)}
           </span>
         )}
+        {priceSource && priceUsd !== undefined && <span className="shrink-0 text-2xs text-faint">{priceSource}</span>}
         <Change value={market?.stats.h24?.priceChangePct} className="text-xs font-medium" />
         <span className="sr-only">24h change</span>
       </div>
 
       <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto scrollbar-none lg:justify-end">
-        <Pill label="MC" title="Market cap">
+        <Pill label="MC" title={priceSource && market?.marketCapUsd === undefined ? `Market cap from the ${priceSource}` : 'Market cap'}>
           {mc === undefined ? <Dash /> : formatUsd(mc)}
         </Pill>
         <Pill label="FDV" title="Fully diluted valuation">
@@ -137,7 +153,7 @@ export function TokenHeader({ state, priceUsd }: { state: TokenOverviewState; pr
           {state.supply === undefined ? <Dash /> : formatAmount(state.supply, { maxDecimals: 0 })}
         </Pill>
         <span title={sourceTitle || undefined} className="shrink-0">
-          <FreshnessBadge updatedAt={state.fetchedAt} error={state.error && !state.market ? 'Market data unavailable' : undefined} stale={failures.length > 0 && !state.market} />
+          <FreshnessBadge updatedAt={state.fetchedAt} error={state.error && !state.market ? 'Market data unavailable' : undefined} stale={state.delayed || (failures.length > 0 && !state.market)} />
         </span>
       </div>
     </header>

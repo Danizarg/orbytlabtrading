@@ -2,28 +2,32 @@
 
 import { keepPreviousData, queryOptions, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { runChain, type ChainResult } from '@/lib/core/chain';
+import type { ChainResult } from '@/lib/core/chain';
 import type { BondingCurveState, LaunchStage, PoolInfo } from '@/lib/core/types';
 import { chainWinner, poolFromCurve, selectPrimaryPool } from '@/lib/services/token';
 import { POLL } from '../query';
-import { dex, gecko } from '../sources';
+import { dex, gecko, isServerStale, runWithServerFallback, server } from '../sources';
 
 /**
  * Pools / pairs for a token: DEX Screener (cheap, 300 req/min) first,
- * GeckoTerminal as the independent fallback; refreshed every 60 s. The
- * primary pool (chart + trades) is the most liquid active pool, the curve
- * itself while bonding, or the ?pool= selection.
+ * GeckoTerminal as the independent fallback, then ORBYT's /api/v1/pools
+ * (both sources merged server-side, CDN-cached 60 s) when a browser source
+ * failed, e.g. this visitor's GeckoTerminal quota is spent. Refreshed every
+ * 60 s; a failed refresh keeps the last list (`delayed`). The primary pool
+ * (chart + trades) is the most liquid active pool, the curve itself while
+ * bonding, or the ?pool= selection.
  */
 
 export const poolsKey = (mint: string) => ['pools', mint] as const;
 
 export function loadPools(mint: string, signal?: AbortSignal): Promise<ChainResult<PoolInfo[]>> {
-  return runChain<PoolInfo[]>(
+  return runWithServerFallback<PoolInfo[]>(
     'pools',
     [
       { id: 'dexscreener', run: () => dex.getPools(mint, signal) },
       { id: 'geckoterminal', run: () => gecko.getPools(mint, signal) },
     ],
+    { id: 'orbyt', run: () => server.pools.getPools(mint, signal) },
     { accept: (r) => r.data.length > 0, signal },
   );
 }
@@ -62,5 +66,7 @@ export function usePools(mint: string, input: PoolsInput) {
     return selectPrimaryPool(mint, pools, { stage, curveComplete: curve?.complete, override: override ?? null });
   }, [mint, listed, stage, curve, solUsd, override]);
 
-  return { query, winner: chainWinner(query.data), ...selection };
+  // Stale-while-error: the previous list stays on screen; panels label it "Delayed".
+  const delayed = query.data !== undefined && (query.isRefetchError || isServerStale(query.data));
+  return { query, winner: chainWinner(query.data), delayed, ...selection };
 }

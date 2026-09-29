@@ -1,65 +1,41 @@
 'use client';
 
-import { ChevronDown, ExternalLink, Lock, RefreshCw } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
-import { useNow } from '@/client/hooks/useNow';
+import { useQueryClient } from '@tanstack/react-query';
+import { ExternalLink, LoaderCircle, Wallet } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { WalletDialog } from '@/components/connect/WalletDialog';
+import { WalletIcon } from '@/components/connect/WalletIcon';
 import { cn } from '@/components/ui/cn';
 import { useQuote } from '@/data/hooks/useQuote';
 import { useSolPrice } from '@/data/hooks/useSolPrice';
-import { DASH, formatAge, formatAmount, formatPct, formatPrice, formatUsd } from '@/lib/core/format';
-import { shortAddress } from '@/lib/core/solana';
-import {
-  errorLines,
-  formatSlippage,
-  jupiterSwapUrl,
-  jupiterTokenUrl,
-  parseAmount,
-  parseSlippagePct,
-  priceImpactTone,
-  quoteRate,
-  sanitizeAmountInput,
-  SELL_PCT_PRESETS,
-  SLIPPAGE_PRESETS_BPS,
-  SOL_PRESETS,
-} from '@/lib/services/token';
-import { Chip, Dash, Pane } from './parts';
+import { useWalletBalances } from '@/data/hooks/useWalletBalances';
+import { formatAmount, formatSol } from '@/lib/core/format';
+import { MINTS, shortAddress } from '@/lib/core/solana';
+import { describeError } from '@/lib/net/errors';
+import { buildQuoteRequest, errorLines, jupiterTokenUrl, parseAmount, providerLabel, SOL_DECIMALS, type QuoteSide } from '@/lib/services/token';
+import { useWallet } from '@/lib/wallet/store';
+import { primaryAction, quoteStatus } from './panel/action';
+import { AmountBox, BuyPresets, SellPresets } from './panel/AmountInput';
+import { checkBalance, decimalToRaw, FEE_RESERVE_LAMPORTS, maxBuyAmount, rawToDecimal, sellAmountForPercent, uiBalanceToRaw } from './panel/amounts';
+import { impactGate } from './panel/execution';
+import { PositionSummary } from './panel/PositionSummary';
+import { ImpactConfirm, QuoteSummary, SlippageRow } from './panel/QuoteSummary';
+import { TradeStatus } from './panel/TradeStatus';
+import { positionKeys, usePositionCost } from './panel/usePositionCost';
+import { useTradeExecution } from './panel/useTradeExecution';
+import { Pane } from './parts';
 import { useTradeSettings } from './tradeSettings';
 
-const IMPACT_CLASS = { ok: 'text-fg-dim', warn: 'text-warn', danger: 'text-down', unknown: 'text-faint' } as const;
-
-function QuoteAge({ at }: { at?: number }) {
-  const now = useNow();
-  if (!at || !now) return null;
-  return <span className="tabular">{formatAge(at, now)} ago</span>;
-}
-
-function Row({ label, children, title, className }: { label: string; children: ReactNode; title?: string; className?: string }) {
-  return (
-    <div className={cn('flex h-6 items-center justify-between gap-3 text-xs', className)} title={title}>
-      <span className="shrink-0 text-muted">{label}</span>
-      <span className="min-w-0 truncate text-right tabular text-fg-dim">{children}</span>
-    </div>
-  );
-}
-
-/** Setting row inside the Advanced disclosure; `note` says where the value takes effect. */
-function SettingRow({ label, note, children }: { label: string; note: string; children: ReactNode }) {
-  return (
-    <div className="flex h-7 items-center justify-between gap-2 text-2xs">
-      <span className="min-w-0">
-        <span className="text-muted">{label}</span>
-        <span className="ml-1.5 text-faint">{note}</span>
-      </span>
-      {children}
-    </div>
-  );
-}
+/** Recent activity is indexed a few seconds after a swap lands: re-read the position after this long. */
+const POSITION_REFRESH_MS = 8_000;
+const RESERVE_SOL = rawToDecimal(FEE_RESERVE_LAMPORTS, SOL_DECIMALS);
 
 /**
- * Axiom-style trade panel: Buy / Sell, Market / Limit, amount with presets,
- * slippage, an Advanced disclosure and a real Jupiter quote (debounced,
- * refreshed every 10 s while visible). The primary button opens the pair on
- * jup.ag in a new tab, where the swap is signed with the user's own wallet.
+ * Axiom-style trade panel: Buy / Sell, amount with presets and the connected
+ * wallet's balances, slippage, a live Jupiter Ultra quote (refreshed every
+ * 10 s while visible) and in-app execution with the connected wallet:
+ * Jupiter builds the order for the wallet, the wallet signs, Jupiter lands
+ * it. Disconnected, the primary button opens the wallet dialog.
  */
 export function TradePanel({
   mint,
@@ -71,297 +47,337 @@ export function TradePanel({
   mint: string;
   symbol?: string;
   decimals?: number;
-  /** Current token price (USD) for the sell-side USD estimate. */
+  /** Current token price (USD) for the sell-side USD estimate and the position value. */
   priceUsd?: number;
   className?: string;
 }) {
-  const s = useTradeSettings();
+  const side = useTradeSettings((s) => s.side);
+  const setSideSetting = useTradeSettings((s) => s.setSide);
+  const slippageBps = useTradeSettings((s) => s.slippageBps);
+  const setSlippageBps = useTradeSettings((s) => s.setSlippageBps);
+  const buyPresets = useTradeSettings((s) => s.buyPresets);
+  const setBuyPreset = useTradeSettings((s) => s.setBuyPreset);
+  const resetBuyPresets = useTradeSettings((s) => s.resetBuyPresets);
+
   const [amount, setAmount] = useState('');
-  const [customSlippage, setCustomSlippage] = useState('');
+  // A sell amount is in the token's own units: it never carries over to another token.
+  const [amountMint, setAmountMint] = useState(mint);
+  if (amountMint !== mint) {
+    setAmountMint(mint);
+    if (side === 'sell') setAmount('');
+  }
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [impactAck, setImpactAck] = useState<{ key: string; pct: number } | null>(null);
+  const primaryRef = useRef<HTMLButtonElement>(null);
+  const positionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const client = useQueryClient();
+
+  // Wallet discovery / silent reconnect (idempotent and ref-counted; the header starts it too).
+  useEffect(() => useWallet.getState().init(), []);
+  useEffect(() => () => clearTimeout(positionTimer.current), []);
+  const address = useWallet((w) => w.address);
+  const walletStatus = useWallet((w) => w.status);
+  const walletName = useWallet((w) => w.walletName);
+  const walletIcon = useWallet((w) => w.walletIcon);
+  const canSignTransaction = useWallet((w) => w.wallets.find((o) => o.name === w.walletName)?.canSignTransaction ?? false);
+  const connected = address !== null && (walletStatus === 'connected' || walletStatus === 'signing');
+  const owner = connected ? address : null;
+
   const solPrice = useSolPrice();
   const solUsd = solPrice.data?.data.priceUsd;
   const label = symbol ?? shortAddress(mint);
-  const isBuy = s.side === 'buy';
-  const market = s.orderMode === 'market';
+  const isBuy = side === 'buy';
 
-  const { quote, result, request, debouncing, stale, error, isPending, isFetching } = useQuote({
-    mint,
-    side: s.side,
-    amount,
-    tokenDecimals: decimals,
-    slippageBps: s.slippageBps,
-    enabled: market,
+  const balances = useWalletBalances(owner, mint);
+  const tokenDecimals = decimals ?? balances.token?.decimals;
+  const position = usePositionCost(owner, mint, balances.token?.amount);
+
+  const { refresh: refreshBalances } = balances;
+  const onSent = useCallback(() => {
+    refreshBalances();
+    if (!owner) return;
+    clearTimeout(positionTimer.current);
+    positionTimer.current = setTimeout(() => void client.invalidateQueries({ queryKey: positionKeys.activity(owner) }), POSITION_REFRESH_MS);
+  }, [refreshBalances, client, owner]);
+  const trade = useTradeExecution({ onSent });
+  // Switching token abandons a trade the wallet has not signed yet (no prompt for a token
+  // no longer on screen) and clears a finished trade's result, which belongs to its own token.
+  const { dismiss: dismissTrade, cancel: cancelTrade } = trade;
+  useEffect(() => {
+    cancelTrade();
+    dismissTrade();
+  }, [mint, cancelTrade, dismissTrade]);
+
+  const q = useQuote({ mint, side, amount, tokenDecimals, slippageBps, paused: trade.busy });
+  const { quote } = q;
+
+  // Amounts in raw units of the input asset (lamports for buys).
+  const inputDecimals = isBuy ? SOL_DECIMALS : tokenDecimals;
+  const amountRaw = inputDecimals === undefined ? undefined : decimalToRaw(amount, inputDecimals);
+  const token = balances.token;
+  const tokenRaw = token?.amount === 0 ? 0n : uiBalanceToRaw(token?.amount, tokenDecimals);
+  const balanceRaw = isBuy ? balances.sol?.lamports : tokenRaw;
+  const balance = connected ? checkBalance({ side, amountRaw, balanceRaw }) : 'unknown';
+
+  // Price impact above 15 % needs an explicit confirmation, tied to this exact token / side / amount / slippage;
+  // an order stopped on its impact only counts for the form it was placed with.
+  const ackKey = `${mint}|${side}|${amount}|${slippageBps}`;
+  const accepted = impactAck?.key === ackKey ? impactAck.pct : undefined;
+  const { impactPct: dangerImpact, needsConfirm: needsImpactConfirm } = impactGate({
+    quoteImpactPct: quote?.priceImpactPct,
+    trade: trade.state,
+    key: ackKey,
+    acceptedImpactPct: accepted,
   });
+
+  // The order uses the amount as typed now (the quote may still be catching up with it).
+  const request = buildQuoteRequest({ side, mint, amount, tokenDecimals, slippageBps });
+  const tradable = tokenDecimals !== undefined && mint !== MINTS.SOL;
+  const action = primaryAction({
+    walletStatus,
+    connected,
+    walletName,
+    canSignTransaction,
+    phase: trade.state.phase,
+    side,
+    symbol: label,
+    tradable,
+    hasAmount: request !== undefined,
+    balance,
+    needsImpactConfirm,
+  });
+
+  const onPrimary = () => {
+    if (action.kind === 'connect') {
+      setDialogOpen(true);
+      return;
+    }
+    if (action.kind !== 'trade' || !request) return;
+    void trade.execute({
+      side,
+      inputMint: request.inputMint,
+      outputMint: request.outputMint,
+      amountRaw: request.amountRaw,
+      slippageBps,
+      symbol: label,
+      key: ackKey,
+      ...(tokenDecimals !== undefined ? { tokenDecimals } : {}),
+      ...(accepted !== undefined ? { acceptedImpactPct: accepted } : {}),
+    });
+  };
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+    requestAnimationFrame(() => {
+      if (!document.activeElement || document.activeElement === document.body) primaryRef.current?.focus();
+    });
+  };
+
+  // Amounts are per side (SOL for buys, tokens for sells): switching side starts from an empty field.
+  const setSide = (next: QuoteSide) => {
+    if (next === side) return;
+    setSideSetting(next);
+    setAmount('');
+    trade.dismiss();
+  };
 
   const amountNum = parseAmount(amount);
   const amountUsd = amountNum === undefined ? undefined : isBuy ? (solUsd === undefined ? undefined : amountNum * solUsd) : priceUsd === undefined ? undefined : amountNum * priceUsd;
-  const rate = quote ? quoteRate(quote, s.side) : undefined;
-  const impactTone = priceImpactTone(quote?.priceImpactPct);
-  const slippageForMin = quote?.slippageBps ?? s.slippageBps;
-  const minReceived = quote ? quote.outAmount * (1 - slippageForMin / 10_000) : undefined;
-  const receiveSymbol = isBuy ? label : 'SOL';
-  const outUsd = quote?.outUsd ?? (quote ? (isBuy ? (priceUsd === undefined ? undefined : quote.outAmount * priceUsd) : solUsd === undefined ? undefined : quote.outAmount * solUsd) : undefined);
-  const customIsActive = !SLIPPAGE_PRESETS_BPS.includes(s.slippageBps);
 
-  let status = '';
-  if (request === undefined) status = decimals === undefined ? 'Waiting for token decimals' : 'Enter an amount for a live quote';
-  else if (debouncing || isPending || stale) status = 'Quoting…';
-  else if (quote) status = 'Refreshes every 10 s';
+  // A failed refresh keeps the last quote on screen (with its age) but never hides the provider error.
+  const { text: status, showError } = quoteStatus({
+    tradable,
+    isSolMint: mint === MINTS.SOL,
+    hasRequest: q.request !== undefined,
+    busy: trade.busy,
+    loading: q.debouncing || q.isPending || q.stale,
+    hasQuote: quote !== undefined,
+    failed: q.error !== undefined,
+  });
+  const quoteErrors = showError && q.error !== undefined ? errorLines(q.error) : [];
 
-  // Amounts are per side (SOL for buys, tokens for sells): switching side starts from an empty field.
-  const setSide = (side: typeof s.side) => {
-    if (side === s.side) return;
-    s.setSide(side);
-    setAmount('');
-  };
+  // Balance line in the amount box (connected wallets only).
+  let balanceNode: ReactNode | undefined;
+  if (connected) {
+    if (isBuy) {
+      balanceNode = balances.sol ? (
+        <span className="tabular text-fg-dim" title={`Source: ${providerLabel(balances.sol.source)}`}>
+          {formatSol(balances.sol.sol, { maxDecimals: 4 })}
+        </span>
+      ) : balances.solError ? (
+        <span className="text-faint" title={`Balance unavailable: ${describeError(balances.solError)}`}>
+          —
+        </span>
+      ) : (
+        <span className="text-faint">…</span>
+      );
+    } else {
+      balanceNode =
+        token?.amount !== undefined ? (
+          <span className="tabular text-fg-dim" title={`Source: ${providerLabel(token.source)}`}>
+            {formatAmount(token.amount)} {label}
+          </span>
+        ) : balances.tokenError || token ? (
+          <span className="text-faint" title={balances.tokenError ? `Balance unavailable: ${describeError(balances.tokenError)}` : 'Balance not readable from the source'}>
+            —
+          </span>
+        ) : (
+          <span className="text-faint">…</span>
+        );
+    }
+  }
+  const maxAmount = connected && isBuy ? maxBuyAmount(balances.sol?.lamports) : undefined;
+
+  const sellDisabledTitle = !connected
+    ? 'Connect a wallet to sell a share of your balance'
+    : balances.tokenPending
+      ? 'Loading your balance'
+      : token?.amount === 0
+        ? `No ${label} in this wallet`
+        : 'Balance unavailable';
+
+  const primaryClass =
+    action.kind === 'connect'
+      ? 'bg-brand text-bg hover:bg-brand-strong'
+      : action.kind === 'blocked' || action.kind === 'connecting'
+        ? 'bg-panel-3 text-muted'
+        : isBuy
+          ? 'bg-up text-bg hover:bg-up/90'
+          : 'bg-down text-bg hover:bg-down/90';
 
   return (
     <Pane className={cn('shrink-0', className)}>
       <div className="p-3">
-        <div role="tablist" aria-label="Side" className="grid h-8 grid-cols-2 gap-px rounded-md bg-line p-px">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={isBuy}
-            onClick={() => setSide('buy')}
-            className={cn('rounded-[5px] text-xs font-semibold transition-colors', isBuy ? 'bg-up-soft text-up' : 'bg-panel text-muted hover:bg-hover hover:text-fg')}
-          >
-            Buy
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!isBuy}
-            onClick={() => setSide('sell')}
-            className={cn('rounded-[5px] text-xs font-semibold transition-colors', !isBuy ? 'bg-down-soft text-down' : 'bg-panel text-muted hover:bg-hover hover:text-fg')}
-          >
-            Sell
-          </button>
+        <div role="group" aria-label="Side" className="grid h-8 grid-cols-2 gap-px rounded-md bg-line p-px">
+          {(['buy', 'sell'] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              aria-pressed={side === s}
+              onClick={() => setSide(s)}
+              className={cn(
+                'rounded-[5px] text-xs font-semibold transition-colors',
+                side === s ? (s === 'buy' ? 'bg-up-soft text-up' : 'bg-down-soft text-down') : 'bg-panel text-muted hover:bg-hover hover:text-fg',
+              )}
+            >
+              {s === 'buy' ? 'Buy' : 'Sell'}
+            </button>
+          ))}
         </div>
 
-        <div className="mt-2 flex items-center justify-between">
-          <div role="tablist" aria-label="Order type" className="flex items-center gap-3">
-            {(['market', 'limit'] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                role="tab"
-                aria-selected={s.orderMode === mode}
-                onClick={() => s.setOrderMode(mode)}
-                className={cn(
-                  'h-6 border-b-2 text-xs font-medium capitalize transition-colors',
-                  s.orderMode === mode ? 'border-brand text-fg' : 'border-transparent text-muted hover:text-fg',
-                )}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-          {market && (
-            <button
-              type="button"
-              onClick={() => s.setAdvancedOpen(!s.advancedOpen)}
-              aria-expanded={s.advancedOpen}
-              aria-controls="trade-advanced"
-              className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-2xs text-muted hover:bg-hover hover:text-fg"
-            >
-              Advanced
-              <ChevronDown aria-hidden className={cn('size-3 transition-transform', s.advancedOpen && 'rotate-180')} />
-            </button>
+        <div className="mt-2 flex h-6 items-center justify-between">
+          <span className="h-6 border-b-2 border-brand text-xs leading-6 font-medium text-fg">Market</span>
+          {connected && address && (
+            <span className="inline-flex min-w-0 items-center gap-1.5 text-2xs text-muted" title={`${walletName ?? 'Wallet'} ${address}`}>
+              <WalletIcon icon={walletIcon} name={walletName} className="size-3.5 rounded-[3px]" />
+              <span className="font-mono">{shortAddress(address)}</span>
+            </span>
           )}
         </div>
 
-        {market ? (
-          <>
-            <div className="mt-2 rounded-md border border-line bg-panel-2 px-2.5 py-2">
-              <div className="flex items-center justify-between text-2xs text-muted">
-                <span>{isBuy ? 'You pay' : 'You sell'}</span>
-                <span title="Wallet balance shows once a wallet is connected">
-                  Balance <span className="text-faint">{DASH}</span>
-                </span>
-              </div>
-              <div className="mt-1 flex items-center gap-2">
-                <input
-                  inputMode="decimal"
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-label={isBuy ? 'SOL amount' : `${label} amount`}
-                  placeholder="0.0"
-                  value={amount}
-                  onChange={(e) => setAmount(sanitizeAmountInput(e.target.value))}
-                  className="h-7 min-w-0 flex-1 bg-transparent font-display text-lg font-semibold tabular text-fg outline-none placeholder:text-faint"
-                />
-                <span className="max-w-24 shrink-0 truncate text-xs font-semibold text-fg-dim" title={isBuy ? 'SOL' : label}>
-                  {isBuy ? 'SOL' : label}
-                </span>
-              </div>
-              <div className="mt-0.5 h-4 text-2xs text-faint tabular">{amountUsd === undefined ? '' : `≈ ${formatUsd(amountUsd, { compact: false })}`}</div>
-            </div>
+        <AmountBox
+          side={side}
+          unit={isBuy ? 'SOL' : label}
+          amount={amount}
+          onAmount={setAmount}
+          amountUsd={amountUsd}
+          balance={balanceNode}
+          onMax={connected && isBuy ? (maxAmount === undefined ? null : () => setAmount(maxAmount)) : undefined}
+          maxTitle={
+            maxAmount !== undefined
+              ? `Balance minus ${RESERVE_SOL} SOL kept for network fees`
+              : balances.sol
+                ? `Balance is below the ${RESERVE_SOL} SOL kept for network fees`
+                : 'Waiting for your SOL balance'
+          }
+        />
 
-            <div className="mt-1.5 grid grid-cols-4 gap-1">
-              {isBuy
-                ? SOL_PRESETS.map((v) => (
-                    <Chip key={v} active={amount === String(v)} onClick={() => setAmount(String(v))} className="h-7 bg-panel-2" title={`${v} SOL`}>
-                      {v} SOL
-                    </Chip>
-                  ))
-                : SELL_PCT_PRESETS.map((pct) => (
-                    <Chip key={pct} disabled className="h-7 bg-panel-2" title="Percent of holdings needs a connected wallet">
-                      {pct}%
-                    </Chip>
-                  ))}
-            </div>
-
-            <div className="mt-2 flex items-center gap-1">
-              <span className="w-14 shrink-0 text-2xs text-muted">Slippage</span>
-              {SLIPPAGE_PRESETS_BPS.map((bps) => (
-                <Chip
-                  key={bps}
-                  active={s.slippageBps === bps}
-                  onClick={() => {
-                    s.setSlippageBps(bps);
-                    setCustomSlippage('');
-                  }}
-                  className="flex-1 bg-panel-2"
-                >
-                  {formatSlippage(bps)}
-                </Chip>
-              ))}
-              <label className={cn('flex h-6 w-16 shrink-0 items-center rounded bg-panel-2 px-1.5 text-2xs', customIsActive ? 'text-brand-strong ring-1 ring-brand/50' : 'text-muted')}>
-                <input
-                  inputMode="decimal"
-                  aria-label="Custom slippage percent"
-                  placeholder={customIsActive ? formatSlippage(s.slippageBps).replace('%', '') : 'Custom'}
-                  value={customSlippage}
-                  onChange={(e) => {
-                    const text = e.target.value.slice(0, 6);
-                    setCustomSlippage(text);
-                    const bps = parseSlippagePct(text);
-                    if (bps !== undefined) s.setSlippageBps(bps);
-                  }}
-                  className="w-full bg-transparent tabular outline-none placeholder:text-faint"
-                />
-                %
-              </label>
-            </div>
-
-            {s.advancedOpen && (
-              <div id="trade-advanced" className="mt-2 rounded-md border border-line px-2.5 py-1">
-                <SettingRow label="Priority fee" note="applied in wallet">
-                  <label className="flex h-6 items-center gap-1 rounded bg-panel-2 px-1.5 text-fg-dim">
-                    <input
-                      inputMode="decimal"
-                      aria-label="Priority fee in SOL"
-                      value={s.priorityFeeSol}
-                      onChange={(e) => s.setPriorityFeeSol(sanitizeAmountInput(e.target.value))}
-                      className="w-14 bg-transparent text-right tabular outline-none"
-                    />
-                    SOL
-                  </label>
-                </SettingRow>
-                <SettingRow label="MEV protection" note="applied in wallet">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={s.mevProtection}
-                    aria-label="MEV protection"
-                    onClick={() => s.setMevProtection(!s.mevProtection)}
-                    className={cn('relative h-4 w-7 shrink-0 rounded-full transition-colors', s.mevProtection ? 'bg-brand' : 'bg-line-strong')}
-                  >
-                    <span aria-hidden className={cn('absolute top-0.5 left-0.5 size-3 rounded-full bg-fg transition-transform', s.mevProtection && 'translate-x-3')} />
-                  </button>
-                </SettingRow>
-              </div>
-            )}
-
-            <div className={cn('mt-2 border-t border-line pt-1.5 transition-opacity', stale && 'opacity-50')} aria-busy={stale || undefined}>
-              <Row label="You receive" title="Jupiter quote for the entered amount">
-                {quote ? (
-                  <>
-                    <span className="text-fg">≈ {formatAmount(quote.outAmount)}</span> {receiveSymbol}
-                    {outUsd !== undefined && <span className="ml-1 text-faint">({formatUsd(outUsd)})</span>}
-                  </>
-                ) : (
-                  <Dash />
-                )}
-              </Row>
-              <Row label="Rate">{rate === undefined ? <Dash /> : `1 ${label} = ${formatPrice(rate, { currency: false })} SOL`}</Row>
-              <Row label="Price impact">
-                <span className={IMPACT_CLASS[impactTone]}>{quote?.priceImpactPct === undefined ? <Dash /> : formatPct(quote.priceImpactPct, { signed: false })}</span>
-              </Row>
-              <Row label="Min. received" title="Quoted amount minus the slippage setting">
-                {minReceived === undefined ? <Dash /> : `${formatAmount(minReceived)} ${receiveSymbol}`}
-              </Row>
-              <Row label="Route" title={quote?.route.join(' → ')}>
-                {quote?.route.length ? quote.route.join(' → ') : <Dash />}
-              </Row>
-              <Row label="Router" title="Jupiter routing product that produced this quote">
-                {quote?.router ?? <Dash />}
-              </Row>
-              <Row label="Fees">{quote?.feeBps === undefined ? <Dash /> : `${(quote.feeBps / 100).toFixed(2)}%`}</Row>
-              <div className="flex h-5 items-center justify-between text-2xs text-faint">
-                <span className="inline-flex items-center gap-1">
-                  {isFetching && <RefreshCw aria-hidden className="size-3 motion-safe:animate-spin" />}
-                  {status}
-                </span>
-                <QuoteAge at={result?.fetchedAt} />
-              </div>
-              {error !== undefined && !quote && request !== undefined && !isPending && (
-                <ul role="alert" className="text-2xs text-down">
-                  {errorLines(error).map((l) => (
-                    <li key={l}>{l}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <a
-              href={jupiterSwapUrl(mint, s.side)}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Opens this pair on jup.ag in a new tab"
-              className={cn(
-                'mt-2 flex h-9 items-center justify-center gap-1.5 rounded-md text-sm font-semibold text-bg transition-colors',
-                isBuy ? 'bg-up hover:bg-up/90' : 'bg-down hover:bg-down/90',
-              )}
-            >
-              <span className="max-w-48 truncate">
-                {isBuy ? 'Buy' : 'Sell'} {label}
-              </span>
-              <ExternalLink aria-hidden className="size-3.5 shrink-0" />
-            </a>
-            <div className="mt-1 flex items-center justify-between text-2xs text-faint">
-              <span>Opens jup.ag in a new tab</span>
-              <a href={jupiterTokenUrl(mint)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 hover:text-fg">
-                Open in Jupiter
-                <ExternalLink aria-hidden className="size-2.5" />
-              </a>
-            </div>
-          </>
+        {isBuy ? (
+          <BuyPresets presets={buyPresets} amount={amount} onPick={setAmount} onSave={setBuyPreset} onReset={resetBuyPresets} />
         ) : (
-          <div className="mt-2 rounded-md border border-line bg-panel-2 px-3 py-4 text-center">
-            <Lock aria-hidden className="mx-auto size-4 text-muted" />
-            <p className="mt-2 text-xs font-medium text-fg-dim">Limit orders require a connected wallet</p>
-            <p className="mt-1 text-2xs text-muted">Market quotes stay available on the Market tab.</p>
-          </div>
+          <SellPresets
+            amount={amount}
+            amountFor={(pct) => (tokenRaw && tokenRaw > 0n ? sellAmountForPercent(tokenRaw, tokenDecimals, pct) : undefined)}
+            disabledTitle={sellDisabledTitle}
+            onPick={setAmount}
+          />
         )}
 
-        <div className="mt-2 grid grid-cols-3 gap-1 border-t border-line pt-2 text-2xs">
-          {[
-            ['SOL balance', 'Balance shows once a wallet is connected'],
-            ['Position', 'Holdings show once a wallet is connected'],
-            ['PnL', 'Profit and loss shows once a wallet is connected'],
-          ].map(([name, title]) => (
-            <div key={name} className="min-w-0" title={title}>
-              <div className="truncate text-faint">{name}</div>
-              <div className="tabular text-fg-dim">
-                <Dash />
-              </div>
-            </div>
-          ))}
+        {balance === 'low_reserve' && <p className="mt-1.5 text-2xs text-warn">Leaves less than {RESERVE_SOL} SOL in the wallet for network fees.</p>}
+
+        <SlippageRow slippageBps={slippageBps} onChange={setSlippageBps} />
+
+        <QuoteSummary
+          quote={quote}
+          side={side}
+          symbol={label}
+          slippageBps={slippageBps}
+          priceUsd={priceUsd}
+          solUsd={solUsd}
+          status={status}
+          fetching={q.isFetching}
+          stale={q.stale}
+          fetchedAt={q.result?.fetchedAt}
+          errorLines={quoteErrors}
+        />
+
+        {dangerImpact !== undefined && connected && (
+          <ImpactConfirm
+            impactPct={dangerImpact}
+            checked={!needsImpactConfirm}
+            disabled={trade.busy}
+            onChange={(checked) => setImpactAck(checked ? { key: ackKey, pct: dangerImpact } : null)}
+          />
+        )}
+
+        <button
+          ref={primaryRef}
+          type="button"
+          onClick={onPrimary}
+          disabled={action.disabled}
+          aria-haspopup={action.kind === 'connect' ? 'dialog' : undefined}
+          aria-busy={action.kind === 'busy' || undefined}
+          className={cn(
+            'mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-md text-sm font-semibold transition-colors disabled:cursor-not-allowed',
+            primaryClass,
+            action.kind === 'busy' && 'opacity-80',
+          )}
+        >
+          {action.kind === 'connect' && <Wallet aria-hidden className="size-3.5 shrink-0" />}
+          {(action.kind === 'busy' || action.kind === 'connecting') && <LoaderCircle aria-hidden className="size-3.5 shrink-0 motion-safe:animate-spin" />}
+          <span className="max-w-60 truncate">{action.label}</span>
+        </button>
+
+        <TradeStatus
+          state={trade.state}
+          symbol={label}
+          tokenDecimals={tokenDecimals}
+          walletName={walletName}
+          onDismiss={trade.dismiss}
+          onCancel={trade.cancellable ? trade.cancel : undefined}
+        />
+
+        <div className="mt-1.5 flex justify-end text-2xs text-faint">
+          <a href={jupiterTokenUrl(mint)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 hover:text-fg">
+            Open in Jupiter
+            <ExternalLink aria-hidden className="size-2.5" />
+          </a>
         </div>
+
+        {connected && (
+          <PositionSummary
+            symbol={label}
+            token={token}
+            tokenPending={balances.tokenPending}
+            tokenError={balances.tokenError}
+            priceUsd={priceUsd}
+            solUsd={solUsd}
+            cost={position.cost}
+            costPending={position.isPending}
+          />
+        )}
       </div>
-      <p className="border-t border-line px-3 py-1.5 text-center text-2xs text-faint">Connect wallet to trade in-app — coming soon</p>
+      {dialogOpen && <WalletDialog initialStep="list" onClose={closeDialog} />}
     </Pane>
   );
 }

@@ -14,6 +14,9 @@ import { errorLines, filterTrades, isLiveFreshness, marketCapAtTrade, parseMinUs
 import { Age, Dash, ErrorLines, SkeletonRows, SourceLine } from './parts';
 import { ROW, TD, TD_NUM, TH, TH_NUM } from './tableStyles';
 
+/** Rows rendered at once (the feed may hold more for the chart). */
+const MAX_ROWS = 300;
+
 const SIDE_TABS = [
   { value: 'all', label: 'All' },
   { value: 'buy', label: 'Buys' },
@@ -71,7 +74,9 @@ export function TradesTable({
   const [minUsdText, setMinUsdText] = useState('');
   const minUsd = parseMinUsd(minUsdText);
   const filtered = useMemo(() => filterTrades(trades, { side, minUsd }), [trades, side, minUsd]);
+  const rows = filtered.length > MAX_ROWS ? filtered.slice(0, MAX_ROWS) : filtered;
   const fresh = feed?.fresh;
+  const onchain = feed?.onchain;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -93,19 +98,27 @@ export function TradesTable({
           {filtered.length !== trades.length ? ` / ${trades.length}` : ''}
         </span>
         <span className="ml-auto">
-          <FreshnessBadge updatedAt={feed?.fetchedAt} live={isLiveFreshness(feed?.freshness)} liveWindowMs={8_000} error={error && !feed ? 'Trade feed unavailable' : undefined} />
+          <FreshnessBadge
+            updatedAt={feed?.fetchedAt}
+            live={isLiveFreshness(feed?.freshness)}
+            // The on-chain feed confirms itself at least every 8 s (reconciliation) even when nobody trades.
+            liveWindowMs={onchain ? 12_000 : 8_000}
+            error={error && !feed ? 'Trade feed unavailable' : undefined}
+          />
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
         {!enabled && poolsPending && <SkeletonRows rows={12} cols={7} />}
-        {!enabled && !poolsPending && <EmptyState title="Waiting for an indexed pool">Trades load once DEX Screener or GeckoTerminal lists a pool for this token.</EmptyState>}
+        {!enabled && !poolsPending && <EmptyState title="Waiting for a pool">Trades load once a pool or bonding curve is known for this token.</EmptyState>}
         {enabled && isPending && !trades.length && <SkeletonRows rows={12} cols={7} />}
         {enabled && !isPending && !trades.length && error !== undefined && (
           <EmptyState title="Trade feed unavailable" tone="error">
             <ErrorLines lines={errorLines(error)} className="text-left" />
           </EmptyState>
         )}
-        {enabled && !isPending && !trades.length && error === undefined && feed && <EmptyState title="No trades yet">The provider has not indexed a trade for this pool.</EmptyState>}
+        {enabled && !isPending && !trades.length && error === undefined && feed && (
+          <EmptyState title="No trades yet">{onchain ? 'No successful trade of this token on this pool on-chain yet.' : 'The provider has not indexed a trade for this pool.'}</EmptyState>
+        )}
         {trades.length > 0 && (
           <table className="w-full min-w-[760px] table-fixed border-separate border-spacing-0">
             <caption className="sr-only">Recent trades, newest first</caption>
@@ -152,7 +165,7 @@ export function TradesTable({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((t) => (
+              {rows.map((t) => (
                 <TradeRow key={t.signature} trade={t} fresh={fresh?.has(t.signature) ?? false} supply={supply} />
               ))}
             </tbody>
@@ -160,7 +173,27 @@ export function TradesTable({
         )}
         {trades.length > 0 && !filtered.length && <EmptyState title="No trades match the filters" />}
       </div>
-      {feed && <SourceLine source={feed.source} fetchedAt={feed.fetchedAt} freshness={feed.freshness} attempts={feed.attempts} notes={feed.notes} className="shrink-0 border-t border-line" />}
+      {feed && (
+        <SourceLine
+          source={feed.source}
+          contributors={feed.contributors}
+          fetchedAt={feed.fetchedAt}
+          freshness={feed.freshness}
+          attempts={feed.attempts}
+          notes={feed.notes}
+          className="shrink-0 border-t border-line"
+          extra={
+            <>
+              {onchain && (
+                <span>
+                  {feed.freshness === 'stream' ? (onchain.pumpCurve ? 'pump.fun trade events streamed from Solana logs' : 'streamed via Solana log subscription') : 'on-chain transactions'} · reconciled every 8 s
+                </span>
+              )}
+              {filtered.length > MAX_ROWS && <span>newest {MAX_ROWS} of {filtered.length} shown</span>}
+            </>
+          }
+        />
+      )}
     </div>
   );
 }

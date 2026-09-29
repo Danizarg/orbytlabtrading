@@ -29,7 +29,22 @@ export interface DiscoverDeps {
 export interface TokenRowsDeps {
   jupiter: TokenRowsProvider | null;
   coingecko: TokenRowsProvider | null;
+  /**
+   * Keyless Jupiter from the server (tight local budget). Skipped when the
+   * keyed Jupiter answered: it would only repeat the same index.
+   */
+  jupiterKeyless?: TokenRowsProvider | null;
+  /** DEX Screener (keyless, 300 req/min): a different index for mints the others lack. */
+  dex?: TokenRowsProvider | null;
 }
+
+/** CDN policy for /api/v1/tokens answers that used a keyless source. */
+export const KEYLESS_TOKENS_CACHE = { sMaxAge: 15, swr: 45 } as const;
+/** Per-worker memory TTL (ms) for keyless answers. */
+export const KEYLESS_TOKENS_TTL_MS = 15_000;
+
+/** Token rows plus whether a keyless source was asked (drives the cache lifetime). */
+export type TokenRowsResult = ChainResult<TokenRow[]> & { keyless: boolean };
 
 /**
  * Fill row gaps from Jupiter Ultra: holder-risk percentages (never
@@ -96,11 +111,17 @@ export async function loadDiscover(query: DiscoverQuery, deps: DiscoverDeps): Pr
 /**
  * Rows for arbitrary mints with coverage failover: each provider is asked only
  * for the mints still missing, so a token one index lacks can come from the
- * next. Rows keep the requested order; unknown mints are simply absent.
+ * next. Order: keyed Jupiter → keyed CoinGecko → keyless Jupiter (only when
+ * the keyed Jupiter did not answer) → DEX Screener. Rows keep the requested
+ * order; unknown mints are simply absent.
  */
-export async function loadTokenRows(mints: readonly string[], deps: TokenRowsDeps): Promise<ChainResult<TokenRow[]>> {
-  const providers = [deps.jupiter, deps.coingecko].filter((p): p is TokenRowsProvider => p !== null);
-  if (!providers.length) {
+export async function loadTokenRows(mints: readonly string[], deps: TokenRowsDeps): Promise<TokenRowsResult> {
+  const steps: Array<{ provider: TokenRowsProvider; keyless: boolean; skipIfKeyedJupiterAnswered?: boolean }> = [];
+  if (deps.jupiter) steps.push({ provider: deps.jupiter, keyless: false });
+  if (deps.coingecko) steps.push({ provider: deps.coingecko, keyless: false });
+  if (deps.jupiterKeyless) steps.push({ provider: deps.jupiterKeyless, keyless: true, skipIfKeyedJupiterAnswered: true });
+  if (deps.dex) steps.push({ provider: deps.dex, keyless: true });
+  if (!steps.length) {
     throw new NotConfiguredError('Server token rows need JUPITER_API_KEY or COINGECKO_API_KEY. The browser uses public sources instead.');
   }
   const wanted = new Set(mints);
@@ -108,13 +129,19 @@ export async function loadTokenRows(mints: readonly string[], deps: TokenRowsDep
   const attempts: ChainAttempt[] = [];
   const contributing: Sourced<TokenRow[]>[] = [];
   let firstOk: Sourced<TokenRow[]> | undefined;
+  let keyedJupiterAnswered = false;
+  let keyless = false;
 
-  for (const provider of providers) {
+  for (const step of steps) {
+    const { provider } = step;
     const missing = mints.filter((m) => !byMint.has(m));
     if (!missing.length) break;
+    if (step.skipIfKeyedJupiterAnswered && keyedJupiterAnswered) continue;
+    if (step.keyless) keyless = true;
     try {
       const result = await provider.getRows(missing);
       attempts.push({ provider: provider.id, ok: true });
+      if (provider === deps.jupiter) keyedJupiterAnswered = true;
       firstOk ??= result;
       let added = 0;
       for (const row of result.data) {
@@ -137,6 +164,13 @@ export async function loadTokenRows(mints: readonly string[], deps: TokenRowsDep
   if (!firstOk) throw new ChainError('tokens', attempts);
 
   const rows = mints.map((m) => byMint.get(m)).filter((r): r is TokenRow => r !== undefined);
+  // No rows is only an answer when every index answered (keyless Jupiter answering covers a failed
+  // keyed Jupiter): otherwise the mints are unknown, not unlisted, and the route serves its last
+  // good rows (flagged stale) instead of an empty list.
+  const answered = new Set(attempts.filter((a) => a.ok).map((a) => a.provider));
+  if (!rows.length && attempts.some((a) => !a.ok && a.code !== 'not_found' && !answered.has(a.provider))) {
+    throw new ChainError('tokens', attempts);
+  }
   const primary = contributing[0] ?? firstOk;
   const parts = contributing.length ? contributing : [firstOk];
   const contributors = contributing.slice(1).map((r) => r.source).filter((s) => s !== primary.source);
@@ -149,5 +183,6 @@ export async function loadTokenRows(mints: readonly string[], deps: TokenRowsDep
     freshness: leastFresh(parts.map((r) => r.freshness)) ?? primary.freshness,
     ...(notes.length ? { notes } : {}),
     attempts,
+    keyless,
   };
 }

@@ -4,12 +4,12 @@ import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { INTERVALS, type Interval } from '@/lib/core/types';
 import { DEFAULT_SLIPPAGE_BPS, MAX_SLIPPAGE_BPS, MIN_SLIPPAGE_BPS, type ChartCurrency, type QuoteSide } from '@/lib/services/token';
+import { BUY_PRESET_COUNT, DEFAULT_BUY_PRESETS, normalizeBuyPresets, parsePresetInput } from './panel/amounts';
 
 /**
- * Browser-local trade-panel and chart preferences. Slippage feeds the quote
- * request; priority fee and MEV protection describe what the user intends to
- * set in their wallet / Jupiter (the swap link cannot carry them). Nothing
- * here leaves the browser.
+ * Browser-local trade-panel and chart preferences. Slippage feeds both the
+ * quote and the order the wallet signs; buy presets are the SOL amounts on
+ * the preset chips (editable). Nothing here leaves the browser.
  *
  * Hydration: the store starts with defaults on the server AND on the
  * client's first render (skipHydration), so SSR markup matches; the token
@@ -19,16 +19,12 @@ import { DEFAULT_SLIPPAGE_BPS, MAX_SLIPPAGE_BPS, MIN_SLIPPAGE_BPS, type ChartCur
  */
 
 export type ChartMode = 'price' | 'mc';
-export type OrderMode = 'market' | 'limit';
 
 export interface TradeSettings {
   side: QuoteSide;
-  orderMode: OrderMode;
   slippageBps: number;
-  /** Priority fee the user intends to pay, SOL (informational). */
-  priorityFeeSol: string;
-  mevProtection: boolean;
-  advancedOpen: boolean;
+  /** SOL amounts on the four buy preset chips. */
+  buyPresets: number[];
   interval: Interval;
   chartMode: ChartMode;
   currency: ChartCurrency;
@@ -36,11 +32,10 @@ export interface TradeSettings {
   /** Saved preferences have been applied (never persisted). */
   hydrated: boolean;
   setSide: (side: QuoteSide) => void;
-  setOrderMode: (mode: OrderMode) => void;
   setSlippageBps: (bps: number) => void;
-  setPriorityFeeSol: (value: string) => void;
-  setMevProtection: (on: boolean) => void;
-  setAdvancedOpen: (open: boolean) => void;
+  /** Replace one buy preset from user text; false (nothing changes) when the text is not a valid SOL amount. */
+  setBuyPreset: (index: number, text: string) => boolean;
+  resetBuyPresets: () => void;
   setInterval: (interval: Interval) => void;
   setChartMode: (mode: ChartMode) => void;
   setCurrency: (currency: ChartCurrency) => void;
@@ -76,24 +71,26 @@ const clampBps = (bps: number) => Math.min(MAX_SLIPPAGE_BPS, Math.max(MIN_SLIPPA
 
 export const useTradeSettings = create<TradeSettings>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       side: 'buy',
-      orderMode: 'market',
       slippageBps: DEFAULT_SLIPPAGE_BPS,
-      priorityFeeSol: '0.001',
-      mevProtection: false,
-      advancedOpen: false,
+      buyPresets: [...DEFAULT_BUY_PRESETS],
       interval: '1m',
       chartMode: 'price',
       currency: 'usd',
       logScale: false,
       hydrated: false,
       setSide: (side) => set({ side }),
-      setOrderMode: (orderMode) => set({ orderMode }),
       setSlippageBps: (bps) => set({ slippageBps: Number.isFinite(bps) ? clampBps(bps) : DEFAULT_SLIPPAGE_BPS }),
-      setPriorityFeeSol: (priorityFeeSol) => set({ priorityFeeSol: priorityFeeSol.slice(0, 12) }),
-      setMevProtection: (mevProtection) => set({ mevProtection }),
-      setAdvancedOpen: (advancedOpen) => set({ advancedOpen }),
+      setBuyPreset: (index, text) => {
+        const value = parsePresetInput(text);
+        if (value === undefined || !Number.isInteger(index) || index < 0 || index >= BUY_PRESET_COUNT) return false;
+        const next = [...get().buyPresets];
+        next[index] = value;
+        set({ buyPresets: normalizeBuyPresets(next) });
+        return true;
+      },
+      resetBuyPresets: () => set({ buyPresets: [...DEFAULT_BUY_PRESETS] }),
       setInterval: (interval) => set({ interval }),
       setChartMode: (chartMode) => set({ chartMode }),
       setCurrency: (currency) => set({ currency }),
@@ -108,24 +105,20 @@ export const useTradeSettings = create<TradeSettings>()(
       partialize: (s) => ({
         side: s.side,
         slippageBps: s.slippageBps,
-        priorityFeeSol: s.priorityFeeSol,
-        mevProtection: s.mevProtection,
-        advancedOpen: s.advancedOpen,
+        buyPresets: s.buyPresets,
         interval: s.interval,
         chartMode: s.chartMode,
         currency: s.currency,
         logScale: s.logScale,
       }),
-      // Validate whatever comes back from storage.
+      // Validate whatever comes back from storage (fields of older versions are dropped).
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<TradeSettings>;
         return {
           ...current,
           side: p.side === 'sell' ? 'sell' : 'buy',
           slippageBps: typeof p.slippageBps === 'number' && Number.isFinite(p.slippageBps) ? clampBps(p.slippageBps) : DEFAULT_SLIPPAGE_BPS,
-          priorityFeeSol: typeof p.priorityFeeSol === 'string' ? p.priorityFeeSol.slice(0, 12) : current.priorityFeeSol,
-          mevProtection: p.mevProtection === true,
-          advancedOpen: p.advancedOpen === true,
+          buyPresets: normalizeBuyPresets(p.buyPresets),
           interval: INTERVALS.includes(p.interval as Interval) ? (p.interval as Interval) : current.interval,
           chartMode: p.chartMode === 'mc' ? 'mc' : 'price',
           currency: p.currency === 'sol' ? 'sol' : 'usd',

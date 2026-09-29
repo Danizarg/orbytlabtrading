@@ -1,8 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { ChainError } from '@/lib/core/chain';
 import type { CandlesQuery, ChartDataProvider, ProviderId } from '@/lib/core/providers';
 import type { CandleSeries, Interval, Sourced } from '@/lib/core/types';
 import { ProviderError } from '@/lib/net/errors';
-import { candleProvidersFor, loadCandles, type CandlesDeps } from './candles';
+import {
+  candleProvidersFor,
+  candlesAreKeylessOnly,
+  candlesCachePolicy,
+  KEYLESS_CANDLES_CACHE,
+  keylessCandlesFor,
+  loadCandles,
+  poolLookupError,
+  type CandlesDeps,
+} from './candles';
+import { noProviderCanServe } from './envelope';
 import { NotConfiguredError } from './errors';
 
 const MINT = '4ov9rwwS4iBHeTWGCrVaQYW1HzWK51MSfs8csGAApump';
@@ -77,5 +88,126 @@ describe('loadCandles', () => {
     const result = await loadCandles({ mint: MINT, interval: '1h', limit: 300 }, { ...NONE, solanaTracker: st.provider });
     expect(result.data.candles).toEqual([]);
     expect(result.source).toBe('solanatracker');
+  });
+});
+
+const GECKO_INTERVALS: readonly Interval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
+const POOL = '8HbgiXuiNbHRcxiNG8UBD8GLewoy6QVDnPFPgjFGmszf';
+const RESOLVED = 'DdMA1cHcHEqYfttc1z1sJEY978CcU1pyjNuTWTNmdvzU';
+
+describe('loadCandles keyless GeckoTerminal fallback', () => {
+  it('serves GeckoTerminal OHLCV without any keyed provider, passing the query through', async () => {
+    const gt = chart('geckoterminal', GECKO_INTERVALS, async (q) => series(q.interval, [60, 120], 'geckoterminal'));
+    const query = { mint: MINT, pool: POOL, interval: '5m' as const, before: 1_759_000_000, limit: 300 };
+    const result = await loadCandles(query, { ...NONE, geckoKeyless: gt.provider });
+    expect(gt.calls).toEqual([query]);
+    expect(result.source).toBe('geckoterminal');
+    expect(result.attempts).toEqual([{ provider: 'geckoterminal', ok: true }]);
+  });
+
+  it('resolves the pool from the cached pool list when the request names none', async () => {
+    const gt = chart('geckoterminal', GECKO_INTERVALS, async (q) => series(q.interval, [60], 'geckoterminal'));
+    const resolvePool = vi.fn(async () => RESOLVED);
+    await loadCandles({ mint: MINT, interval: '1m', limit: 300 }, { ...NONE, geckoKeyless: gt.provider, resolvePool });
+    expect(resolvePool).toHaveBeenCalledWith(MINT);
+    expect(gt.calls[0]?.pool).toBe(RESOLVED);
+  });
+
+  it('answers unsupported (never guesses a pool) when no pool is known', async () => {
+    const gt = chart('geckoterminal', GECKO_INTERVALS, async (q) => series(q.interval, [60], 'geckoterminal'));
+    const error = await loadCandles({ mint: MINT, interval: '1m', limit: 300 }, { ...NONE, geckoKeyless: gt.provider, resolvePool: async () => undefined }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ChainError);
+    expect((error as ChainError).attempts).toEqual([expect.objectContaining({ provider: 'geckoterminal', ok: false, code: 'unsupported' })]);
+    expect(gt.calls).toHaveLength(0);
+  });
+
+  it('reports a failed pool lookup as a retryable failure, never as "not configured" (501)', async () => {
+    const gt = chart('geckoterminal', GECKO_INTERVALS, async (q) => series(q.interval, [60], 'geckoterminal'));
+    const lookup = new ChainError('pools', [
+      { provider: 'dexscreener', ok: false, error: 'dexscreener: timeout', code: 'timeout' },
+      { provider: 'geckoterminal', ok: false, error: 'geckoterminal: HTTP 429', code: 'rate_limited' },
+    ]);
+    const error = await loadCandles(
+      { mint: MINT, interval: '5m', limit: 300 },
+      {
+        ...NONE,
+        geckoKeyless: gt.provider,
+        resolvePool: async () => {
+          throw lookup;
+        },
+      },
+    ).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ChainError);
+    const attempts = (error as ChainError).attempts;
+    expect(attempts).toEqual([expect.objectContaining({ provider: 'geckoterminal', ok: false, code: 'rate_limited' })]);
+    // The route maps an all-'unsupported' chain to 501, which clients skip silently: this must not be one.
+    expect(noProviderCanServe(attempts)).toBe(false);
+    expect(gt.calls).toHaveLength(0);
+  });
+
+  it('maps pool lookup failures to retryable codes and keeps aborts as they are', () => {
+    const timeout = poolLookupError('geckoterminal', new ProviderError('dexscreener', 'timeout', 'dexscreener: timeout'));
+    expect(timeout).toMatchObject({ provider: 'geckoterminal', code: 'timeout' });
+    expect(poolLookupError('geckoterminal', new Error('boom'))).toMatchObject({ code: 'http' });
+    const abort = new ProviderError('dexscreener', 'aborted', 'dexscreener: aborted');
+    expect(poolLookupError('geckoterminal', abort)).toBe(abort);
+  });
+
+  it('runs after every keyed provider and only when they fail or have no candles', async () => {
+    const order: string[] = [];
+    const bird = chart('birdeye', ['1m'], async () => {
+      order.push('birdeye');
+      throw new ProviderError('birdeye', 'rate_limited', 'birdeye: HTTP 429');
+    });
+    const cg = chart('coingecko', ['1m'], async () => {
+      order.push('coingecko');
+      return series('1m', [], 'coingecko');
+    });
+    const gt = chart('geckoterminal', GECKO_INTERVALS, async () => {
+      order.push('geckoterminal');
+      return series('1m', [60], 'geckoterminal');
+    });
+    const result = await loadCandles({ mint: MINT, pool: POOL, interval: '1m', limit: 300 }, { ...NONE, birdeye: bird.provider, coingecko: cg.provider, geckoKeyless: gt.provider });
+    expect(order).toEqual(['birdeye', 'coingecko', 'geckoterminal']);
+    expect(result.source).toBe('geckoterminal');
+
+    const keyedOk = chart('solanatracker', ['1m'], async () => series('1m', [60], 'solanatracker'));
+    const gt2 = chart('geckoterminal', GECKO_INTERVALS, async () => series('1m', [60], 'geckoterminal'));
+    const keyed = await loadCandles({ mint: MINT, pool: POOL, interval: '1m', limit: 300 }, { ...NONE, solanaTracker: keyedOk.provider, geckoKeyless: gt2.provider });
+    expect(keyed.source).toBe('solanatracker');
+    expect(gt2.calls).toHaveLength(0);
+  });
+
+  it('never fabricates sub-minute candles: keyless-only deployments answer not configured', async () => {
+    const gt = chart('geckoterminal', GECKO_INTERVALS, async (q) => series(q.interval, [1], 'geckoterminal'));
+    for (const interval of ['1s', '5s', '15s'] as const) {
+      await expect(loadCandles({ mint: MINT, pool: POOL, interval, limit: 300 }, { ...NONE, geckoKeyless: gt.provider })).rejects.toThrow(
+        new RegExp(`${interval} candles`),
+      );
+    }
+    expect(gt.calls).toHaveLength(0);
+  });
+});
+
+describe('candles cache semantics', () => {
+  const gt = chart('geckoterminal', GECKO_INTERVALS, async (q) => series(q.interval, [60], 'geckoterminal')).provider;
+  const bird = chart('birdeye', ['1s', '1m'], async (q) => series(q.interval, [60], 'birdeye')).provider;
+
+  it('knows when only the keyless source can answer an interval', () => {
+    expect(candlesAreKeylessOnly('1m', { ...NONE, geckoKeyless: gt })).toBe(true);
+    expect(candlesAreKeylessOnly('1m', { ...NONE, birdeye: bird, geckoKeyless: gt })).toBe(false);
+    expect(candlesAreKeylessOnly('5m', { ...NONE, birdeye: bird, geckoKeyless: gt })).toBe(true);
+    expect(candlesAreKeylessOnly('1s', { ...NONE, geckoKeyless: gt })).toBe(false);
+    expect(keylessCandlesFor('1s', { ...NONE, geckoKeyless: gt })).toBeUndefined();
+  });
+
+  it('caches keyless GeckoTerminal answers 30 s (latest) / 600 s (older pages) and keyed ones by their own policy', () => {
+    const keyed = { latest: { sMaxAge: 10, swr: 30 }, history: { sMaxAge: 300, swr: 3_600 } };
+    expect(candlesCachePolicy('geckoterminal', false, keyed)).toEqual(KEYLESS_CANDLES_CACHE.latest);
+    expect(candlesCachePolicy('geckoterminal', true, keyed)).toEqual(KEYLESS_CANDLES_CACHE.history);
+    expect(KEYLESS_CANDLES_CACHE.latest.sMaxAge).toBe(30);
+    expect(KEYLESS_CANDLES_CACHE.history.sMaxAge).toBe(600);
+    expect(candlesCachePolicy('birdeye', false, keyed)).toBe(keyed.latest);
+    expect(candlesCachePolicy('coingecko', true, keyed)).toBe(keyed.history);
   });
 });
