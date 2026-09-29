@@ -227,7 +227,17 @@ Added wallet balance auto-deposit flow for the trading platform:
 
 **Testing:** Run `npm run dev`, connect wallet via header button, click Deposit to see balance and sign button.
 
-State as of 2026-09-29 (after wallet deposit feature):
+**Devnet Testing (2026-09-29):** 
+- Created `.env.local` with devnet RPC endpoints for testing with testnet SOL
+- `NEXT_PUBLIC_SOLANA_BROWSER_RPC_URL=https://api.devnet.solana.com`
+- `NEXT_PUBLIC_SOLANA_WS_URL=wss://api.devnet.solana.com`
+- Dev server is running and automatically picked up the `.env.local` configuration
+- User has 5 devnet SOL to test the auto-deposit flow
+- **Before testing:** Ensure Phantom wallet is set to **Devnet** network
+- **To test:** Navigate to http://localhost:3000, connect wallet on devnet, balance should display and auto-trigger signature request
+
+State as of 2026-09-29 (after wallet deposit feature + devnet config):
 - 1595 tests pass; typecheck and lint are clean (6 pre-existing format test failures in formatUsd)
 - Wallet balance auto-deposit feature complete and ready for testing
+- Dev server running with devnet configuration loaded
 - All code follows existing patterns: proper error handling, Wallet Standard integration, transaction safety
