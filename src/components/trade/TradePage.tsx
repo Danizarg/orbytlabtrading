@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { Tabs } from '@/components/ui/Tabs';
 import { useHolders } from '@/data/hooks/useHolders';
+import { useQuotePrice } from '@/data/hooks/useQuotePrice';
 import { useRisk } from '@/data/hooks/useRisk';
 import { useTokenOverview } from '@/data/hooks/useTokenOverview';
 import { useTrades } from '@/data/hooks/useTrades';
@@ -44,7 +45,10 @@ export function TradePage({ mint }: { mint: string }) {
   const poolIndexed = isIndexedPool(pool);
   // A live pump.fun curve: its trades decode straight from the program logs (the curve PDA is the pool).
   const pumpCurve = pool?.dex === 'pumpfun' && pool.isBondingCurve === true && !t.frozenPools.has(pool.address) && t.curve?.complete !== true;
-  const tradesState = useTrades(mint, pool?.address, { indexed: poolIndexed, pumpCurve, solUsd: t.solUsd, supply: t.supply });
+  // A pool quoted in another asset than SOL or a stablecoin (e.g. GLDx): its trades are valued with that asset's USD price.
+  const quotePrice = useQuotePrice(pool);
+  const quoteUsd = useMemo(() => (quotePrice ? { mint: quotePrice.mint, priceUsd: quotePrice.priceUsd } : undefined), [quotePrice]);
+  const tradesState = useTrades(mint, pool?.address, { indexed: poolIndexed, pumpCurve, solUsd: t.solUsd, quoteUsd, supply: t.supply });
   const [tab, setTab] = useState<Tab>('trades');
 
   // Saved trade-panel / chart preferences apply after mount so SSR and hydration markup match.
@@ -142,6 +146,7 @@ export function TradePage({ mint }: { mint: string }) {
             rowPrice={rowPrice}
             aggregateTicks={!t.poolOverridden}
             solUsd={t.solUsd}
+            quotePrice={quotePrice}
             className="order-1 min-h-[380px] lg:col-start-1 lg:row-start-1 lg:min-h-0"
           />
         </ErrorBoundary>
@@ -163,6 +168,7 @@ export function TradePage({ mint }: { mint: string }) {
                 enabled={tradesState.enabled}
                 poolsPending={!poolsAnswered}
                 quoteSymbol={pool?.quoteSymbol}
+                quotePrice={quotePrice}
               />
             )}
             {tab === 'holders' && <HoldersPanel holders={holders} />}

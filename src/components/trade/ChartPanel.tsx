@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useCandles, type PriceObservation } from '@/data/hooks/useCandles';
+import type { QuotePrice } from '@/data/hooks/useQuotePrice';
 import type { TradeFeed } from '@/data/hooks/useTrades';
 import type { LiveTick } from '@/lib/analytics/candles';
 import { formatTime } from '@/lib/core/format';
@@ -16,7 +17,7 @@ import { shortAddress } from '@/lib/core/solana';
 import type { PoolInfo, Trade } from '@/lib/core/types';
 import { fallbackNote } from '@/lib/onchain/candleFallback';
 import { describeAttempt, errorLines, INTERVAL_LABELS, isLiveFreshness, isSolQuoted, visibleFailures } from '@/lib/services/token';
-import { Chip, ErrorLines, Pane, SourceLine, UpdatedAgo } from './parts';
+import { Chip, ErrorLines, Pane, QuotePriceNote, SourceLine, UpdatedAgo } from './parts';
 import { useTradeSettings } from './tradeSettings';
 
 function Divider() {
@@ -64,6 +65,7 @@ export function ChartPanel({
   aggregateTicks,
   poolIndexed,
   solUsd,
+  quotePrice,
   className,
 }: {
   mint: string;
@@ -83,6 +85,8 @@ export function ChartPanel({
   /** Token-level prices may move the last bar (false for a user-pinned pool). */
   aggregateTicks: boolean;
   solUsd?: number;
+  /** USD price of a non-SOL, non-stable quote asset: trades on such a pool are valued with it. */
+  quotePrice?: QuotePrice;
   className?: string;
 }) {
   // Saved interval / currency apply after mount; wait for them before fetching candles.
@@ -129,6 +133,8 @@ export function ChartPanel({
 
   const derivedTrades = c.derivation?.trades ?? 0;
   const derivedTooFew = c.kind === 'trades' && derivedTrades < 2;
+  // Held trades the bars could not use (no USD price yet).
+  const unpricedTrades = c.kind === 'trades' ? Math.max(0, trades.length - derivedTrades) : 0;
   const showChart = c.available && !derivedTooFew && candles.length > 0;
   const loading = c.isPending && !candles.length;
   // Trade-built bars depend on the trade feed: its failure (e.g. the on-chain feed could not read the chain) is the chart's too.
@@ -142,6 +148,14 @@ export function ChartPanel({
     empty = (
       <EmptyState title="Trades unavailable" tone="error">
         <ErrorLines lines={tradeFeedFailures.map(describeAttempt)} className="text-left" />
+      </EmptyState>
+    );
+  } else if (derivedTooFew && unpricedTrades > 0 && c.currency === 'usd') {
+    // Trades are in hand but none can be valued yet (e.g. the pool's quote asset has no USD price): say so, not "0 trades".
+    empty = (
+      <EmptyState title="Waiting for a USD price">
+        {trades.length} trade{trades.length === 1 ? '' : 's'} received; {derivedTrades} with a USD price.
+        {pool?.quoteSymbol && !isSolQuoted(pool) ? ` This pool is quoted in ${pool.quoteSymbol}: bars are drawn once ${pool.quoteSymbol}'s USD price is known.` : ' Bars are drawn once the trades can be valued in USD.'}
       </EmptyState>
     );
   } else if (derivedTooFew) {
@@ -293,6 +307,7 @@ export function ChartPanel({
             {c.kind === 'trades' && c.fallback && <span>{fallbackNote(c.fallback)}</span>}
             {c.kind !== 'trades' && c.source && <span>OHLCV</span>}
             {c.currency === 'sol' && <span>in SOL</span>}
+            {c.kind === 'trades' && c.currency === 'usd' && <QuotePriceNote quote={quotePrice} />}
             {pool && (
               <span title={pool.address}>
                 {pool.dexLabel} pool {shortAddress(pool.address)}

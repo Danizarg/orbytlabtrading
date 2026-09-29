@@ -9,7 +9,7 @@
 
 import { ChainError, fillMissing, type ChainAttempt } from '@/lib/core/chain';
 import { PROVIDER_LABELS, type ProviderId, type QuoteRequest } from '@/lib/core/providers';
-import { isSolanaAddress, MINTS } from '@/lib/core/solana';
+import { isSolanaAddress, MINTS, STABLE_MINTS } from '@/lib/core/solana';
 import type {
   BondingCurveState,
   Candle,
@@ -668,6 +668,26 @@ export function isSolQuoted(pool: Pick<PoolInfo, 'quoteMint' | 'quoteSymbol'> | 
   if (pool.quoteMint) return pool.quoteMint === MINTS.SOL;
   const symbol = pool.quoteSymbol?.toUpperCase();
   return symbol === 'SOL' || symbol === 'WSOL';
+}
+
+/**
+ * The pool's quote asset when trades on it need that asset's own USD price to
+ * be valued: neither SOL (SOL/USD) nor a USD stablecoin (e.g. a StonkFun pool
+ * quoted in GLDx).
+ */
+export function otherQuoteMint(pool: Pick<PoolInfo, 'quoteMint'> | undefined): string | undefined {
+  const mint = pool?.quoteMint;
+  return mint && mint !== MINTS.SOL && !STABLE_MINTS.has(mint) ? mint : undefined;
+}
+
+/**
+ * USD price of a pool's quote asset implied by the pool's own prices (one
+ * provider snapshot): USD per token / quote per token.
+ */
+export function impliedQuoteUsd(pool: Pick<PoolInfo, 'priceUsd' | 'priceNative'> | undefined): number | undefined {
+  if (!pool || !isPos(pool.priceUsd) || !isPos(pool.priceNative)) return undefined;
+  const price = pool.priceUsd / pool.priceNative;
+  return isPos(price) ? price : undefined;
 }
 
 export interface CurrencyOption {

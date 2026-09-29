@@ -9,7 +9,7 @@ import {
   type PumpTradeEvent,
 } from '@/lib/analytics/swaps';
 import type { RpcParsedTransaction } from '@/lib/analytics/tx-types';
-import { PROGRAMS } from '@/lib/core/solana';
+import { MINTS, PROGRAMS } from '@/lib/core/solana';
 import { priceWithSol, pumpTradeFromEvents, rawToNumber, reservePriceSol, tradeFromPumpEvents } from './pumpTrades';
 
 /**
@@ -217,5 +217,20 @@ describe('priceWithSol', () => {
   it('keeps a stablecoin-quoted trade’s own USD figures', () => {
     const usdc = { trade: { ...native.trade, solAmount: undefined, priceUsd: 0.07, usdValue: 70 } };
     expect(priceWithSol(usdc, 200, undefined)).toMatchObject({ priceUsd: 0.07, usdValue: 70 });
+  });
+
+  it('values a trade priced in another quote asset (e.g. GLDx) with that asset’s USD price only', () => {
+    // A quote asset that is neither SOL nor a stablecoin (a StonkFun pool's GLDx, say).
+    const GLDX = 'GLDxQuoteAsset11111111111111111111111111111';
+    const direct = { trade: { ...native.trade, solAmount: undefined, quoteAmount: 0.2 }, quote: { mint: GLDX, price: 0.0002, amount: 0.2 } };
+    expect(priceWithSol(direct, 200, 1_000_000_000, { mint: GLDX, priceUsd: 400 })).toMatchObject({ priceUsd: 0.08, usdValue: 80, marketCapUsd: 80_000_000 });
+    // No price for that asset (or a price for another one): nothing is invented, SOL/USD is never used for it.
+    const unpriced = priceWithSol(direct, 200, 1_000_000_000);
+    expect(unpriced.priceUsd).toBeUndefined();
+    expect(unpriced.usdValue).toBeUndefined();
+    expect(priceWithSol(direct, 200, 1_000_000_000, { mint: MINTS.USDC, priceUsd: 1 }).priceUsd).toBeUndefined();
+    // Routed from SOL into the pool: the venue price is the pool's (GLDx), the value the SOL the trader paid.
+    const routed = { trade: native.trade, quote: { mint: GLDX, price: 0.0002 } };
+    expect(priceWithSol(routed, 200, undefined, { mint: GLDX, priceUsd: 400 })).toMatchObject({ priceUsd: 0.08, usdValue: 100 });
   });
 });

@@ -6,12 +6,13 @@ import { cn } from '@/components/ui/cn';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
 import { Tabs } from '@/components/ui/Tabs';
+import type { QuotePrice } from '@/data/hooks/useQuotePrice';
 import type { TradeFeed } from '@/data/hooks/useTrades';
 import { tradeUsdValue } from '@/lib/analytics/trades';
 import { formatAmount, formatDateTime, formatPrice, formatUsd } from '@/lib/core/format';
 import type { Trade } from '@/lib/core/types';
 import { errorLines, filterTrades, isLiveFreshness, marketCapAtTrade, parseMinUsd, type TradeSideFilter } from '@/lib/services/token';
-import { Age, Dash, ErrorLines, SkeletonRows, SourceLine } from './parts';
+import { Age, Dash, ErrorLines, QuotePriceNote, SkeletonRows, SourceLine } from './parts';
 import { ROW, TD, TD_NUM, TH, TH_NUM } from './tableStyles';
 
 /** Rows rendered at once (the feed may hold more for the chart). */
@@ -23,12 +24,18 @@ const SIDE_TABS = [
   { value: 'sell', label: 'Sells' },
 ] as const;
 
-const TradeRow = memo(function TradeRow({ trade, fresh, supply }: { trade: Trade; fresh: boolean; supply?: number }) {
+const TradeRow = memo(function TradeRow({ trade, fresh, supply, solColumn }: { trade: Trade; fresh: boolean; supply?: number; solColumn: boolean }) {
   const usd = tradeUsdValue(trade);
   const mc = marketCapAtTrade(trade, supply);
   const buy = trade.side === 'buy';
-  // Adaptive decimals: a 0.00004 SOL trade must not round to "0".
-  const quote = trade.solAmount !== undefined ? formatAmount(trade.solAmount) : trade.quoteAmount !== undefined ? `${formatAmount(trade.quoteAmount)} ${trade.quoteSymbol ?? ''}`.trim() : undefined;
+  // Adaptive decimals: a 0.00004 SOL trade must not round to "0". A SOL leg under another quote's column
+  // (a trade routed from SOL into a GLDx pool) carries its unit.
+  const quote =
+    trade.solAmount !== undefined
+      ? `${formatAmount(trade.solAmount)}${solColumn ? '' : ' SOL'}`
+      : trade.quoteAmount !== undefined
+        ? `${formatAmount(trade.quoteAmount)} ${trade.quoteSymbol ?? ''}`.trim()
+        : undefined;
   // New rows slide in (row) and flash their value cells in the trade's direction.
   const flash = fresh ? (buy ? 'motion-safe:animate-flash-up' : 'motion-safe:animate-flash-down') : undefined;
   return (
@@ -59,6 +66,7 @@ export function TradesTable({
   enabled,
   poolsPending = false,
   quoteSymbol,
+  quotePrice,
 }: {
   trades: readonly Trade[];
   feed?: TradeFeed;
@@ -69,6 +77,8 @@ export function TradesTable({
   /** The pool list is still loading (the feed cannot start yet). */
   poolsPending?: boolean;
   quoteSymbol?: string;
+  /** USD price of a non-SOL, non-stable quote asset: trades on such a pool are valued with it. */
+  quotePrice?: QuotePrice;
 }) {
   const [side, setSide] = useState<TradeSideFilter>('all');
   const [minUsdText, setMinUsdText] = useState('');
@@ -77,6 +87,7 @@ export function TradesTable({
   const rows = filtered.length > MAX_ROWS ? filtered.slice(0, MAX_ROWS) : filtered;
   const fresh = feed?.fresh;
   const onchain = feed?.onchain;
+  const solColumn = quoteSymbol === undefined || ['SOL', 'WSOL'].includes(quoteSymbol.toUpperCase());
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -166,7 +177,7 @@ export function TradesTable({
             </thead>
             <tbody>
               {rows.map((t) => (
-                <TradeRow key={t.signature} trade={t} fresh={fresh?.has(t.signature) ?? false} supply={supply} />
+                <TradeRow key={t.signature} trade={t} fresh={fresh?.has(t.signature) ?? false} supply={supply} solColumn={solColumn} />
               ))}
             </tbody>
           </table>
@@ -189,6 +200,7 @@ export function TradesTable({
                   {feed.freshness === 'stream' ? (onchain.pumpCurve ? 'pump.fun trade events streamed from Solana logs' : 'streamed via Solana log subscription') : 'on-chain transactions'} · reconciled every 8 s
                 </span>
               )}
+              <QuotePriceNote quote={quotePrice} />
               {filtered.length > MAX_ROWS && <span>newest {MAX_ROWS} of {filtered.length} shown</span>}
             </>
           }

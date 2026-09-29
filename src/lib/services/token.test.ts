@@ -13,6 +13,7 @@ import {
   formatSlippage,
   frozenPools,
   geckoQuoteOhlcvPath,
+  impliedQuoteUsd,
   intervalOptions,
   isDefinitelyAbsent,
   isIndexedPool,
@@ -23,6 +24,7 @@ import {
   mergeLaunchpad,
   mergeOverview,
   mergeRiskReports,
+  otherQuoteMint,
   parseMinUsd,
   parsePoolParam,
   parseSlippagePct,
@@ -337,6 +339,20 @@ describe('chart intervals', () => {
 
 describe('SOL-denominated charts', () => {
   const GECKO = ['1m', '5m', '15m', '1h', '4h', '1d'] as const;
+
+  it('names the quote asset that needs its own USD price (not SOL, not a stablecoin) and the price its pool implies', () => {
+    const GLDX = 'GLDxQuoteAsset11111111111111111111111111111';
+    expect(otherQuoteMint({ quoteMint: GLDX })).toBe(GLDX);
+    expect(otherQuoteMint({ quoteMint: MINTS.SOL })).toBeUndefined();
+    expect(otherQuoteMint({ quoteMint: MINTS.USDC })).toBeUndefined();
+    expect(otherQuoteMint({})).toBeUndefined();
+    expect(otherQuoteMint(undefined)).toBeUndefined();
+    // $0.0000034 per token at 0.0000000085 GLDx per token → GLDx ≈ $400.
+    expect(impliedQuoteUsd({ priceUsd: 0.0000034, priceNative: 0.0000000085 })).toBeCloseTo(400, 9);
+    expect(impliedQuoteUsd({ priceUsd: 0.0000034 })).toBeUndefined();
+    expect(impliedQuoteUsd({ priceUsd: 0, priceNative: 1 })).toBeUndefined();
+    expect(impliedQuoteUsd(undefined)).toBeUndefined();
+  });
 
   it('recognises SOL-quoted pools by mint, else by symbol', () => {
     expect(isSolQuoted(ammPool)).toBe(true);

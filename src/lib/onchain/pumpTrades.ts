@@ -55,6 +55,20 @@ export interface NativeTrade {
   trade: Trade;
   /** Price per token in SOL (undefined when the quote is not SOL or unknown). */
   priceSol?: number;
+  /**
+   * Pools quoted in an asset that is neither SOL nor a USD stablecoin (e.g. a
+   * StonkFun pool quoted in GLDx): the venue price per token in that asset,
+   * and the trade's amount of it when the trade was paid in it (not routed
+   * from another asset). USD fields follow from the asset's USD price
+   * (`QuoteUsd`), the way SOL-quoted trades follow from SOL/USD.
+   */
+  quote?: { mint: string; price: number; amount?: number };
+}
+
+/** USD price of a pool's non-SOL, non-stable quote asset. */
+export interface QuoteUsd {
+  mint: string;
+  priceUsd: number;
 }
 
 export interface PumpTradeContext {
@@ -145,14 +159,20 @@ export function pumpTradeFromEvents(events: readonly PumpTradeEvent[], ctx: Pump
 
 /**
  * USD fields from the SOL price: priceUsd = priceSol × SOL/USD, usdValue =
- * solAmount × SOL/USD, marketCapUsd = priceUsd × supply. Fields a trade
- * already carries (e.g. a USDC-quoted trade's own USD value) are kept.
+ * solAmount × SOL/USD, marketCapUsd = priceUsd × supply. A trade priced in
+ * another quote asset takes priceUsd = quote price × the asset's USD price
+ * (and its usdValue from the quote amount when the trader paid in it). Fields
+ * a trade already carries (e.g. a USDC-quoted trade's own USD value) are kept.
  */
-export function priceWithSol(native: NativeTrade, solUsd: number | undefined, supply: number | undefined): Trade {
+export function priceWithSol(native: NativeTrade, solUsd: number | undefined, supply: number | undefined, quoteUsd?: QuoteUsd): Trade {
   const trade: Trade = { ...native.trade };
   const sol = typeof solUsd === 'number' && Number.isFinite(solUsd) && solUsd > 0 ? solUsd : undefined;
+  const { quote } = native;
+  const quoteRate = quote && quoteUsd?.mint === quote.mint && Number.isFinite(quoteUsd.priceUsd) && quoteUsd.priceUsd > 0 ? quoteUsd.priceUsd : undefined;
   if (trade.priceUsd === undefined && native.priceSol !== undefined && sol !== undefined) trade.priceUsd = native.priceSol * sol;
+  if (trade.priceUsd === undefined && quote && quoteRate !== undefined) trade.priceUsd = quote.price * quoteRate;
   if (trade.usdValue === undefined && trade.solAmount !== undefined && sol !== undefined) trade.usdValue = trade.solAmount * sol;
+  if (trade.usdValue === undefined && quote?.amount !== undefined && quoteRate !== undefined) trade.usdValue = quote.amount * quoteRate;
   if (trade.marketCapUsd === undefined && trade.priceUsd !== undefined && typeof supply === 'number' && Number.isFinite(supply) && supply > 0) {
     trade.marketCapUsd = trade.priceUsd * supply;
   }
