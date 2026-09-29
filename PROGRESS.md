@@ -78,14 +78,14 @@ Per-IP rate limits drive where each call runs.
 | Normalized provider architecture | Done: foundation plus all stage-1 adapters. |
 | Resilience (dedupe, cache, backoff, failover, cooldown) | Done in the transports and chains. Error boundaries and loading states come in stage 2 UI. |
 | API keys / `.env.example` | Done. Every variable is optional and documented with provider, feature and where to get it. |
-| Server API routes `/api/v1/*` | TODO (stage 2 slice `api-routes`). |
-| /discover, /watchlist | TODO (stage 2 slice `discover`). |
-| /pulse (New / Final Stretch / Migrated) | TODO (stage 2 slice `pulse`). Stream client and bonding decoder are done. |
-| /trade/[mint] (real chart, trades, holders, risk, quote) | TODO (stage 2 slice `trade`). |
-| /wallet/[address] + /tracker | TODO (stage 2 slice `wallet-tracker`). PnL engine, activity parser and streams are done. |
-| Global shell (search, SOL price, stream status, status bar) | TODO (stage 2 slice `shell`). |
+| Server API routes `/api/v1/*` | Done: 19 routes, reviewed. Adds auth (SIWS) and a hardened logo proxy. |
+| /discover, /watchlist | Done: a universe of 14 keyless sources with pacing, enrichment and hover prefetch. Reviewed. |
+| /pulse (New / Final Stretch / Migrated) | Done: PumpPortal stream, Jupiter/GeckoTerminal backfill, on-chain curve progress. Reviewed. |
+| /trade/[mint] (real chart, trades, holders, risk, quote) | Done (stage 3). Stage 3c in progress: an on-chain trade feed and trade-built candles for fresh tokens, in-app swaps with the connected wallet, and server fallbacks. |
+| /wallet/[address] + /tracker | Done: holdings, activity, progressive FIFO PnL, and a tracker with account-change hints plus reconciliation. Reviewed. |
+| Global shell (search, SOL price, stream status, status bar) | Done. Adds the wallet connect button (Phantom / Wallet Standard, SIWS). |
 | Freshness badges | Primitive done. Wiring comes in stage 2. |
-| Production build + verification with live data | TODO (after stage 2). |
+| Production build + verification with live data | `next build` passes (2026-09-29 10:00). Browser verification: stage 4. |
 | README / PROGRESS final docs | TODO (final step). |
 
 ## Build log
@@ -130,16 +130,16 @@ Per-IP rate limits drive where each call runs.
 
 ## Next concrete step
 
-Stage 3 (`docs/build/stage3-complete.workflow.js`) was resumed at 2026-09-29 09:00 (run wf_15f42718-4ae).
+Stage 3c (`docs/build/stage3c-onchain-trading.workflow.js`) launched 2026-09-29 ~09:57. It has three tasks, each with a reviewer:
+1. onchain-feed: live trades from publicnode logs plus reconciliation, and candles built from those trades for fresh tokens.
+2. wallet-trading: Axiom-style panel executing Jupiter swaps signed by the connected wallet.
+3. resilience: server keyless fallbacks for candles, pools and tokens with CDN caching, and stale-while-error.
 
-- **Done and cached:** swap-parser review (pool-side quotes, 117 tests), keyed-provider review, Pulse completion.
-- **Re-running:** trade, wallet-tracker and discover, in completion mode (finishing the partial files), plus the api-routes and pulse reviews.
+Then:
+- run stage 4 (`docs/build/stage4-integrate.workflow.js`): browser verification and audits
+- `npm run check` and `npm run build`
+- merge to main and push (the owner asked for this; Vercel redeploys from main)
 
-Owner feedback applied on 2026-09-29:
-- The deposit address is central and read-only, shown with a QR code and a one-line network hint.
-- All disclaimer lines are removed ("Market data only · No custody …", deposit notes).
-- Typography is Inter.
-
-Then run stage 4 (`docs/build/stage4-integrate.workflow.js`): browser verification of every page with live data, plus audits for real-data integrity, security/Vercel, visual quality and performance. After that, `npm run build` and merge to main.
-
-**Note:** main currently contains PR #1 (the early foundation with placeholder pages) and is what the live site shows. Merge this branch as soon as the build is verified.
+State as of 2026-09-29 10:00:
+- 1376 tests pass; typecheck and lint are clean; the production build passes.
+- Owner items done: central deposit address with the owner's QR (a guard test decodes it), no disclaimer lines, Inter font, Phantom connect and sign-in.
