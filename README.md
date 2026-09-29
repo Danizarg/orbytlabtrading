@@ -1,55 +1,74 @@
-# Orbyt AI Trading
+# ORBYT — Solana trading terminal
 
-An Axiom-inspired, responsive Solana market dashboard with real GeckoTerminal data and an editable receiving address.
+A real-data Solana trading terminal in the Axiom / GMGN class: live token discovery, a launch scanner (Pulse), token pages with TradingView Lightweight Charts and live transaction feeds, a read-only trade panel with real Jupiter quotes, wallet analytics with deterministic PnL, and a live wallet tracker.
 
-**New assistant? Read [PROGRESS.md](PROGRESS.md) first.** It records the scope, architecture, validation, deployment status, and next steps for Claude, ChatGPT, or another development environment.
+Every number on screen comes from a real provider or from the chain. Nothing is simulated. When a source can't supply a value, the UI shows `—`.
+
+**Continuing development?** Read [`AGENTS.md`](AGENTS.md), [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) and [`PROGRESS.md`](PROGRESS.md) first.
 
 ## Run
 
-Requires Node.js 20 or later. There are no runtime package dependencies.
+Requires Node.js 24.
 
-```sh
-npm run dev
-npm run check
+```bash
+npm install
+npm run dev        # http://localhost:3000
+npm run check      # typecheck + lint + tests
+npm run build      # production build
 ```
 
-Open the URL printed by the development server (normally http://127.0.0.1:4173). Refresh after static-file edits. Set the `PORT` environment variable if that port is occupied.
+No API keys are required. Without keys ORBYT runs on keyless public sources (see below). Keys unlock faster feeds and extra data; copy `.env.example` to `.env.local` and fill in what you have.
 
-## Live market data
+## Pages
 
-- Trending Solana pools and newly created pairs
-- Search by token name or contract address
-- Real price, market cap, liquidity, volume, and transaction counts
-- On-chain candlesticks and recent trades linked to Solscan
-- 30-second refresh while visible, pause, manual refresh, and a local watchlist
-- Clear missing-data, rate-limit, and delayed-data states; no simulated fallback
+| Route | What it shows |
+| --- | --- |
+| `/discover` | Ranked token table (trending, top volume, organic, new, gainers) across time windows with price, MC, liquidity, volume, txns, holders, risk metrics and DEX. |
+| `/pulse` | Launch scanner: New Pairs (live from the PumpPortal stream), Final Stretch (bonding curves near migration, progress decoded on-chain) and Migrated. |
+| `/trade/[mint]` | Token page: chart, trades, holders, pools, info, risk, launchpad state and an Axiom-style trade panel with live read-only quotes. |
+| `/wallet/[address]` | Holdings, activity and FIFO SOL-denominated PnL for any wallet, computed from parsed transactions. |
+| `/tracker` | Live activity feed for wallets you track (browser-local list). |
+| `/watchlist` | Your starred tokens (browser-local). |
 
-Data source: [GeckoTerminal public API](https://api.geckoterminal.com/docs/index.html). Provider caching and delays apply. Gainers sorts the current trending-pool sample, not every token on Solana.
+## Data sources
 
-## Receiving address
+| Source | Used for | Key |
+| --- | --- | --- |
+| Jupiter (Tokens V2, Price V3, Ultra, Swap) | discovery, metadata, prices, audit/risk, quotes | optional `JUPITER_API_KEY` |
+| GeckoTerminal / CoinGecko on-chain | trending/new/top pools, OHLCV candles, trades, token info, holder summary, launchpad graduation | optional `COINGECKO_API_KEY` |
+| DEX Screener | secondary enrichment (pairs, socials, migration detection) | none |
+| PumpPortal (WebSocket, free tier) | new pump.fun launches and migrations | none |
+| Solana RPC (public mainnet, publicnode, or your own) | bonding curves, mint info, balances, transactions, wallet activity | optional `SOLANA_RPC_URL` |
+| Helius | fast wallet history, holder lists, DAS metadata | optional `HELIUS_API_KEY` |
+| Birdeye | 1s/15s candles, trades, holders, holder tags, meme lists | optional `BIRDEYE_API_KEY` |
+| Solana Tracker | Pulse lists, risk metrics, 1s candles, trades | optional `SOLANATRACKER_API_KEY` |
 
-- **All visitors:** edit `depositAddress` in `dist/config.js`, commit, push, and deploy.
-- **This browser:** use **Deposit → Edit**. This overrides the site default only on the current browser/origin.
-- **Restore site default:** choose **Use site default** in the address dialog.
+Where each call runs is decided by rate limits: keyless public APIs are called from each visitor's browser (their own IP quota), while keyed providers and the public Solana RPC (which blocks browser origins) run in Next.js route handlers under `/api/v1/*` with CDN caching.
 
-The user-configured public address has been preserved. Never enter a seed phrase or private key. Transfers go to the displayed address. The app does not hold funds, verify deposits, credit balances, or execute trades.
+Attribution: on-chain data powered by GeckoTerminal. Quotes are routed by Jupiter (Metis / Jupiter Ultra). Charts use TradingView Lightweight Charts (Apache-2.0).
 
-## Deploy on Vercel
+## Deposit address
 
-Repository: https://github.com/Danizarg/orbytlabtrading
+The Deposit dialog shows ORBYT's central deposit address, defined once in `src/config/site.ts`. It is the same for every visitor, cannot be edited in the UI, and belongs to the site owner. ORBYT does not hold funds, verify deposits or credit balances.
 
-Import the repository into your Vercel account. `vercel.json` selects the `dist` output folder and runs `npm run build` (syntax validation only). Framework preset: **Other**. No environment variables or API keys are required. Keep the root directory at the repository root.
+## Architecture
 
-For CLI deployment after authentication:
+- `src/lib/core` — normalized models, provider interfaces, failover chain, formatting
+- `src/lib/providers/*` — one adapter per provider, each a factory that takes a `JsonFetcher` so it runs in the browser or on the server
+- `src/lib/net`, `src/lib/server` — transports with per-provider budgets, retries, cooldowns and dedupe; server registry; response envelopes
+- `src/lib/streams` — reconnecting WebSocket clients (PumpPortal, Solana PubSub)
+- `src/lib/analytics` — swap derivation from parsed transactions, FIFO PnL, candle aggregation
+- `src/data` — client data layer (browser sources, server proxies, React Query hooks)
+- `src/app/api/v1` — route handlers
+- `src/components` — UI
+- `tests/fixtures` — real provider responses used only in tests
 
-```sh
-npx vercel login
-npx vercel link
-npx vercel --prod
-```
+Details, decisions and current status: [`PROGRESS.md`](PROGRESS.md). Provider research with live-verified endpoint facts: [`docs/research`](docs/research).
 
-Primary intended domain: **www.orbytai.org**. Add it in the Vercel project's Domains settings and use the exact DNS records Vercel supplies. Domain metadata in the HTML does not configure DNS. See PROGRESS.md for the verified current status.
+## Deploy
 
-## Portability
+The repository is Vercel-ready: `vercel.json` sets the Next.js framework preset and Fluid compute. Add environment variables in the Vercel project settings and redeploy. Production data feeds work without any key, but a private RPC (`SOLANA_RPC_URL` or `HELIUS_API_KEY`) is recommended for wallet features under real traffic.
 
-Clone the repo or give another assistant the complete folder plus `PROGRESS.md`. No OpenAI, ChatGPT, or Claude account integration is required. Vercel account authentication and domain ownership are handled separately. Browser-local watchlists and address overrides do not transfer; the public default address does.
+## Not financial advice
+
+ORBYT displays market data and read-only quotes. It never signs transactions, executes trades or holds funds.
