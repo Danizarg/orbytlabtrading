@@ -1,6 +1,6 @@
 # ORBYT UI design brief (for implementation agents)
 
-ORBYT is a dark, dense, professional Solana trading terminal in the Axiom / GMGN class. Information density beats whitespace, but everything stays aligned, legible and calm. The brand is the existing Orbyt palette: purple brand #a895ff, mint "up" #69e6b2, rose "down" #fa788d on near-black panels. Use ONLY the design tokens in src/app/globals.css (Tailwind v4 `@theme`): bg, panel, panel-2, panel-3, hover, line, line-strong, fg, fg-dim, muted, faint, brand, brand-strong, brand-soft, up, up-soft, down, down-soft, warn, warn-soft, info. Fonts: font-sans (DM Sans) for UI, font-display (Space Grotesk) for headings and big numbers, font-mono (JetBrains Mono) for addresses and signatures. Text sizes: text-2xs (11px) for labels and meta, text-xs (12px) for table cells, text-[13px] for body, larger only for headline numbers. Numbers always use the `tabular` utility.
+ORBYT is a dark, dense, professional Solana trading terminal in the Axiom / GMGN class. Information density beats whitespace, but everything stays aligned, legible and calm. The brand is the existing Orbyt palette: purple brand #a895ff, mint "up" #69e6b2, rose "down" #fa788d on near-black panels. Use ONLY the design tokens in src/app/globals.css (Tailwind v4 `@theme`): bg, panel, panel-2, panel-3, hover, line, line-strong, fg, fg-dim, muted, faint, brand, brand-strong, brand-soft, up, up-soft, down, down-soft, warn, warn-soft, info. Fonts: Inter (font-sans and font-display) for all UI text and numbers with tabular figures, JetBrains Mono (font-mono) for addresses and signatures. No other fonts.
 
 ## Principles
 1. **Real data or an honest gap.** A missing metric renders "—" (formatters in src/lib/core/format.ts already do this). Never show 0 for unknown. A delayed source is labelled as delayed.
@@ -20,7 +20,7 @@ Panel, Tabs, Skeleton, EmptyState, Change, FreshnessBadge, TokenAvatar (with bon
   - Logo · Nav (Discover, Pulse, Tracker, Watchlist).
   - Global search (center): accepts a name, symbol or mint. The dropdown shows token hits (avatar, symbol, name, MC, liquidity, verified badge). If the input is a valid address, it offers "Open token" and "Open wallet". Enter opens the first hit.
   - Right side: SOL price chip (◎ $x.xx ±%), stream status dot (popover lists PumpPortal / Solana WS / provider health with cooldowns), Deposit button (existing).
-- **Status bar (28 px, bottom, sticky):** provider health dots, the data attribution line, and "Market data only · No custody · No trade execution".
+- **Status bar (28 px, bottom, sticky):** provider health dots, the data attribution line.
 
 ### /discover
 - **Title row:** "Discover" + list Tabs [Trending, Top volume, Organic, New, Gainers] + window Tabs [5m, 1h, 6h, 24h] + filters popover (min liquidity, min MC, max age, launch stage, hide flagged) + FreshnessBadge.
@@ -66,9 +66,15 @@ Same table fed by the user's watchlist, with an empty state that explains how to
 
 ### /tracker
 - **Left:** tracked wallets (label inline-editable, address, remove, link to /wallet). Add form (address + label, validated).
-- **Right:** live merged activity feed across tracked wallets (newest first), filter by wallet/kind, and a status line explaining the live mechanism: "Live via Solana log subscriptions (best effort) + reconciliation every 60 s". New rows slide in.
+- **Right:** live merged activity feed across tracked wallets (newest first), filter by wallet/kind, and a status line explaining the live mechanism: "Live via Solana log subscriptions (best effort) + reconciliation every 90 s". New rows slide in.
 
 ## Motion and polish
 - Keep motion subtle: 150 ms colour transitions, 900 ms price flash, 350 ms slide-in. Honour prefers-reduced-motion by disabling slide/flash (Tailwind motion-safe:).
 - Every scrolling area gets thin scrollbars (global). Sticky table headers use the bg-panel background.
 - Keep empty cells visually quiet: the "—" dash uses text-faint.
+
+
+## Owner directives (2026-09-29)
+- No disclaimer copy anywhere ("No custody", "Not financial advice", "read-only", "does not hold funds", "coming soon").
+- The deposit dialog shows only the central deposit address, the owner's official QR image (public/deposit-qr.png), copy, Solscan, and a one-line network hint.
+- The look should be sober, institutional and dense, like a big DEX. It must not read as an AI template.

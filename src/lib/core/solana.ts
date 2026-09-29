@@ -9,7 +9,7 @@ export const MINTS = {
   /** Wrapped SOL (also used by providers to mean native SOL). */
   SOL: 'So11111111111111111111111111111111111111112',
   USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-  USDT: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCELBGDxH4',
+  USDT: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
 } as const;
 
 export const PROGRAMS = {

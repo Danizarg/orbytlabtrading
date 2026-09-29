@@ -34,8 +34,10 @@ export function serverRpcUrl(): string {
   return PUBLIC_MAINNET_RPC;
 }
 
+/** Which endpoint serverRpcUrl() actually points at (kept in lockstep with it). */
 export function rpcKind(): 'custom' | 'helius' | 'public' {
-  if (env.solanaRpcUrl() && env.solanaRpcUrl() !== PUBLIC_MAINNET_RPC) return 'custom';
+  const explicit = env.solanaRpcUrl();
+  if (explicit) return explicit === PUBLIC_MAINNET_RPC ? 'public' : 'custom';
   if (env.heliusApiKey()) return 'helius';
   return 'public';
 }

@@ -91,9 +91,11 @@ export function toTrade(d: DerivedTrade, pool: string, source: ProviderId): Trad
     source,
   };
   if (d.wallet) trade.wallet = d.wallet;
-  if (typeof d.solAmount === 'number' && Number.isFinite(d.solAmount)) {
-    trade.solAmount = d.solAmount;
-    trade.quoteAmount = d.solAmount;
+  // Router-paid pump.fun trades carry the curve's SOL amount from the TradeEvent (venue price, before router fees).
+  const solAmount = typeof d.solAmount === 'number' && Number.isFinite(d.solAmount) ? d.solAmount : d.venueSolAmount;
+  if (typeof solAmount === 'number' && Number.isFinite(solAmount) && solAmount > 0) {
+    trade.solAmount = solAmount;
+    trade.quoteAmount = solAmount;
     trade.quoteSymbol = 'SOL';
   } else if (d.quoteMint && typeof d.quoteAmount === 'number' && Number.isFinite(d.quoteAmount)) {
     trade.quoteAmount = d.quoteAmount;

@@ -16,8 +16,14 @@ function safeImage(src: string | null | undefined): string | undefined {
   return undefined;
 }
 
+/** Same-origin logo proxy for hosts that block cross-origin <img> loads (CORP same-origin). */
+function proxied(url: string): string {
+  return `/api/v1/img?u=${encodeURIComponent(url)}`;
+}
+
 /**
- * Token logo with initials fallback. `progress` (0-100) draws a bonding-curve
+ * Token logo with initials fallback. A logo that fails to load directly is
+ * retried once through ORBYT's image proxy before falling back to initials. `progress` (0-100) draws a bonding-curve
  * ring around the avatar, like launch scanners do.
  */
 export function TokenAvatar({
@@ -33,8 +39,11 @@ export function TokenAvatar({
   progress?: number | null;
   className?: string;
 }) {
-  const [failed, setFailed] = useState(false);
-  const url = failed ? undefined : safeImage(src);
+  // 0 = direct, 1 = via proxy, 2 = give up (initials).
+  const [attempt, setAttempt] = useState<{ src: string | null | undefined; step: 0 | 1 | 2 }>({ src, step: 0 });
+  const step = attempt.src === src ? attempt.step : 0;
+  const direct = safeImage(src);
+  const url = !direct || step === 2 ? undefined : step === 1 ? proxied(direct) : direct;
   const initials = (symbol ?? '?').replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2).toUpperCase() || '?';
   const ring = typeof progress === 'number' && Number.isFinite(progress);
   const pct = ring ? Math.min(100, Math.max(0, progress)) : 0;
@@ -64,7 +73,7 @@ export function TokenAvatar({
         style={{ width: size, height: size }}
       >
         {url ? (
-          <img src={url} alt="" width={size} height={size} loading="lazy" referrerPolicy="no-referrer" className="size-full object-cover" onError={() => setFailed(true)} />
+          <img src={url} alt="" width={size} height={size} loading="lazy" referrerPolicy="no-referrer" className="size-full object-cover" onError={() => setAttempt({ src, step: step === 0 ? 1 : 2 })} />
         ) : (
           initials
         )}
