@@ -4,8 +4,8 @@ import { ChainError, type ChainAttempt } from '@/lib/core/chain';
 import type { Freshness, Sourced } from '@/lib/core/types';
 import { cached } from '@/lib/server/cache';
 import { describeError, isProviderError } from '@/lib/server/http';
-import { badRequest, buildMeta, notConfigured, ok, okSourced, upstreamFailure, type CachePolicy } from '@/lib/server/respond';
-import { BadRequestError, NotConfiguredError } from './errors';
+import { badRequest, buildMeta, fail, notConfigured, ok, okSourced, upstreamFailure, type CachePolicy } from '@/lib/server/respond';
+import { BadRequestError, NoRouteError, NotConfiguredError } from './errors';
 
 /**
  * Glue between route services and the shared response helpers: error
@@ -102,6 +102,10 @@ export async function handle(run: () => Promise<Response>): Promise<Response> {
   } catch (error) {
     if (error instanceof BadRequestError) return badRequest(error.message);
     if (error instanceof NotConfiguredError) return notConfigured(error.message);
+    // A final "cannot quote this" answer: 404 so clients stop retrying, with the provider named.
+    if (error instanceof NoRouteError) {
+      return fail(404, 'no_route', error.message, [{ provider: error.provider, ok: false, error: `${error.provider}: no route` }]);
+    }
     // Chain attempts are echoed in the error body's sources: sanitize them first.
     if (error instanceof ChainError) return upstreamFailure(new ChainError(error.name, safeAttempts(error.attempts)));
     if (!isProviderError(error)) {

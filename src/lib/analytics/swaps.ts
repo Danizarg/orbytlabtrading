@@ -70,9 +70,19 @@ export interface DerivedTrade {
   /**
    * Execution price per token in quote units (quote / tokenAmount). When the
    * trader's own quote leg is unknown it falls back to the pump.fun curve
-   * price (`venueSolAmount / tokenAmount`).
+   * price (`venueSolAmount / tokenAmount`), then to the pool side.
    */
   priceQuote?: number;
+  /**
+   * Which balance change produced `solAmount` / `quoteAmount` / `priceQuote`:
+   * `trader` — the trader's own leg (includes router/bot fees and tips it paid);
+   * `event` — no trader leg was visible, the pump.fun TradeEvent priced it;
+   * `pool` — no trader leg was visible (a bot or relayer paid on its behalf, or
+   * the paying PDA differs from the token-holding PDA), the quote is what the
+   * pool / curve itself moved, i.e. the venue price before third-party fees.
+   * Absent when no quote could be attributed.
+   */
+  quoteSide?: 'trader' | 'event' | 'pool';
   /** Venue label, e.g. 'pump.fun', 'PumpSwap', 'Raydium', 'Jupiter' (an aggregator wins over the AMM it routed through). */
   program?: string;
   /** The AMM / bonding-curve program that executed the swap (never an aggregator), e.g. 'PumpSwap' under 'DFlow'. */
@@ -599,9 +609,12 @@ function solCounterparty(view: TxView, wallet: string, sol: bigint): string | un
  * `mint` (two buys in one tx), the quote is ambiguous and left undefined
  * rather than guessed — the trade is still returned.
  *
- * Null when the trader has no counter-leg at all (a transfer is not a trade),
- * unless a SOL-quoted pump.fun TradeEvent proves the trade (then only
- * `venueSolAmount` / `priceQuote` carry its value).
+ * When the trader has no counter-leg at all, the trade is still real if the
+ * other side proves it: a SOL-quoted pump.fun TradeEvent (then only
+ * `venueSolAmount` / `priceQuote` carry its value), else the pool side (see
+ * `poolSideQuote`: the counterpart moved exactly one quote asset the way a
+ * trade moves it — a bot or relayer paid for the receiver). Otherwise null —
+ * a transfer is not a trade.
  * Timestamp: blockTime, else the TradeEvent timestamp; null without either.
  */
 export function deriveTradeForMint(tx: RpcParsedTransaction, mint: string, opts: { pool?: string } = {}): DerivedTrade | null {
@@ -634,8 +647,7 @@ export function deriveTradeForMint(tx: RpcParsedTransaction, mint: string, opts:
   const venueSol = fromEvent && event ? toUi(event.solAmount, LAMPORTS_DECIMALS) : undefined;
   if (venueSol !== undefined) trade.venueSolAmount = venueSol;
 
-  const quote = resolveQuote(view, deltas, trader, mint);
-  if (quote && quote !== 'ambiguous') {
+  const applyQuote = (quote: QuoteLeg, side: 'trader' | 'pool') => {
     const amount = toUi(abs(quote.raw), quote.decimals);
     if (quote.mint === WSOL) trade.solAmount = amount;
     else {
@@ -643,14 +655,20 @@ export function deriveTradeForMint(tx: RpcParsedTransaction, mint: string, opts:
       trade.quoteAmount = amount;
     }
     trade.priceQuote = amount / tokenAmount;
+    trade.quoteSide = side;
     return trade;
-  }
+  };
+  const quote = resolveQuote(view, deltas, trader, mint);
+  if (quote === 'ambiguous') return trade;
+  if (quote) return applyQuote(quote, 'trader');
   if (venueSol !== undefined && venueSol > 0) {
     // The curve event proves the trade even when the trader's own SOL leg is not visible (e.g. paid by a router).
     trade.priceQuote = venueSol / tokenAmount;
+    trade.quoteSide = 'event';
     return trade;
   }
-  return quote === 'ambiguous' ? trade : null;
+  const poolSide = poolSideQuote(view, deltas, trader, mint, opts.pool);
+  return poolSide ? applyQuote(poolSide, 'pool') : null;
 }
 
 /** A quote leg of the trader: `mint` is WSOL for its SOL (native + WSOL) leg. */
@@ -697,6 +715,41 @@ function otherSideMoved(view: TxView, deltas: OwnerDeltas, trader: { owner: stri
     if (moved !== 0n && (moved > 0n) !== (leg.raw > 0n) && abs(leg.raw) * 2n >= abs(moved)) return true;
   }
   return false;
+}
+
+/**
+ * Quote read from the other side of the trade when the trader shows no quote
+ * leg of its own (a bot or relayer paid for the receiver; a sniper program
+ * holds tokens in one PDA and pays from another). The counterpart is `pool`
+ * when given (it must have moved `mint` against the trader), else the unique
+ * off-curve owner that did — an on-curve wallet on the other side is a plain
+ * transfer, never a pool. It qualifies only when it moved exactly one quote
+ * asset — SOL (native + WSOL, above dust) or one other token — the way a pool
+ * does (it receives quote on a buy, pays it on a sell) and no other token
+ * moved with `mint` on either side (two tokens for one payment cannot be
+ * priced). The result is the venue price before third-party fees.
+ */
+function poolSideQuote(view: TxView, deltas: OwnerDeltas, trader: { owner: string } & MintDelta, mint: string, pool: string | undefined): QuoteLeg | undefined {
+  const traderUp = trader.raw > 0n;
+  if (tokenLegsOf(deltas, trader.owner).some((t) => t.mint !== mint && (t.raw > 0n) === traderUp)) return undefined;
+  const opposing: string[] = [];
+  for (const [owner, byMint] of deltas) {
+    const d = byMint.get(mint)?.raw ?? 0n;
+    if (owner !== trader.owner && d !== 0n && (d > 0n) !== traderUp) opposing.push(owner);
+  }
+  const other = pool !== undefined ? opposing.find((o) => o === pool) : opposing.length === 1 && isOffCurve(opposing[0] as string) ? opposing[0] : undefined;
+  if (other === undefined) return undefined;
+
+  const legs: QuoteLeg[] = [];
+  const sol = ownerSol(view, deltas, other);
+  if (abs(sol) >= DUST_LAMPORTS && (sol > 0n) === traderUp) legs.push({ mint: WSOL, raw: sol, decimals: LAMPORTS_DECIMALS });
+  for (const t of tokenLegsOf(deltas, other)) {
+    if (t.mint === mint) continue;
+    // Another token left the pool together with `mint` (or entered it with `mint` on a sell).
+    if ((t.raw > 0n) !== traderUp) return undefined;
+    legs.push(t);
+  }
+  return legs.length === 1 ? legs[0] : undefined;
 }
 
 /** Raw SOL movement of any owner: its own lamports (fee added back when it paid it) + its WSOL token accounts. */

@@ -18,18 +18,27 @@ import {
   type TokenDiscoveryProvider,
   type TokenRowsProvider,
 } from '@/lib/core/providers';
-import type { LaunchStage, LaunchpadState, StatWindow, TokenRow, WindowStats } from '@/lib/core/types';
-import { describeError } from '@/lib/net/errors';
+import { isSolanaAddress } from '@/lib/core/solana';
+import type { Freshness, LaunchStage, LaunchpadState, Sourced, StatWindow, TokenRow, WindowStats } from '@/lib/core/types';
+import { describeError, isAbortError, isProviderError } from '@/lib/net/errors';
+import type { JsonFetcher } from '@/lib/net/types';
+import { GECKOTERMINAL_ACCEPT, GECKOTERMINAL_BASE_URLS } from '@/lib/providers/geckoterminal';
+import { parseList, rowFromPool } from '@/lib/providers/geckoterminal/parse';
 import type { JupiterUltraInfo } from '@/lib/providers/jupiter';
 
 // ---------------------------------------------------------------------------
 // Lists, windows and URL parameters
 // ---------------------------------------------------------------------------
 
-/** Discover tabs. `gainers` is the trending list re-sorted client-side by the window's price change. */
-export type DiscoverListKey = DiscoverList | 'gainers';
+/**
+ * Discover tabs. `all` is the deduplicated union of every keyless list
+ * (see "Universe" below); `gainers` is the trending list re-sorted
+ * client-side by the window's price change.
+ */
+export type DiscoverListKey = DiscoverList | 'gainers' | 'all';
 
 export const DISCOVER_LISTS: readonly { value: DiscoverListKey; label: string }[] = [
+  { value: 'all', label: 'All' },
   { value: 'trending', label: 'Trending' },
   { value: 'top', label: 'Top volume' },
   { value: 'organic', label: 'Organic' },
@@ -90,7 +99,7 @@ export interface DiscoverParams {
   filters: DiscoverFilters;
 }
 
-export const DEFAULT_LIST: DiscoverListKey = 'trending';
+export const DEFAULT_LIST: DiscoverListKey = 'all';
 export const DEFAULT_WINDOW: DiscoverWindow = '1h';
 
 type SearchParamsLike = URLSearchParams | Record<string, string | string[] | undefined>;
@@ -390,12 +399,13 @@ export interface DiscoverSources {
   /** ORBYT /api/v1/discover proxy; pass only when a keyed provider backs it (capabilities.serverDiscover). */
   server?: TokenDiscoveryProvider | null;
   jupiter: TokenDiscoveryProvider;
-  gecko: TokenDiscoveryProvider;
+  /** Keyless fallback; omit (null) when GeckoTerminal is loaded separately (the universe). */
+  gecko?: TokenDiscoveryProvider | null;
 }
 
-/** The upstream list behind a tab (gainers is a view over trending). */
+/** The upstream list behind a tab (gainers is a view over trending; `all` has no single upstream list). */
 export function baseListOf(list: DiscoverListKey): DiscoverList {
-  return list === 'gainers' ? 'trending' : list;
+  return list === 'gainers' || list === 'all' ? 'trending' : list;
 }
 
 /**
@@ -418,7 +428,7 @@ export function loadDiscoverList(
     [
       server && { id: server.id, run: () => server.discover(query, signal) },
       { id: jupiter.id, run: () => jupiter.discover(query, signal) },
-      list !== 'organic' && { id: gecko.id, run: () => gecko.discover(query, signal) },
+      gecko && list !== 'organic' && { id: gecko.id, run: () => gecko.discover(query, signal) },
     ],
     { signal, accept: (r) => r.data.length > 0 },
   );
@@ -628,8 +638,26 @@ export interface EnrichmentCacheOptions {
   now?: () => number;
 }
 
+/**
+ * Immutable handle on the cache contents at one point in time: a new object
+ * after every fetch settles, so React can derive enriched rows from
+ * (rows, revision) with useSyncExternalStore + useMemo and no effects.
+ */
+export interface EnrichmentRevision {
+  readonly n: number;
+  /** Snapshot for `rows` from cached data only (no fetching). */
+  peek(rows: readonly TokenRow[]): EnrichmentSnapshot;
+}
+
+export const EMPTY_ENRICHMENT_REVISION: EnrichmentRevision = { n: 0, peek: () => ({ byMint: {}, errors: {} }) };
+
 export interface EnrichmentCache {
+  /** Fetch what is new or stale for `rows` (within the rate gaps), then return their snapshot. */
   load(rows: readonly TokenRow[]): Promise<EnrichmentSnapshot>;
+  /** Current revision (identity changes whenever cached data changes). */
+  revision(): EnrichmentRevision;
+  /** Notified after every fetch settles. */
+  subscribe(listener: () => void): () => void;
 }
 
 interface Entry<T> {
@@ -660,6 +688,31 @@ export function createEnrichmentCache(fetchers: EnrichmentFetchers, opts: Enrich
   let dexAt: number | undefined;
   const errors: EnrichmentSnapshot['errors'] = {};
   let inflight: Promise<unknown> | null = null;
+  const listeners = new Set<() => void>();
+  let revisionCount = 0;
+
+  function snapshot(rows: readonly TokenRow[]): EnrichmentSnapshot {
+    const byMint: Record<string, RowEnrichment> = {};
+    for (const row of rows.slice(0, maxMints)) {
+      const mint = row.token.mint;
+      const u = ultra.get(mint)?.value;
+      const d = dex.get(mint)?.value;
+      if (u || d) byMint[mint] = { ...(u ? { ultra: u } : {}), ...(d ? { dex: d } : {}) };
+    }
+    return {
+      byMint,
+      ...(ultraAt !== undefined ? { ultraAt } : {}),
+      ...(dexAt !== undefined ? { dexAt } : {}),
+      errors: { ...errors },
+    };
+  }
+
+  let revision: EnrichmentRevision = { n: ++revisionCount, peek: snapshot };
+
+  function bump() {
+    revision = { n: ++revisionCount, peek: snapshot };
+    listeners.forEach((l) => l());
+  }
 
   function prune(t: number) {
     const maxAge = ttl * 10;
@@ -693,9 +746,11 @@ export function createEnrichmentCache(fetchers: EnrichmentFetchers, opts: Enrich
             for (const mint of ultraDue) ultra.set(mint, { at, value: data[mint] });
             ultraAt = at;
             delete errors.ultra;
+            bump();
           },
           (error: unknown) => {
             errors.ultra = describeError(error);
+            bump();
           },
         ),
       );
@@ -711,9 +766,11 @@ export function createEnrichmentCache(fetchers: EnrichmentFetchers, opts: Enrich
             for (const mint of dexDue) dex.set(mint, { at, value: byMint.get(mint) });
             dexAt = at;
             delete errors.dex;
+            bump();
           },
           (error: unknown) => {
             errors.dex = describeError(error);
+            bump();
           },
         ),
       );
@@ -733,18 +790,13 @@ export function createEnrichmentCache(fetchers: EnrichmentFetchers, opts: Enrich
       } finally {
         inflight = null;
       }
-      const byMint: Record<string, RowEnrichment> = {};
-      for (const row of rows.slice(0, maxMints)) {
-        const mint = row.token.mint;
-        const u = ultra.get(mint)?.value;
-        const d = dex.get(mint)?.value;
-        if (u || d) byMint[mint] = { ...(u ? { ultra: u } : {}), ...(d ? { dex: d } : {}) };
-      }
-      return {
-        byMint,
-        ...(ultraAt !== undefined ? { ultraAt } : {}),
-        ...(dexAt !== undefined ? { dexAt } : {}),
-        errors: { ...errors },
+      return snapshot(rows);
+    },
+    revision: () => revision,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
       };
     },
   };
@@ -830,4 +882,681 @@ export function launchpadBadge(launchpad: string | undefined): string | undefine
   if (v.includes('boop')) return 'Boop';
   const name = launchpadVenue(launchpad) ?? launchpad;
   return name.length > 10 ? `${name.slice(0, 9)}…` : name;
+}
+
+// ---------------------------------------------------------------------------
+// Universe ("All"): the largest honest token set keyless sources allow
+// ---------------------------------------------------------------------------
+
+/**
+ * Every keyless list ORBYT can read from the browser, loaded independently
+ * and merged by mint. Order = merge precedence and default row order.
+ */
+export type UniverseSourceId =
+  | 'jup-trending'
+  | 'jup-top'
+  | 'jup-organic'
+  | 'gt-trending'
+  | 'gt-vol-1'
+  | 'gt-vol-2'
+  | 'gt-vol-3'
+  | 'gt-tx-1'
+  | 'gt-tx-2'
+  | 'gt-tx-3'
+  | 'ds-promoted'
+  | 'jup-new'
+  | 'gt-new-1'
+  | 'gt-new-2';
+
+export type UniverseProvider = Extract<ProviderId, 'jupiter' | 'geckoterminal' | 'dexscreener'>;
+
+export interface UniverseSourceDef {
+  id: UniverseSourceId;
+  provider: UniverseProvider;
+  label: string;
+  /** Re-fetch cadence (ms); never faster than the upstream cache. */
+  refreshMs: number;
+  /** The list depends on the selected stats window (re-fetched when it changes). */
+  windowed: boolean;
+}
+
+export const UNIVERSE_SOURCES: readonly UniverseSourceDef[] = [
+  { id: 'jup-trending', provider: 'jupiter', label: 'Jupiter trending', refreshMs: 30_000, windowed: true },
+  { id: 'jup-top', provider: 'jupiter', label: 'Jupiter top traded', refreshMs: 45_000, windowed: true },
+  { id: 'jup-organic', provider: 'jupiter', label: 'Jupiter top organic', refreshMs: 60_000, windowed: true },
+  { id: 'gt-trending', provider: 'geckoterminal', label: 'GeckoTerminal trending', refreshMs: 60_000, windowed: true },
+  { id: 'gt-vol-1', provider: 'geckoterminal', label: 'GeckoTerminal top volume p1', refreshMs: 120_000, windowed: false },
+  { id: 'gt-vol-2', provider: 'geckoterminal', label: 'GeckoTerminal top volume p2', refreshMs: 120_000, windowed: false },
+  { id: 'gt-vol-3', provider: 'geckoterminal', label: 'GeckoTerminal top volume p3', refreshMs: 120_000, windowed: false },
+  { id: 'gt-tx-1', provider: 'geckoterminal', label: 'GeckoTerminal top transactions p1', refreshMs: 120_000, windowed: false },
+  { id: 'gt-tx-2', provider: 'geckoterminal', label: 'GeckoTerminal top transactions p2', refreshMs: 120_000, windowed: false },
+  { id: 'gt-tx-3', provider: 'geckoterminal', label: 'GeckoTerminal top transactions p3', refreshMs: 120_000, windowed: false },
+  { id: 'ds-promoted', provider: 'dexscreener', label: 'DEX Screener promoted', refreshMs: 60_000, windowed: false },
+  { id: 'jup-new', provider: 'jupiter', label: 'Jupiter recent', refreshMs: 30_000, windowed: false },
+  { id: 'gt-new-1', provider: 'geckoterminal', label: 'GeckoTerminal new pools p1', refreshMs: 60_000, windowed: false },
+  { id: 'gt-new-2', provider: 'geckoterminal', label: 'GeckoTerminal new pools p2', refreshMs: 60_000, windowed: false },
+];
+
+/**
+ * Minimum gap between two calls to the same provider from the universe
+ * loader. GeckoTerminal keyless is ~8 calls/min per browser (10 s → ≤ 6/min,
+ * leaving headroom for its cooldowns); Jupiter is 4 per 10 s shared with the
+ * SOL price chip and Ultra enrichment (3.5 s → ≤ 3 per 10 s).
+ */
+export const UNIVERSE_SPACING_MS: Readonly<Record<UniverseProvider, number>> = {
+  jupiter: 3_500,
+  geckoterminal: 10_000,
+  dexscreener: 1_500,
+};
+
+/** Retry delay after the n-th consecutive failure of one source. */
+export function universeBackoffMs(failures: number): number {
+  return Math.min(120_000, 20_000 * 2 ** Math.max(0, failures - 1));
+}
+
+// --- DEX Screener promotion feeds --------------------------------------------
+
+/** Paid boosts (top, latest) and latest profiles; 60 req/min each upstream. */
+export const DEXSCREENER_FEED_PATHS = ['/token-boosts/top/v1', '/token-boosts/latest/v1', '/token-profiles/latest/v1'] as const;
+export const DEX_PROMOTED_MAX_MINTS = 120;
+export const DEX_PROMOTED_NOTE = 'DEX Screener promoted = paid boosts and profiles, not a market ranking';
+
+/** Solana token addresses in a boosts / profiles feed payload, feed order, de-duplicated. */
+export function parseDexFeed(payload: unknown): string[] {
+  if (!Array.isArray(payload)) return [];
+  const out = new Set<string>();
+  for (const item of payload) {
+    if (typeof item !== 'object' || item === null) continue;
+    const { chainId, tokenAddress } = item as { chainId?: unknown; tokenAddress?: unknown };
+    if (chainId !== 'solana' || typeof tokenAddress !== 'string') continue;
+    const mint = tokenAddress.trim();
+    if (isSolanaAddress(mint)) out.add(mint);
+  }
+  return [...out];
+}
+
+/**
+ * Promoted tokens with real market rows: the three feeds are read together
+ * (a failed feed only shrinks the set), then the mints go through the
+ * provider's row lookup so every value is live pair data.
+ */
+export async function loadDexPromoted(
+  fetcher: JsonFetcher,
+  rows: TokenRowsProvider,
+  baseUrl: string,
+  signal?: AbortSignal,
+): Promise<Sourced<TokenRow[]>> {
+  const base = baseUrl.replace(/\/+$/, '');
+  const settled = await Promise.allSettled(
+    DEXSCREENER_FEED_PATHS.map((path) =>
+      fetcher<unknown>('dexscreener', `${base}${path}`, { label: `dexscreener ${path.split('/')[1] ?? 'feed'}`, cacheMs: 30_000, signal }),
+    ),
+  );
+  const seen = new Set<string>();
+  const mints: string[] = [];
+  let failed = 0;
+  let firstError: unknown;
+  for (const r of settled) {
+    if (r.status === 'fulfilled') {
+      for (const mint of parseDexFeed(r.value)) {
+        if (seen.has(mint)) continue;
+        seen.add(mint);
+        mints.push(mint);
+      }
+    } else {
+      if (isAbortError(r.reason)) throw r.reason;
+      failed++;
+      firstError ??= r.reason;
+    }
+  }
+  if (failed === settled.length) throw firstError;
+  const notes = [DEX_PROMOTED_NOTE];
+  if (failed) notes.push(`${failed} of ${settled.length} DEX Screener feeds failed (${describeError(firstError)})`);
+  const list = mints.slice(0, DEX_PROMOTED_MAX_MINTS);
+  if (!list.length) return { data: [], source: 'dexscreener', fetchedAt: Date.now(), freshness: 'indexed', notes };
+  const result = await rows.getRows(list, signal);
+  return { ...result, data: orderByMints(result.data, list), notes: [...notes, ...(result.notes ?? [])] };
+}
+
+// --- GeckoTerminal network-wide pool pages -------------------------------------
+
+export type GeckoPoolSort = 'h24_volume_usd_desc' | 'h24_tx_count_desc';
+
+const GECKO_POOL_INCLUDE = 'include=base_token,quote_token,dex';
+
+/** Same URL shapes as the GeckoTerminal adapter, so identical requests share the browser response cache. */
+export function geckoListPath(kind: 'pools' | 'new_pools', page: number, sort?: GeckoPoolSort): string {
+  const p = Math.min(10, Math.max(1, Math.floor(page)));
+  return kind === 'pools'
+    ? `/networks/solana/pools?${GECKO_POOL_INCLUDE}&sort=${sort ?? 'h24_volume_usd_desc'}&page=${p}`
+    : `/networks/solana/new_pools?${GECKO_POOL_INCLUDE}&page=${p}`;
+}
+
+/** One row per base token from a JSON:API pool list (first pool wins). */
+export function geckoRowsFromList(payload: unknown, fetchedAt: number, label: string): TokenRow[] {
+  const doc = parseList('geckoterminal', payload, `geckoterminal ${label}`);
+  const seen = new Set<string>();
+  const rows: TokenRow[] = [];
+  for (const res of doc.data) {
+    const row = rowFromPool(res, doc.included, 'geckoterminal', fetchedAt);
+    if (!row || seen.has(row.token.mint)) continue;
+    seen.add(row.token.mint);
+    rows.push(row);
+  }
+  return rows;
+}
+
+export async function loadGeckoList(fetcher: JsonFetcher, path: string, label: string, signal?: AbortSignal): Promise<Sourced<TokenRow[]>> {
+  const payload = await fetcher<unknown>('geckoterminal', `${GECKOTERMINAL_BASE_URLS.keyless}${path}`, {
+    headers: { accept: GECKOTERMINAL_ACCEPT },
+    label: `geckoterminal ${label}`,
+    cacheMs: 15_000,
+    signal,
+  });
+  const fetchedAt = Date.now();
+  return { data: geckoRowsFromList(payload, fetchedAt, label), source: 'geckoterminal', fetchedAt, freshness: 'indexed' };
+}
+
+// --- Merge ---------------------------------------------------------------------
+
+/** Which row leads when several sources know a mint (lower = richer, fresher data). */
+const SOURCE_PRECEDENCE: Partial<Record<ProviderId, number>> = { jupiter: 0, coingecko: 1, geckoterminal: 1, dexscreener: 2 };
+
+function precedence(row: TokenRow): number {
+  return SOURCE_PRECEDENCE[row.market.source] ?? 3;
+}
+
+function pick<T extends object, K extends keyof T>(obj: T, keys: readonly K[]): Partial<T> {
+  const out: Partial<T> = {};
+  for (const k of keys) if (obj[k] !== undefined) out[k] = obj[k];
+  return out;
+}
+
+const IDENTITY_KEYS = ['symbol', 'name', 'image', 'decimals', 'createdAt', 'launchpad', 'verified', 'creator'] as const;
+const MARKET_KEYS = ['priceUsd', 'priceSol', 'marketCapUsd', 'fdvUsd', 'liquidityUsd', 'holders'] as const;
+const WINDOW_KEYS: readonly StatWindow[] = ['m5', 'h1', 'h6', 'h24'];
+
+/**
+ * Fill-only merge of two rows for one mint. Primary values are never
+ * overwritten; stats are filled per whole window so buys, sells and volume of
+ * a window always come from a single provider. Returns `primary` itself when
+ * nothing is filled (row identity is what memoized rows key on).
+ */
+export function mergeRows(primary: TokenRow, secondary: TokenRow): TokenRow {
+  if (primary.token.mint !== secondary.token.mint) return primary;
+  let token = primary.token;
+  let market = primary.market;
+  let pool = primary.pool;
+  let risk = primary.risk;
+
+  const identity = pick(secondary.token, IDENTITY_KEYS);
+  if (fillsGap(token, identity)) token = fillMissing(token, identity);
+  if (fillsGap(token.socials, secondary.token.socials)) token = { ...token, socials: fillMissing({ ...token.socials }, secondary.token.socials) };
+
+  const marketFill = pick(secondary.market, MARKET_KEYS);
+  if (fillsGap(market, marketFill)) market = fillMissing(market, marketFill);
+  const missingWindows = WINDOW_KEYS.filter((w) => !market.stats[w] && secondary.market.stats[w]);
+  if (missingWindows.length) {
+    const stats = { ...market.stats };
+    for (const w of missingWindows) stats[w] = secondary.market.stats[w];
+    market = { ...market, stats };
+  }
+
+  if (!pool && secondary.pool) pool = secondary.pool;
+  if (fillsGap(risk, secondary.risk)) risk = fillMissing<RowRisk>({ ...risk }, secondary.risk);
+
+  if (token === primary.token && market === primary.market && pool === primary.pool && risk === primary.risk) return primary;
+  const out: TokenRow = { ...primary, token, market };
+  if (pool) out.pool = pool;
+  if (risk) out.risk = risk;
+  return out;
+}
+
+export interface UniverseEntry {
+  status: 'idle' | 'loading' | 'ok' | 'error';
+  /** Last good rows (kept while a refresh is loading or has failed). */
+  rows: readonly TokenRow[];
+  /** Window the rows were fetched for (windowed sources). */
+  window?: DiscoverWindow;
+  fetchedAt?: number;
+  freshness?: Freshness;
+  source?: ProviderId;
+  notes?: readonly string[];
+  error?: string;
+  /** Not retried before this time (backoff after a failure). */
+  retryAt?: number;
+  /** Consecutive failures. */
+  failures: number;
+}
+
+export type UniverseEntries = Readonly<Partial<Record<UniverseSourceId, UniverseEntry>>>;
+
+export const EMPTY_ENTRY: UniverseEntry = { status: 'idle', rows: [], failures: 0 };
+
+export function emptyEntries(defs: readonly UniverseSourceDef[] = UNIVERSE_SOURCES): UniverseEntries {
+  const out: Partial<Record<UniverseSourceId, UniverseEntry>> = {};
+  for (const def of defs) out[def.id] = EMPTY_ENTRY;
+  return out;
+}
+
+/** Per-mint memo so an unchanged token keeps its row object across refreshes of other sources. */
+export type MergeCache = Map<string, { inputs: readonly TokenRow[]; rank: number; out: TokenRow }>;
+
+function sameRows(a: readonly TokenRow[], b: readonly TokenRow[]): boolean {
+  return a.length === b.length && a.every((row, i) => row === b[i]);
+}
+
+export interface MergedUniverse {
+  rows: TokenRow[];
+  contributors: ProviderId[];
+}
+
+/**
+ * Union of every source, one row per mint, ranked by first appearance in
+ * source order. The richest source leads a mint (Jupiter → GeckoTerminal →
+ * DEX Screener) and the others only fill its gaps.
+ */
+export function mergeUniverse(entries: UniverseEntries, defs: readonly UniverseSourceDef[] = UNIVERSE_SOURCES, cache?: MergeCache): MergedUniverse {
+  const inputs = new Map<string, TokenRow[]>();
+  const order: string[] = [];
+  const contributors = new Set<ProviderId>();
+  for (const def of defs) {
+    const entry = entries[def.id];
+    if (!entry?.rows.length) continue;
+    if (entry.source) contributors.add(entry.source);
+    for (const row of entry.rows) {
+      const mint = row.token.mint;
+      const list = inputs.get(mint);
+      if (list) list.push(row);
+      else {
+        inputs.set(mint, [row]);
+        order.push(mint);
+      }
+    }
+  }
+  const rows: TokenRow[] = [];
+  order.forEach((mint, i) => {
+    const list = inputs.get(mint);
+    const rank = i + 1;
+    if (!list?.length) return;
+    const prev = cache?.get(mint);
+    if (prev && prev.rank === rank && sameRows(prev.inputs, list)) {
+      rows.push(prev.out);
+      return;
+    }
+    const [lead, ...rest] = [...list].sort((a, b) => precedence(a) - precedence(b));
+    if (!lead) return;
+    const merged = rest.reduce(mergeRows, lead);
+    const out = merged.rank === rank ? merged : { ...merged, rank };
+    cache?.set(mint, { inputs: list, rank, out });
+    rows.push(out);
+  });
+  if (cache) for (const mint of cache.keys()) if (!inputs.has(mint)) cache.delete(mint);
+  return { rows, contributors: [...contributors] };
+}
+
+// --- Scheduling --------------------------------------------------------------------
+
+export interface ProviderClock {
+  lastStartAt: Partial<Record<UniverseProvider, number>>;
+  inflight: Partial<Record<UniverseProvider, number>>;
+}
+
+/** Re-check interval while a provider is cooling down after a 429. */
+export const COOLDOWN_RECHECK_MS = 5_000;
+
+/** Earliest time a source may run again; undefined while it is in flight. */
+export function dueAt(def: UniverseSourceDef, entry: UniverseEntry, window: DiscoverWindow): number | undefined {
+  if (entry.status === 'loading') return undefined;
+  let at = entry.fetchedAt === undefined || (def.windowed && entry.window !== window) ? 0 : entry.fetchedAt + def.refreshMs;
+  if (entry.retryAt !== undefined) at = Math.max(at, entry.retryAt);
+  return at;
+}
+
+export interface SchedulePick {
+  task?: UniverseSourceDef;
+  /** When no task is due: time until the next one may run (undefined = nothing pending). */
+  waitMs?: number;
+}
+
+/**
+ * Next source to fetch: one call in flight per provider, provider spacing
+ * respected, cooldowns waited out. A source that has never answered beats a
+ * refresh so the first paint fills up before anything re-polls; otherwise
+ * source order wins.
+ */
+export function pickNext(
+  defs: readonly UniverseSourceDef[],
+  entries: UniverseEntries,
+  now: number,
+  window: DiscoverWindow,
+  clock: ProviderClock,
+  spacing: Readonly<Record<UniverseProvider, number>> = UNIVERSE_SPACING_MS,
+  coolingDown?: (provider: UniverseProvider) => boolean,
+): SchedulePick {
+  let firstDue: UniverseSourceDef | undefined;
+  let firstFresh: UniverseSourceDef | undefined;
+  let wait: number | undefined;
+  for (const def of defs) {
+    const entry = entries[def.id] ?? EMPTY_ENTRY;
+    const due = dueAt(def, entry, window);
+    if (due === undefined || (clock.inflight[def.provider] ?? 0) > 0) continue;
+    const last = clock.lastStartAt[def.provider];
+    let at = last === undefined ? due : Math.max(due, last + spacing[def.provider]);
+    if (coolingDown?.(def.provider)) at = Math.max(at, now + COOLDOWN_RECHECK_MS);
+    if (at <= now) {
+      firstDue ??= def;
+      if (entry.fetchedAt === undefined) {
+        firstFresh = def;
+        break;
+      }
+    } else {
+      wait = wait === undefined ? at - now : Math.min(wait, at - now);
+    }
+  }
+  const task = firstFresh ?? firstDue;
+  if (task) return { task };
+  return wait === undefined ? {} : { waitMs: wait };
+}
+
+// --- Loader -------------------------------------------------------------------------
+
+export interface UniverseSnapshot {
+  window: DiscoverWindow;
+  entries: UniverseEntries;
+  rows: TokenRow[];
+  contributors: ProviderId[];
+  /** Latest successful fetch across sources (ms). */
+  updatedAt?: number;
+  /** True until every source has answered at least once (data or error). */
+  settling: boolean;
+  running: boolean;
+}
+
+export interface UniverseLoaderOptions {
+  fetch: (def: UniverseSourceDef, window: DiscoverWindow, signal: AbortSignal) => Promise<Sourced<TokenRow[]>>;
+  defs?: readonly UniverseSourceDef[];
+  window?: DiscoverWindow;
+  spacing?: Readonly<Record<UniverseProvider, number>>;
+  now?: () => number;
+  coolingDown?: (provider: UniverseProvider) => boolean;
+  backoffMs?: (failures: number) => number;
+}
+
+export interface UniverseLoader {
+  subscribe(listener: () => void): () => void;
+  getSnapshot(): UniverseSnapshot;
+  setWindow(window: DiscoverWindow): void;
+  /** Start (or resume) fetching; due sources run at once, spaced per provider. */
+  start(): void;
+  /** Pause: aborts in-flight calls, keeps every row. */
+  stop(): void;
+  /** Manual retry: failing sources become due immediately (spacing still applies). */
+  retry(): void;
+}
+
+/**
+ * Drives the universe: loads sources one provider-call at a time within the
+ * spacing rules, publishes a merged snapshot after every answer (partial
+ * results appear as they arrive), keeps the last good rows of a source whose
+ * refresh fails, and backs off failing sources without blocking the others.
+ */
+export function createUniverseLoader(opts: UniverseLoaderOptions): UniverseLoader {
+  const defs = opts.defs ?? UNIVERSE_SOURCES;
+  const now = opts.now ?? Date.now;
+  const spacing = opts.spacing ?? UNIVERSE_SPACING_MS;
+  const backoff = opts.backoffMs ?? universeBackoffMs;
+  const clock: ProviderClock = { lastStartAt: {}, inflight: {} };
+  const cache: MergeCache = new Map();
+  const listeners = new Set<() => void>();
+  let entries = emptyEntries(defs);
+  let window = opts.window ?? DEFAULT_WINDOW;
+  let running = false;
+  let controller: AbortController | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  function build(): UniverseSnapshot {
+    const { rows, contributors } = mergeUniverse(entries, defs, cache);
+    let updatedAt: number | undefined;
+    let settling = false;
+    for (const def of defs) {
+      const e = entries[def.id] ?? EMPTY_ENTRY;
+      if (e.fetchedAt !== undefined) updatedAt = Math.max(updatedAt ?? 0, e.fetchedAt);
+      if (e.fetchedAt === undefined && e.failures === 0) settling = true;
+    }
+    return { window, entries, rows, contributors, ...(updatedAt !== undefined ? { updatedAt } : {}), settling, running };
+  }
+
+  let snapshot = build();
+
+  function emit(): void {
+    snapshot = build();
+    listeners.forEach((l) => l());
+  }
+
+  function patch(id: UniverseSourceId, update: Partial<UniverseEntry>): void {
+    entries = { ...entries, [id]: { ...(entries[id] ?? EMPTY_ENTRY), ...update } };
+  }
+
+  function finish(def: UniverseSourceDef): void {
+    clock.inflight[def.provider] = Math.max(0, (clock.inflight[def.provider] ?? 0) - 1);
+  }
+
+  function launch(def: UniverseSourceDef, signal: AbortSignal): void {
+    const w = window;
+    clock.lastStartAt[def.provider] = now();
+    clock.inflight[def.provider] = (clock.inflight[def.provider] ?? 0) + 1;
+    patch(def.id, { status: 'loading' });
+    opts.fetch(def, w, signal).then(
+      (result) => {
+        finish(def);
+        patch(def.id, {
+          status: 'ok',
+          rows: result.data,
+          window: w,
+          fetchedAt: result.fetchedAt || now(),
+          freshness: result.freshness,
+          source: result.source,
+          notes: result.notes,
+          error: undefined,
+          retryAt: undefined,
+          failures: 0,
+        });
+        emit();
+        schedule();
+      },
+      (error: unknown) => {
+        finish(def);
+        const prev = entries[def.id] ?? EMPTY_ENTRY;
+        if (isAbortError(error) || signal.aborted) {
+          // Paused, not failed: becomes due again when the loader resumes.
+          patch(def.id, { status: prev.fetchedAt !== undefined ? 'ok' : 'idle' });
+        } else {
+          const failures = prev.failures + 1;
+          const retryAfter = isProviderError(error) && error.retryAfterMs ? error.retryAfterMs : 0;
+          patch(def.id, { status: 'error', error: describeError(error), failures, retryAt: now() + Math.max(backoff(failures), retryAfter) });
+        }
+        emit();
+        schedule();
+      },
+    );
+  }
+
+  function schedule(): void {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+    if (!running || !controller) return;
+    let started = false;
+    for (;;) {
+      const pick = pickNext(defs, entries, now(), window, clock, spacing, opts.coolingDown);
+      if (pick.task) {
+        launch(pick.task, controller.signal);
+        started = true;
+        continue; // another provider may be due as well
+      }
+      if (pick.waitMs !== undefined) timer = setTimeout(schedule, Math.max(50, pick.waitMs));
+      break;
+    }
+    if (started) emit();
+  }
+
+  return {
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    getSnapshot: () => snapshot,
+    setWindow(next) {
+      if (next === window) return;
+      window = next;
+      emit();
+      schedule();
+    },
+    start() {
+      if (running) return;
+      running = true;
+      controller = new AbortController();
+      emit();
+      schedule();
+    },
+    stop() {
+      if (!running) return;
+      running = false;
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+      controller?.abort();
+      controller = undefined;
+      emit();
+    },
+    retry() {
+      let changed = false;
+      for (const def of defs) {
+        const e = entries[def.id];
+        if (e?.status === 'error' && e.retryAt !== undefined) {
+          patch(def.id, { retryAt: undefined });
+          changed = true;
+        }
+      }
+      if (!changed) return;
+      emit();
+      schedule();
+    },
+  };
+}
+
+// --- Presentation ---------------------------------------------------------------------
+
+export interface UniverseProviderStatus {
+  provider: UniverseProvider;
+  label: string;
+  total: number;
+  /** Sources with data whose last refresh succeeded. */
+  ok: number;
+  /** Sources with data whose last refresh failed (rows kept). */
+  stale: number;
+  /** Sources still waiting for a first answer. */
+  pending: number;
+  /** Sources that have never answered and failed. */
+  failed: number;
+  /** First error line and the earliest retry among failing sources. */
+  error?: string;
+  retryAt?: number;
+}
+
+export interface UniverseSummary {
+  loaded: number;
+  sourcesTotal: number;
+  sourcesWithData: number;
+  pending: number;
+  failing: number;
+  /** Nothing has ever answered and every source has failed. */
+  allFailed: boolean;
+  updatedAt?: number;
+  providers: UniverseProviderStatus[];
+  /** "GeckoTerminal trending: rate limited" lines for failing sources. */
+  errors: string[];
+}
+
+export function summarizeUniverse(
+  snapshot: Pick<UniverseSnapshot, 'entries' | 'rows' | 'updatedAt'>,
+  defs: readonly UniverseSourceDef[] = UNIVERSE_SOURCES,
+): UniverseSummary {
+  const byProvider = new Map<UniverseProvider, UniverseProviderStatus>();
+  const errors: string[] = [];
+  let sourcesWithData = 0;
+  let pending = 0;
+  let failing = 0;
+  for (const def of defs) {
+    const e = snapshot.entries[def.id] ?? EMPTY_ENTRY;
+    let p = byProvider.get(def.provider);
+    if (!p) {
+      p = { provider: def.provider, label: PROVIDER_LABELS[def.provider], total: 0, ok: 0, stale: 0, pending: 0, failed: 0 };
+      byProvider.set(def.provider, p);
+    }
+    p.total++;
+    const hasData = e.fetchedAt !== undefined;
+    if (hasData) sourcesWithData++;
+    if (e.status === 'error') {
+      failing++;
+      if (hasData) p.stale++;
+      else p.failed++;
+      const line = `${def.label}: ${(e.error ?? 'failed').replace(/^[a-z][a-z-]*:\s*/i, '')}`;
+      if (!errors.includes(line)) errors.push(line);
+      p.error ??= line;
+      if (e.retryAt !== undefined && (p.retryAt === undefined || e.retryAt < p.retryAt)) p.retryAt = e.retryAt;
+    } else if (hasData) {
+      p.ok++;
+    } else {
+      pending++;
+      p.pending++;
+    }
+  }
+  return {
+    loaded: snapshot.rows.length,
+    sourcesTotal: defs.length,
+    sourcesWithData,
+    pending,
+    failing,
+    allFailed: sourcesWithData === 0 && pending === 0 && failing === defs.length,
+    ...(snapshot.updatedAt !== undefined ? { updatedAt: snapshot.updatedAt } : {}),
+    providers: [...byProvider.values()],
+    errors,
+  };
+}
+
+/** Sorted, de-duplicated mint key for React Query keys and effect dependencies. */
+export function mintSetKey(rows: readonly TokenRow[] | undefined): string {
+  return rows?.length ? [...new Set(rows.map((r) => r.token.mint))].sort().join(',') : '';
+}
+
+/** Rows rendered per chunk of the infinite-scroll table. */
+export const ROWS_PER_CHUNK = 60;
+
+/** Mints enriched per view: one Jupiter Ultra batch. */
+export const ENRICH_ROWS = 100;
+
+/**
+ * Which rows to enrich: what is on screen first (top of the sorted, filtered
+ * list), then the top of the unfiltered list so a stage / flag filter can
+ * still discover rows whose stage or flags only enrichment reveals. Capped at
+ * `limit` so it always fits one Ultra call.
+ */
+export function enrichmentTarget(visible: readonly TokenRow[], all: readonly TokenRow[], limit = ENRICH_ROWS): TokenRow[] {
+  const out: TokenRow[] = [];
+  const seen = new Set<string>();
+  for (const list of [visible, all]) {
+    for (const row of list) {
+      if (out.length >= limit) return out;
+      if (seen.has(row.token.mint)) continue;
+      seen.add(row.token.mint);
+      out.push(row);
+    }
+  }
+  return out;
 }

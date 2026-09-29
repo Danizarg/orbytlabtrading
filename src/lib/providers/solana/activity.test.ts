@@ -33,15 +33,6 @@ const history: RpcSignatureInfo[] = [
 ].filter((s): s is RpcSignatureInfo => s !== undefined);
 const failedSigs = new Set(history.filter((s) => s.err !== null).map((s) => s.signature));
 
-const realSwapsImplemented = (() => {
-  try {
-    actualSwaps.classifyWalletActivity(buyV2, WALLET, { source: 'solana-rpc' });
-    return true;
-  } catch (error) {
-    return !/not implemented/i.test(String(error));
-  }
-})();
-
 function fakeClassify(tx: RpcParsedTransaction, wallet: string): WalletActivity {
   return {
     signature: tx.transaction.signatures[0] as string,
@@ -233,7 +224,7 @@ describe('getTransaction (single)', () => {
 });
 
 describe('createRpcActivityProvider (real classifier)', () => {
-  it.skipIf(!realSwapsImplemented)('classifies the live BuyV2 transaction for its trader', async () => {
+  it('classifies the live BuyV2 transaction for its trader', async () => {
     vi.mocked(classifyWalletActivity).mockImplementation(actualSwaps.classifyWalletActivity);
     const { activity } = setup(() => ({ result: buyV2 }));
     const result = await activity.getTransaction?.(buyV2Signature, WALLET);

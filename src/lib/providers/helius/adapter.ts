@@ -97,13 +97,19 @@ function mapTransportError(error: unknown, apiKey: string): unknown {
   return new ProviderError(PROVIDER, 'network', `${PROVIDER}: request failed`);
 }
 
-/** JSON-RPC / DAS error codes → ProviderError codes. */
-function rpcErrorCode(code: number | undefined, notFoundOnInvalidParams: boolean): ProviderErrorCode {
+/**
+ * JSON-RPC / DAS error → ProviderError code. Known codes first (Helius answers
+ * -32401 for a missing key and -32029 for DAS rate limits; gateways may echo
+ * HTTP 401/429), then the message for unnumbered errors. Solana's own -32001
+ * (block cleaned up) is NOT an auth failure: a not_configured code would make
+ * failover chains skip Helius silently.
+ */
+function rpcErrorCode(code: number | undefined, message: string | undefined, notFoundOnInvalidParams: boolean): ProviderErrorCode {
   switch (code) {
     case 429:
     case -32029:
       return 'rate_limited';
-    case -32001:
+    case 401:
     case -32401:
       return 'not_configured';
     case -32004:
@@ -112,8 +118,11 @@ function rpcErrorCode(code: number | undefined, notFoundOnInvalidParams: boolean
       // e.g. getTokenLargestAccounts on an address that is not a token mint.
       return notFoundOnInvalidParams ? 'not_found' : 'http';
     default:
-      return 'http';
+      break;
   }
+  if (message && /too many requests|rate.?limit/i.test(message)) return 'rate_limited';
+  if (message && /api.?key|unauthori[sz]ed/i.test(message)) return 'not_configured';
+  return 'http';
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +176,7 @@ export function createHelius(opts: HeliusOptions): HeliusAdapter {
       const code = typeof rpcError.code === 'number' ? rpcError.code : undefined;
       const detail = text(rpcError.message);
       const message = `${PROVIDER}: ${method} RPC error${code !== undefined ? ` ${code}` : ''}${detail ? ` (${redact(detail, apiKey)})` : ''}`;
-      throw new ProviderError(PROVIDER, rpcErrorCode(code, notFoundOnInvalidParams), message);
+      throw new ProviderError(PROVIDER, rpcErrorCode(code, detail, notFoundOnInvalidParams), message);
     }
     if (!('result' in envelope)) throw new ProviderError(PROVIDER, 'malformed', `${PROVIDER}: ${method} response has no result`);
     return envelope.result;

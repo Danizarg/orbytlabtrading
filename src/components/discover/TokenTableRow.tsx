@@ -25,8 +25,9 @@ import {
   VerifiedMark,
   WatchStar,
 } from './cells';
+import { tradeHref } from './prefetch';
 import { SocialLinks } from './SocialLinks';
-import { TD, TD_ACTION, TD_RANK, TD_TOKEN } from './tableStyles';
+import { ROW_H, TD, TD_ACTION, TD_RANK, TD_TOKEN } from './tableStyles';
 
 export type TableVariant = 'discover' | 'watchlist';
 
@@ -36,16 +37,18 @@ interface RowProps {
   variant: TableVariant;
   /** Navigate to the token page (newTab for cmd/ctrl/shift or middle click). */
   onOpen: (mint: string, newTab: boolean) => void;
+  /** Hover / focus intent: prefetch the token page. */
+  onHover?: (mint: string) => void;
 }
 
 const INTERACTIVE = 'a,button,input,select,textarea,label';
 
 /**
- * One Discover / watchlist row. Memoized: re-renders only when its row object
- * or the window changes; the age cell ticks on its own and the watch star
- * subscribes to its own mint.
+ * One Discover / watchlist row (32 px). Memoized: re-renders only when its
+ * row object or the window changes; the age cell ticks on its own and the
+ * watch star subscribes to its own mint.
  */
-export const TokenTableRow = memo(function TokenTableRow({ row, win, variant, onOpen }: RowProps) {
+export const TokenTableRow = memo(function TokenTableRow({ row, win, variant, onOpen, onHover }: RowProps) {
   const { token, market, pool, risk } = row;
   const mint = token.mint;
   const stats = windowStats(row, win);
@@ -71,17 +74,19 @@ export const TokenTableRow = memo(function TokenTableRow({ row, win, variant, on
     onOpen(mint, true);
   }
 
+  const hover = onHover ? () => onHover(mint) : undefined;
+
   return (
-    <tr className="group h-9 cursor-pointer" onClick={handleClick} onAuxClick={handleAuxClick}>
+    <tr className={cn('group cursor-pointer', ROW_H)} onClick={handleClick} onAuxClick={handleAuxClick} onMouseEnter={hover} onFocus={hover}>
       <td className={cn(TD_RANK, 'text-right text-2xs tabular text-faint')}>{row.rank ?? ''}</td>
 
       <td className={TD_TOKEN}>
         <div className="flex min-w-0 items-center gap-1.5">
-          <TokenAvatar src={token.image} symbol={token.symbol} size={24} progress={bondingProgress(row)} />
+          <TokenAvatar src={token.image} symbol={token.symbol} size={22} progress={bondingProgress(row)} />
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1 leading-4">
+            <div className="flex h-[14px] min-w-0 items-center gap-1 leading-[14px]">
               <Link
-                href={`/trade/${mint}`}
+                href={tradeHref(mint)}
                 prefetch={false}
                 title={token.name ? `${symbol} · ${token.name}` : symbol}
                 className="max-w-[55%] shrink-0 truncate font-semibold text-fg hover:text-brand-strong"
@@ -99,11 +104,11 @@ export const TokenTableRow = memo(function TokenTableRow({ row, win, variant, on
                 <LaunchpadChip launchpad={token.launchpad} />
               </span>
             </div>
-            <div className="flex h-4 items-center gap-1 text-2xs text-faint">
+            <div className="flex h-[14px] items-center gap-1 text-2xs leading-[14px] text-faint">
               <span className="font-mono" title={mint}>
                 {shortAddress(mint)}
               </span>
-              <span className="-my-0.5 inline-flex">
+              <span className="-my-1 inline-flex">
                 <CopyButton value={mint} label="Copy mint address" />
               </span>
               <SocialLinks socials={token.socials} symbol={token.symbol} />

@@ -69,10 +69,10 @@ describe('AppShell (server render)', () => {
     expect(html).toContain('Deposit');
   });
 
-  it('shows attribution and the no-custody disclaimer', () => {
+  it('shows attribution and no disclaimer line', () => {
     expect(html).toContain('on-chain data powered by GeckoTerminal');
     expect(html).toContain('TradingView Lightweight Charts');
-    expect(html).toContain('Market data only · No custody · No trade execution · Not financial advice');
+    expect(html).not.toContain('No custody');
   });
 
   it('never claims health or prices it has not observed', () => {

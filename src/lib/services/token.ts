@@ -22,6 +22,7 @@ import type {
   RiskLevel,
   RiskReport,
   Socials,
+  SwapQuote,
   TokenMarket,
   TokenMeta,
   TokenRow,
@@ -386,10 +387,121 @@ export function buildQuoteRequest(input: {
   return request;
 }
 
-/** jup.ag swap link with the pair preselected (verified format: /swap?sell=<mint>&buy=<mint>). */
+/**
+ * jup.ag swap link with the pair preselected. Verified in a browser on
+ * 2026-09-29: `/swap?sell=<mint>&buy=<mint>` preloads both sides; an `amount`
+ * parameter is ignored, and slippage / priority fee are set inside Jupiter.
+ */
 export function jupiterSwapUrl(mint: string, side: QuoteSide): string {
   const [sell, buy] = side === 'buy' ? [MINTS.SOL, mint] : [mint, MINTS.SOL];
   return `https://jup.ag/swap?sell=${sell}&buy=${buy}`;
+}
+
+/** Fallback token page on jup.ag. */
+export function jupiterTokenUrl(mint: string): string {
+  return `https://jup.ag/tokens/${mint}`;
+}
+
+// ---------------------------------------------------------------------------
+// Trade panel (read-only preview; ORBYT never signs)
+// ---------------------------------------------------------------------------
+
+export const SOL_PRESETS: readonly number[] = [0.1, 0.5, 1, 5];
+export const SELL_PCT_PRESETS: readonly number[] = [25, 50, 75, 100];
+export const SLIPPAGE_PRESETS_BPS: readonly number[] = [100, 500, 1_000, 2_000];
+export const DEFAULT_SLIPPAGE_BPS = 1_000;
+/** 0.01 % … 50 %. */
+export const MIN_SLIPPAGE_BPS = 1;
+export const MAX_SLIPPAGE_BPS = 5_000;
+
+/** Keep an amount field numeric: digits and at most one decimal point (a comma counts as a point). */
+export function sanitizeAmountInput(raw: string): string {
+  let out = '';
+  let dot = false;
+  for (const ch of raw.replace(/,/g, '.')) {
+    if (ch >= '0' && ch <= '9') out += ch;
+    else if (ch === '.' && !dot) {
+      out += ch;
+      dot = true;
+    }
+  }
+  return out.slice(0, 24);
+}
+
+/** Positive finite number from an amount field; undefined otherwise. */
+export function parseAmount(input: string): number | undefined {
+  const n = Number(input.trim().replace(/,/g, '.'));
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/** Slippage percent text ("0.5", "10") → basis points, clamped to 0.01–50 %; undefined when not a number. */
+export function parseSlippagePct(input: string): number | undefined {
+  const pct = Number(input.trim().replace(/[%\s]/g, '').replace(/,/g, '.'));
+  if (!Number.isFinite(pct) || pct <= 0) return undefined;
+  return Math.min(MAX_SLIPPAGE_BPS, Math.max(MIN_SLIPPAGE_BPS, Math.round(pct * 100)));
+}
+
+export function formatSlippage(bps: number): string {
+  const pct = bps / 100;
+  return `${Number.isInteger(pct) ? pct : pct.toFixed(pct < 1 ? 2 : 1).replace(/0$/, '')}%`;
+}
+
+/** SOL per token implied by a quote (buy: SOL in / tokens out; sell: SOL out / tokens in). */
+export function quoteRate(quote: Pick<SwapQuote, 'inAmount' | 'outAmount'>, side: QuoteSide): number | undefined {
+  const sol = side === 'buy' ? quote.inAmount : quote.outAmount;
+  const tokens = side === 'buy' ? quote.outAmount : quote.inAmount;
+  if (!isPos(sol) || !isPos(tokens)) return undefined;
+  const rate = sol / tokens;
+  return Number.isFinite(rate) && rate > 0 ? rate : undefined;
+}
+
+/** Price impact severity: > 5 % warn, > 15 % danger. */
+export function priceImpactTone(pct: number | undefined): 'ok' | 'warn' | 'danger' | 'unknown' {
+  if (pct === undefined || !Number.isFinite(pct)) return 'unknown';
+  const abs = Math.abs(pct);
+  return abs > 15 ? 'danger' : abs > 5 ? 'warn' : 'ok';
+}
+
+// ---------------------------------------------------------------------------
+// Links
+// ---------------------------------------------------------------------------
+
+/** /trade/[mint], optionally pinned to a pool (Pools tab selection). */
+export function tokenTradeHref(mint: string, pool?: string): string {
+  return pool && isSolanaAddress(pool) ? `/trade/${mint}?pool=${pool}` : `/trade/${mint}`;
+}
+
+export interface ExplorerLink {
+  id: 'solscan' | 'geckoterminal' | 'dexscreener' | 'jupiter' | 'pumpfun';
+  label: string;
+  href: string;
+}
+
+/** External pages for a token; the launchpad link only for pump.fun tokens. */
+export function explorerLinks(mint: string, opts: { pool?: string; launchpad?: string } = {}): ExplorerLink[] {
+  const links: ExplorerLink[] = [
+    { id: 'solscan', label: 'Solscan', href: `https://solscan.io/token/${mint}` },
+    {
+      id: 'geckoterminal',
+      label: 'GeckoTerminal',
+      href: opts.pool && isSolanaAddress(opts.pool) ? `https://www.geckoterminal.com/solana/pools/${opts.pool}` : `https://www.geckoterminal.com/solana/tokens/${mint}`,
+    },
+    { id: 'dexscreener', label: 'DEX Screener', href: `https://dexscreener.com/solana/${mint}` },
+    { id: 'jupiter', label: 'Jupiter', href: jupiterTokenUrl(mint) },
+  ];
+  if (opts.launchpad?.toLowerCase().includes('pump')) links.push({ id: 'pumpfun', label: 'pump.fun', href: `https://pump.fun/coin/${mint}` });
+  return links;
+}
+
+/** Only http(s) URLs from token metadata are rendered as links. */
+export function safeHttpUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -437,6 +549,34 @@ export function curvePriceUsd(curve: BondingCurveState, solUsd: number | undefin
 export function curveMarketCapUsd(curve: BondingCurveState, solUsd: number | undefined): number | undefined {
   const unit = curveQuoteUsd(curve, solUsd);
   return unit !== undefined && isPos(curve.marketCapQuote) ? curve.marketCapQuote * unit : undefined;
+}
+
+/**
+ * The pump.fun curve account as a pool for tokens no aggregator has indexed
+ * yet (the curve IS the venue; DEX Screener and GeckoTerminal use the same
+ * address once they list it). Every figure is decoded on-chain: liquidity is
+ * the quote actually deposited in the curve (real reserves).
+ */
+export function poolFromCurve(curve: BondingCurveState, solUsd: number | undefined): PoolInfo {
+  const pool: PoolInfo = {
+    address: curve.curve,
+    dex: 'pumpfun',
+    dexLabel: 'Pump.fun',
+    baseMint: curve.mint,
+    quoteMint: curve.quoteMint,
+    isBondingCurve: true,
+    source: 'solana-rpc',
+  };
+  const quoteSymbol = curveQuoteSymbol(curve);
+  if (quoteSymbol) pool.quoteSymbol = quoteSymbol;
+  if (isPos(curve.priceQuote)) pool.priceNative = curve.priceQuote;
+  const priceUsd = curvePriceUsd(curve, solUsd);
+  if (priceUsd !== undefined) pool.priceUsd = priceUsd;
+  const marketCapUsd = curveMarketCapUsd(curve, solUsd);
+  if (marketCapUsd !== undefined) pool.marketCapUsd = marketCapUsd;
+  const unit = curveQuoteUsd(curve, solUsd);
+  if (unit !== undefined && isPos(curve.realQuoteReserves)) pool.liquidityUsd = curve.realQuoteReserves * unit;
+  return pool;
 }
 
 // ---------------------------------------------------------------------------
@@ -527,6 +667,16 @@ export function tradeTicks(trades: readonly Trade[], lastBarSec: number, volumeA
 export function providerLabel(provider: ProviderId | undefined): string {
   if (!provider) return '—';
   return provider === 'orbyt' ? 'ORBYT API' : PROVIDER_LABELS[provider];
+}
+
+/** Provider whose chain step answered ('orbyt' when the server route did). */
+export function chainWinner(result: { attempts: readonly ChainAttempt[] } | undefined): ProviderId | undefined {
+  return result?.attempts.find((a) => a.ok)?.provider;
+}
+
+/** Browser-called indexed sources (GeckoTerminal, DEX Screener) are polled at their cache age, not faster. */
+export function pollForWinner(winner: ProviderId | undefined, fast: number, indexed: number): number {
+  return winner === 'geckoterminal' || winner === 'dexscreener' ? indexed : fast;
 }
 
 /** Failed attempts worth showing (a 501 "not configured" server route is skipped silently). */

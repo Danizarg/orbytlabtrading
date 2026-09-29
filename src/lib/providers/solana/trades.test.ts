@@ -27,15 +27,6 @@ const signatures: RpcSignatureInfo[] = [
   ...curveSignatures.slice(2),
 ];
 
-const realSwapsImplemented = (() => {
-  try {
-    actualSwaps.deriveTradeForMint(buyV2, MINT, { pool: POOL });
-    return true;
-  } catch (error) {
-    return !/not implemented/i.test(String(error));
-  }
-})();
-
 /** Deterministic stand-in for the swap derivation (the real one is exercised in the integration test). */
 function fakeDerive(tx: RpcParsedTransaction): DerivedTrade {
   return {
@@ -232,7 +223,7 @@ describe('toTrade / dexIdFromProgramLabel', () => {
 });
 
 describe('createRpcTradesProvider (real swap derivation)', () => {
-  it.skipIf(!realSwapsImplemented)('derives the live pump.fun BuyV2 trade from the captured transaction', async () => {
+  it('derives the live pump.fun BuyV2 trade from the captured transaction', async () => {
     vi.mocked(deriveTradeForMint).mockImplementation(actualSwaps.deriveTradeForMint);
     const handler = (request: RpcRequest) =>
       request.method === 'getSignaturesForAddress'

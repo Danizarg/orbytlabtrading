@@ -12,6 +12,7 @@ import { Tabs } from '@/components/ui/Tabs';
 import { useTokenRows } from '@/data/hooks/useTokenRows';
 import type { DiscoverWindow } from '@/lib/core/providers';
 import { DISCOVER_WINDOWS, errorLines, nextSort, sortRows, type SortKey, type SortState } from '@/lib/services/discover';
+import { usePrefetchTrade } from './prefetch';
 import { LoadError, RefreshWarning, SourceFooter, sourceName } from './StatusParts';
 import { TokenTable } from './TokenTable';
 
@@ -27,6 +28,7 @@ export function WatchlistView() {
   const [win, setWin] = useState<DiscoverWindow>('24h');
   const [sort, setSort] = useState<SortState | null>(null);
   const onSort = useCallback((key: SortKey) => setSort((s) => nextSort(s, key)), []);
+  const prefetch = usePrefetchTrade();
   const { query, enrichment, rows, missing, pending, winner } = useTokenRows(watchlist);
 
   // "#" is the position in the user's watchlist.
@@ -96,6 +98,7 @@ export function WatchlistView() {
           skeletonRows={result ? pending.length : 0}
           missing={result ? missing : undefined}
           empty={empty}
+          onHover={prefetch}
           caption={`Watchlist tokens, ${win} window`}
         />
       </ErrorBoundary>
@@ -103,7 +106,7 @@ export function WatchlistView() {
       <SourceFooter
         result={count > 0 ? result : undefined}
         winner={winner}
-        enrichment={count > 0 ? enrichment.data : undefined}
+        enrichment={count > 0 ? enrichment : undefined}
         rows={visible}
         count={
           hydrated && count > 0 ? (

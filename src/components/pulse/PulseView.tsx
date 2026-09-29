@@ -24,7 +24,7 @@ export function PulseView() {
   }, []);
 
   return (
-    <div className="flex h-[calc(100dvh-4.75rem)] min-h-[32rem] flex-col">
+    <div className="flex h-[calc(100dvh-var(--shell-header-h)-var(--shell-footer-h))] min-h-[32rem] flex-col">
       <PulseToolbar active={active} onActiveChange={setActive} />
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-line lg:grid-cols-3">
         {PULSE_COLUMNS.map((config) => {

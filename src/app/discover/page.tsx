@@ -3,7 +3,8 @@ import { DiscoverView } from '@/components/discover/DiscoverView';
 
 export const metadata: Metadata = {
   title: 'Discover',
-  description: 'Trending, top-volume, organic and new Solana tokens with live market data, holder concentration and launch stage.',
+  description:
+    'Every Solana memecoin the public indexes list, merged from Jupiter, GeckoTerminal and DEX Screener, plus trending, top-volume, organic and new lists with live market data, holder concentration and launch stage.',
 };
 
 export default async function Page({ searchParams }: PageProps<'/discover'>) {

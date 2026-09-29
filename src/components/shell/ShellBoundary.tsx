@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/components/ui/cn';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
-import { ATTRIBUTION, DISCLAIMER } from './StatusBar';
+import { ATTRIBUTION } from './StatusBar';
 
 /**
  * Keeps one failing header widget from taking the shell down: an error that
@@ -49,7 +49,6 @@ export function StatusBarBoundary({ children }: { children: ReactNode }) {
           <p className="lg:min-w-0 lg:truncate" title={ATTRIBUTION}>
             {ATTRIBUTION}
           </p>
-          <p className="ml-auto shrink-0 text-muted">{DISCLAIMER}</p>
         </footer>
       )}
     >

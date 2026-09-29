@@ -81,6 +81,8 @@ export const BIRDEYE_MAX_CANDLES = 5_000;
 export const BIRDEYE_MAX_TRADES = 100;
 export const BIRDEYE_MAX_HOLDERS = 100;
 export const BIRDEYE_PULSE_LIMIT = 50;
+/** Caveat on Birdeye's token-account-level top-10 share (ORBYT's own distributions exclude liquidity accounts). */
+export const BIRDEYE_TOP10_NOTE = 'Top-10 share from Birdeye; it may include bonding-curve or pool accounts.';
 
 const PROVIDER = 'birdeye' as const;
 const DEFAULT_CANDLES = 300;
@@ -277,10 +279,11 @@ export function createBirdeye(opts: BirdeyeOptions): BirdeyeAdapter {
     const fetchedAt = Date.now();
     const snapshot = parseHolderSnapshot(data, mint, max, fetchedAt, isProgramOwner, (owner) => staticLiquidityLabel(owner, curvePda));
     if (!snapshot) throw malformed('holders');
-    // Birdeye's own top-10 share is over token accounts; say so when curve / pool vaults are among them.
+    // Birdeye's own top-10 share is over token accounts: say so when a curve / pool vault is among
+    // them, or an unlabelled program-derived owner that may be one (only wallets are known not to be).
     const notes =
-      snapshot.distribution && snapshot.top.slice(0, 10).some((h) => h.label)
-        ? ['Top-10 share from Birdeye; it may include bonding-curve or pool accounts.']
+      snapshot.distribution && snapshot.top.slice(0, 10).some((h) => h.label || h.isProgramAccount)
+        ? [BIRDEYE_TOP10_NOTE]
         : [];
     return sourced(snapshot, fetchedAt, 'indexed', notes);
   }

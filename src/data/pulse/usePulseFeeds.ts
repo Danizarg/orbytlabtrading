@@ -7,15 +7,17 @@ import { usePumpPortalMigrations, usePumpPortalNewTokens } from '@/client/hooks/
 import { useSolPrice } from '@/data/hooks/useSolPrice';
 import { browserCurves, gecko, jup, server } from '@/data/sources';
 import { PUBLIC_ENDPOINTS } from '@/lib/config/capabilities';
-import { runChain, type ChainStep } from '@/lib/core/chain';
-import { PROVIDER_LABELS } from '@/lib/core/providers';
-import type { BondingCurveState, PulseColumn, TokenRow } from '@/lib/core/types';
+import { chunk, runChain, type ChainStep } from '@/lib/core/chain';
+import { PROVIDER_LABELS, type DiscoverQuery } from '@/lib/core/providers';
+import type { BondingCurveState, PulseColumn, Sourced, TokenRow } from '@/lib/core/types';
 import { isAbortError, isProviderError } from '@/lib/net/errors';
 import {
   classifyGeckoPool,
   feedErrorText,
   geckoMigrationAction,
   isCurveTarget,
+  mergeSourcedRecords,
+  MIGRATED_WINDOW_MS,
   patchFromCurve,
   patchFromGeckoPool,
   patchFromMigration,
@@ -38,20 +40,27 @@ import { useVisibleInterval } from './timers';
  *
  * 1. PumpPortal stream (browser WebSocket): pump.fun creates appear instantly,
  *    migrations flip tokens to graduated. bonk creates wait for confirmation.
- * 2. Keyless backfill: Jupiter /tokens/v2/recent (6 s), GeckoTerminal new
- *    pools and pump.fun curve pools (60 s each, 2 calls/min).
- * 3. On-chain pump.fun curves via publicnode (4 s, ≤100 mints, falling back
- *    to ORBYT's RPC proxy): exact progress, price and market cap.
+ * 2. Keyless backfill: Jupiter /tokens/v2/recent (6 s) and 1 h trending
+ *    launchpad tokens (90 s; fresh graduations and late-curve tokens),
+ *    GeckoTerminal new pools and pump.fun curve pools (60 s each, 2 calls/min).
+ * 3. On-chain pump.fun curves via publicnode (4 s, falling back to ORBYT's
+ *    RPC proxy): exact progress, price and market cap. publicnode refuses
+ *    getMultipleAccounts beyond 10 addresses (HTTP 403 "Request blocked",
+ *    verified 2026-09-29), so a browser poll reads 30 mints as 3 sub-batches
+ *    (6 RPC calls per 4 s ≈ 15 / 10 s against a 30 / 10 s budget); a keyed
+ *    server RPC takes 100 per poll.
  * 4. Enrichment: Jupiter token rows (15 s) and Ultra risk extras (60 s).
  * 5. Keyed server lists when configured (10 s per column).
  *
  * Jupiter keyless budget (4 calls / 10 s per browser): recent 1.7 + rows 0.7
- * + Ultra 0.2 + SOL price 0.3 ≈ 2.8 calls / 10 s. React Query pauses polling
- * while the tab is hidden; the manual timers here do the same.
+ * + Ultra 0.2 + trending 0.1 + SOL price 0.3 ≈ 3.0 calls / 10 s, leaving
+ * headroom for the global search. React Query pauses polling while the tab
+ * is hidden; the manual timers here do the same.
  */
 
 export const PULSE_CADENCE = {
   jupRecent: 6_000,
+  jupTrending: 90_000,
   geckoNew: 60_000,
   geckoPump: 60_000,
   curves: 4_000,
@@ -64,7 +73,9 @@ export const PULSE_CADENCE = {
 /** Re-check sooner when the previous run had nothing to request (no network call was made). */
 const IDLE_RETRY_MS = { curves: 1_500, jupRows: 3_000, jupUltra: 20_000 } as const;
 
-const BATCH = { curves: 100, rows: 100, ultra: 100 } as const;
+const BATCH = { curvesBrowser: 30, curvesServer: 100, rows: 100, ultra: 100 } as const;
+/** Largest getMultipleAccounts the browser RPC (publicnode) serves; larger requests are blocked with HTTP 403. */
+export const BROWSER_ACCOUNTS_PER_CALL = 10;
 const MAX_CURVE_MISSES = 2;
 const MAX_PENDING = 100;
 const PENDING_TTL_MS = 5 * 60_000;
@@ -172,22 +183,17 @@ function metaOf(r: { source: PatchMeta['source']; freshness: PatchMeta['freshnes
 // Polls
 // ---------------------------------------------------------------------------
 
-/** Jupiter's 30 latest first-pool creations (all launchpads). */
-async function pollRecent(signal: AbortSignal, serverFirst: boolean): Promise<PollResult> {
-  const result = await runChain<TokenRow[]>(
-    'pulse recent',
-    [
-      serverFirst && { id: 'orbyt', run: () => server.discover.discover({ list: 'new', window: '5m' }, signal) },
-      { id: 'jupiter', run: () => jup.discover({ list: 'new', window: '5m' }, signal) },
-    ],
-    { signal },
-  );
-  const meta = metaOf(result);
+/**
+ * Discovery rows → readings. Launches only (tokens without a launchpad are
+ * plain AMM listings); pending candidates are verified on the way. A
+ * graduation that cannot be placed (no time, or older than 24 h) and an
+ * unknown stage only update tokens already tracked.
+ */
+function launchRowPatches(rows: readonly TokenRow[], meta: PatchMeta): PulsePatch[] {
   const now = Date.now();
   const patches: PulsePatch[] = [];
-  for (const row of result.data) {
+  for (const row of rows) {
     const lp = row.token.launchpad;
-    // Launches only: tokens without a launchpad are plain AMM listings.
     if (!lp?.launchpad || lp.stage === 'amm') continue;
     const mint = row.token.mint;
     const candidate = pending.get(mint);
@@ -199,11 +205,39 @@ async function pollRecent(signal: AbortSignal, serverFirst: boolean): Promise<Po
         continue;
       }
     }
-    patches.push(patchFromTokenRow(row, meta));
+    const patch = patchFromTokenRow(row, meta);
+    const placeable =
+      lp.stage === 'bonding' ||
+      (lp.stage === 'graduated' && typeof lp.graduatedAt === 'number' && now - lp.graduatedAt <= MIGRATED_WINDOW_MS);
+    if (!placeable) patch.updateOnly = true;
+    patches.push(patch);
     rowsLastPicked.set(mint, now);
   }
+  return patches;
+}
+
+async function pollDiscoverList(label: string, query: DiscoverQuery, signal: AbortSignal, serverFirst: boolean): Promise<PollResult> {
+  const result = await runChain<TokenRow[]>(
+    label,
+    [
+      serverFirst && { id: 'orbyt', run: () => server.discover.discover(query, signal) },
+      { id: 'jupiter', run: () => jup.discover(query, signal) },
+    ],
+    { signal },
+  );
+  const patches = launchRowPatches(result.data, metaOf(result));
   enqueuePatches(patches);
   return { polled: result.data.length, applied: patches.length, via: PROVIDER_LABELS[result.source] };
+}
+
+/** Jupiter's 30 latest first-pool creations (all launchpads). */
+function pollRecent(signal: AbortSignal, serverFirst: boolean): Promise<PollResult> {
+  return pollDiscoverList('pulse recent', { list: 'new', window: '5m' }, signal, serverFirst);
+}
+
+/** Trending launchpad tokens of the last hour: recent graduations (Migrated) and busy curves (Final Stretch candidates). */
+function pollTrending(signal: AbortSignal, serverFirst: boolean): Promise<PollResult> {
+  return pollDiscoverList('pulse trending', { list: 'trending', window: '1h', limit: 100 }, signal, serverFirst);
 }
 
 /** GeckoTerminal newest pools: launchpad curves → New Pairs; migration venues → Migrated (after confirmation). */
@@ -262,6 +296,12 @@ async function pollGeckoPump(signal: AbortSignal): Promise<PollResult> {
   return { polled: result.data.length, applied: patches.length, via: PROVIDER_LABELS[result.source] };
 }
 
+/** Browser RPC reads in sub-batches the public endpoint accepts; one failing sub-batch fails the step (the chain then tries the proxy). */
+async function readCurvesInBrowser(mints: readonly string[], signal: AbortSignal): Promise<Sourced<Record<string, BondingCurveState>>> {
+  const parts = await Promise.all(chunk(mints, BROWSER_ACCOUNTS_PER_CALL).map((group) => browserCurves.getCurves(group, signal)));
+  return mergeSourcedRecords(parts, { source: 'solana-rpc', freshness: 'realtime' });
+}
+
 /** Decoded pump.fun bonding curves for visible tokens, candidates and a rotation of the rest. */
 async function pollCurves(signal: AbortSignal, serverFirst: boolean, solPriceUsd: number | undefined): Promise<PollResult | null> {
   const now = Date.now();
@@ -278,12 +318,12 @@ async function pollCurves(signal: AbortSignal, serverFirst: boolean, solPriceUsd
     [visible.final.filter(eligible), [...pumpCandidates.keys()].filter(eligible), visible.new.filter(eligible)],
     rotation,
     curveLastPolled,
-    BATCH.curves,
+    serverFirst ? BATCH.curvesServer : BATCH.curvesBrowser,
   );
   if (!mints.length) return null;
   for (const mint of mints) curveLastPolled.set(mint, now);
 
-  const browser: ChainStep<Record<string, BondingCurveState>> = { id: 'solana-rpc', run: () => browserCurves.getCurves(mints, signal) };
+  const browser: ChainStep<Record<string, BondingCurveState>> = { id: 'solana-rpc', run: () => readCurvesInBrowser(mints, signal) };
   const proxied: ChainStep<Record<string, BondingCurveState>> = { id: 'orbyt', run: () => server.curves.getCurves(mints, signal) };
   const result = await runChain('pulse curves', serverFirst ? [proxied, browser] : [browser, proxied], { signal });
 
@@ -422,6 +462,7 @@ export function usePulseFeeds(): void {
   useEffect(() => () => flushPatches(), []);
 
   usePulsePoll('jupRecent', PULSE_CADENCE.jupRecent, (signal) => pollRecent(signal, caps.serverDiscover));
+  usePulsePoll('jupTrending', PULSE_CADENCE.jupTrending, (signal) => pollTrending(signal, caps.serverDiscover));
   usePulsePoll('geckoNew', PULSE_CADENCE.geckoNew, pollGeckoNew);
   usePulsePoll('geckoPump', PULSE_CADENCE.geckoPump, pollGeckoPump);
   usePulsePoll('curves', PULSE_CADENCE.curves, (signal) => pollCurves(signal, serverRpcFirst, solPriceUsd), { idleMs: IDLE_RETRY_MS.curves });

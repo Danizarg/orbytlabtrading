@@ -6,7 +6,7 @@ import { useCapabilities } from '@/client/capabilities';
 import type { TokenRow } from '@/lib/core/types';
 import { enrichRows, loadTokenRows, orderByMints, stableFetchSet } from '@/lib/services/discover';
 import { dex, gecko, jup, server } from '../sources';
-import { pollFor, useRowEnrichment, winnerOf } from './useDiscover';
+import { pollFor, useEnrichmentSnapshot, useRowEnrichment, winnerOf } from './useDiscover';
 
 /** Refresh cadence: Jupiter / keyed server every 20 s; GeckoTerminal fallback every 60 s (its cache age). */
 const POLL_ROWS = 20_000;
@@ -40,12 +40,14 @@ export function useTokenRows(mints: readonly string[]) {
     retry: 1,
   });
 
-  const enrichment = useRowEnrichment(query.data?.data);
+  const baseRows = query.data?.data;
+  useRowEnrichment(baseRows);
+  const enrichment = useEnrichmentSnapshot(baseRows);
 
   const rows = useMemo<TokenRow[] | undefined>(() => {
-    if (!query.data) return undefined;
-    return orderByMints(enrichRows(query.data.data, enrichment.data), mints);
-  }, [query.data, enrichment.data, mints]);
+    if (!baseRows) return undefined;
+    return orderByMints(enrichRows(baseRows, enrichment), mints);
+  }, [baseRows, enrichment, mints]);
 
   const { missing, pending } = useMemo(() => {
     const found = new Set(rows?.map((r) => r.token.mint));

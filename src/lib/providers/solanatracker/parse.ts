@@ -233,6 +233,10 @@ export interface ParsedHolders {
   liquidity: number;
 }
 
+/** `/tokens/{mint}/holders` returns at most 100 rows; the bare `/holders/top` array at most 20. */
+const HOLDERS_CAP = 100;
+const HOLDERS_TOP_CAP = 20;
+
 /**
  * `/tokens/{mint}/holders` → `{ total, accounts: [{ wallet, amount, percentage, identity? }] }`;
  * `/tokens/{mint}/holders/top` → bare `[{ address, amount, percentage }]`. Both accepted.
@@ -276,8 +280,10 @@ export function parseHolders(
   const snapshot: HolderSnapshot = { mint, top: entries.slice(0, limit), updatedAt: fetchedAt };
   const total = count(r?.total);
   if (total !== undefined) snapshot.totalHolders = total;
-  // Top 100 per call: the list is complete when it covers every holder.
-  const complete = total !== undefined ? total <= rows.length : rows.length < 100;
+  // The list is complete when it covers every holder: `total` says so directly; without it,
+  // a page shorter than the endpoint's cap does (100 rows for /holders, 20 for the bare /holders/top array).
+  const cap = Array.isArray(body) ? HOLDERS_TOP_CAP : HOLDERS_CAP;
+  const complete = total !== undefined ? total <= rows.length : rows.length < cap;
   const distribution = holderDistribution(entries, (e) => liquidity.has(e), complete);
   if (distribution) snapshot.distribution = distribution;
   return { snapshot, liquidity: liquidity.size };

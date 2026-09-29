@@ -89,6 +89,24 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+/** Deterministic valid 32-byte base58 address. */
+function fakeAddress(i: number): string {
+  const bytes = new Uint8Array(32).fill(9);
+  bytes[0] = (i % 250) + 1;
+  bytes[30] = Math.floor(i / 256) % 256;
+  bytes[31] = i % 256;
+  let n = 0n;
+  for (const b of bytes) n = (n << 8n) + BigInt(b);
+  let s = '';
+  while (n > 0n) {
+    s = B58.charAt(Number(n % 58n)) + s;
+    n /= 58n;
+  }
+  return s;
+}
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -557,6 +575,19 @@ describe('solanatracker getHolders', () => {
     expect(res.data.distribution?.top11to20Pct).toBeCloseTo(sum(pct.slice(10)), 10);
     // No liquidity account was identified: no exclusion caveat.
     expect(res.notes).toBeUndefined();
+  });
+
+  it('treats a 20-row bare array as the /holders/top cap, so the 11–20 bucket is exact only when it can be filled', async () => {
+    const wallets = Array.from({ length: 19 }, (_, i) => ({ address: fakeAddress(i + 1), amount: 1_000 - i, percentage: 1 }));
+    const withCurve = [{ address: CC_CURVE, amount: 600_000_000, percentage: 60 }, ...wallets];
+    const res = await tracker([[`/tokens/${CC}/holders`, withCurve]]).st.getHolders(CC, 100);
+    expect(res.data.top[0]?.label).toBe('Bonding curve');
+    expect(res.data.top).toHaveLength(20);
+    // 20 rows is the cap: after excluding the curve only 19 holders are known, so holders 11–20 may be missing their tail.
+    expect(res.data.distribution).toEqual({ top10Pct: 10 });
+    // 19 rows are below the cap: the list is complete and both buckets are exact.
+    const short = await tracker([[`/tokens/${CC}/holders`, withCurve.slice(0, 19)]]).st.getHolders(CC, 100);
+    expect(short.data.distribution).toEqual({ top10Pct: 10, top11to20Pct: 8 });
   });
 
   it('slices to the requested limit (max 100) without changing the distribution', async () => {

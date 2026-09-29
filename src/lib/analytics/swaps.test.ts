@@ -586,6 +586,46 @@ describe('pump.fun TradeEvent sources', () => {
     expect(decodePumpTradeEvents(failed)).toEqual([]);
   });
 
+  it('tracks the executing program through nested invokes, consumed and return lines', () => {
+    const nested = clone(buyV2);
+    nested.meta.innerInstructions = [];
+    nested.meta.logMessages = [
+      'Program ComputeBudget111111111111111111111111111111 invoke [1]',
+      'Program ComputeBudget111111111111111111111111111111 success',
+      `Program ${PROGRAMS.PUMP} invoke [1]`,
+      'Program log: Instruction: BuyV2',
+      `Program ${PROGRAMS.TOKEN_2022} invoke [2]`,
+      'Program log: Instruction: TransferChecked',
+      eventLine, // emitted while the token program executes: not pump's
+      `Program ${PROGRAMS.TOKEN_2022} consumed 1234 of 5678 compute units`,
+      `Program ${PROGRAMS.TOKEN_2022} success`,
+      `Program ${PROGRAMS.PUMP} invoke [2]`,
+      'Program return: abc',
+      `Program ${PROGRAMS.PUMP} consumed 100 of 200 compute units`,
+      `Program ${PROGRAMS.PUMP} success`,
+      eventLine, // back at depth 1 inside pump: accepted
+      `Program ${PROGRAMS.PUMP} consumed 30000 of 40000 compute units`,
+      `Program ${PROGRAMS.PUMP} success`,
+    ];
+    expect(decodePumpTradeEvents(nested)).toHaveLength(1);
+  });
+
+  it('decodes the 97-byte legacy layout (no reserves / fee / name fields)', () => {
+    const legacy = Uint8Array.from(getBase64Encoder().encode(eventLine.slice('Program data: '.length))).subarray(0, 97);
+    const tx = clone(buyV2);
+    tx.meta.innerInstructions = [];
+    tx.meta.logMessages = [`Program ${PROGRAMS.PUMP} invoke [1]`, `Program data: ${getBase64Decoder().decode(legacy)}`, `Program ${PROGRAMS.PUMP} success`];
+    const [event] = decodePumpTradeEvents(tx);
+    expect(event).toMatchObject({ mint: MINT, solAmount: 987_650_071n, tokenAmount: 20_682_995_874_269n, isBuy: true, user: WALLET, timestamp: 1_790_628_401 });
+    expect(event?.virtualSolReserves).toBeUndefined();
+    expect(event?.fee).toBeUndefined();
+    expect(event?.ixName).toBeUndefined();
+    expect(event?.quoteMint).toBeUndefined();
+    // A 96-byte fragment is not an event.
+    tx.meta.logMessages = [`Program ${PROGRAMS.PUMP} invoke [1]`, `Program data: ${getBase64Decoder().decode(legacy.subarray(0, 96))}`, `Program ${PROGRAMS.PUMP} success`];
+    expect(decodePumpTradeEvents(tx)).toEqual([]);
+  });
+
   it('does not treat a non-SOL-quoted curve event as SOL', () => {
     // Patch the event's quote_mint to USDC. Offsets per the IDL: ix_name length u32 @258,
     // then name, mayhem_mode 1, four u64 fee fields, shareholders vec length u32 (0 here), quote_mint.
@@ -676,6 +716,15 @@ const BOB_X = '3JsCd8LjmmyPT1PhfQZnJeZQwxr5FD6YgzZQDM61Btwc';
 const POOL_X = '5R4MoQJCn3NDtMCzTNeJi6mFKB5cfTvyehFQcudPhWCU';
 const POOL_Y = 'aSDy5waVxqAP6FpLM7Qd4YJBB136kbEm6mAD4JrkEEt';
 const POOL_USDC = 'HQrh2TqZrkadKuMKic8s3NzeV22FTZVZPUFP1eJtwDqS';
+const POOL_WSOL = 'DaMv6o4G9mEnuLyi1YibThDshbhbT3hbRQc5P9sTodjP';
+/** Jupiter-style temporary WSOL account (createAccountWithSeed, closed in the same tx). */
+const TEMP_WSOL = '3JsCd8LjmmyPT1PhfQZnJeZQwxr5FD6YgzZQDM61Btwc';
+/** More real PDAs (off-curve): a second pool, a program's token vault and its treasury. */
+const POOL2 = 'AU5yNsssb7ww2XVLLD74fXvHVN6Ho79ZZhjM9H9ZDCDP';
+const VAULT_PDA = 'A8YN2TjFECBFKMv5jaQ4SthPJb5KF4XYBhwMYKFT5Jd6';
+const TREASURY_PDA = 'CnJYShWKkDCHeees6Jgi2nx6rekrsu62VqJkDLxpZeNs';
+const VAULT_X = 'BmwisdBiJQaMMeHya6c3uR6zvZzz6PLmFhzxovdxz39d';
+const ALICE_X_AUX = 'CauEvHvbB4LFDqLtRjp39qtK8sbJFWBR2W2113yAm8M5';
 const SYSTEM = '11111111111111111111111111111111';
 const ATA = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
 const JUPITER = 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4';
@@ -694,7 +743,8 @@ interface AccountSpec {
 interface TokenSpec {
   account: number;
   mint: string;
-  owner: string;
+  /** Omitted = the pre-2022 balance shape without an owner field. */
+  owner?: string;
   decimals: number;
   /** Raw amount before; omitted = the token account did not exist (opened in the tx). */
   pre?: string;
@@ -703,7 +753,9 @@ interface TokenSpec {
 }
 
 function balance(t: TokenSpec, amount: string): RpcTokenBalance {
-  return { accountIndex: t.account, mint: t.mint, owner: t.owner, programId: PROGRAMS.TOKEN, uiTokenAmount: { amount, decimals: t.decimals, uiAmount: null } };
+  const entry: RpcTokenBalance = { accountIndex: t.account, mint: t.mint, programId: PROGRAMS.TOKEN, uiTokenAmount: { amount, decimals: t.decimals, uiAmount: null } };
+  if (t.owner !== undefined) entry.owner = t.owner;
+  return entry;
 }
 
 function buildTx(spec: {
@@ -752,6 +804,12 @@ const ix = {
     programId: ATA,
     program: 'spl-associated-token-account',
     parsed: { type: 'create', info: { source, account, wallet, mint } },
+  }),
+  /** Jupiter's temporary WSOL account pattern (not an ATA). */
+  createWithSeed: (source: string, newAccount: string, lamports: number): RpcParsedInstruction => ({
+    programId: SYSTEM,
+    program: 'system',
+    parsed: { type: 'createAccountWithSeed', info: { source, newAccount, lamports, base: source, seed: 'jup-wsol', owner: PROGRAMS.TOKEN, space: 165 } },
   }),
   closeAccount: (account: string, destination: string, owner: string): RpcParsedInstruction => ({
     programId: PROGRAMS.TOKEN,
@@ -1207,7 +1265,292 @@ describe('synthetic: ATA rent on open and close', () => {
   });
 });
 
+describe('synthetic: Jupiter-style routes', () => {
+  it('SOL → X with a createAccountWithSeed WSOL account, a new X ATA and a platform fee in X', () => {
+    // ALICE: native −(5,000 fee + 1,488,440 X-ATA rent + 1,000,000,000 wrapped). The temp WSOL account
+    // (rent + 1 SOL) is created and closed inside the tx, so it never shows in token balances; the pool's
+    // WSOL vault +1 SOL, ALICE +990 X, BOB (platform fee account) +10 X.
+    const tx = buildTx({
+      accounts: [
+        { pubkey: ALICE, pre: 5_000_000_000, post: 5_000_000_000 - FEE - RENT_2026 - 1_000_000_000 },
+        { pubkey: TEMP_WSOL, pre: 0, post: 0, signer: false },
+        { pubkey: ALICE_X, pre: 0, post: RENT_2026, signer: false },
+        { pubkey: POOL_WSOL, pre: RENT + 10_000_000_000, post: RENT + 11_000_000_000, signer: false },
+        { pubkey: POOL_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: BOB_X, pre: RENT, post: RENT, signer: false },
+      ],
+      tokens: [
+        { account: 2, mint: X, owner: ALICE, decimals: 6, post: '990000000' },
+        { account: 3, mint: MINTS.SOL, owner: POOL, decimals: 9, pre: '10000000000', post: '11000000000' },
+        { account: 4, mint: X, owner: POOL, decimals: 6, pre: '5000000000', post: '4000000000' },
+        { account: 5, mint: X, owner: BOB, decimals: 6, pre: '0', post: '10000000' },
+      ],
+      instructions: [ix.createWithSeed(ALICE, TEMP_WSOL, RENT_2026 + 1_000_000_000), ix.createAta(ALICE, ALICE_X, ALICE, X), ix.call(JUPITER), ix.closeAccount(TEMP_WSOL, ALICE, ALICE)],
+    });
+    expect(walletBalanceChanges(tx, ALICE)).toEqual({ wallet: ALICE, solDelta: -1, feeSol: 0.000005, tokens: [{ mint: X, delta: 990, decimals: 6 }], rentSol: 0.00148844 });
+    for (const trade of [deriveTradeForMint(tx, X, { pool: POOL }), deriveTradeForMint(tx, X)]) {
+      expect(trade).toMatchObject({ side: 'buy', wallet: ALICE, tokenAmount: 990, solAmount: 1, quoteSide: 'trader', program: 'Jupiter' });
+      // 1 / 990 SOL per token
+      expectRel(trade?.priceQuote, 1 / 990);
+    }
+    expect(classifyWalletActivity(tx, ALICE)).toMatchObject({ kind: 'buy', solAmount: 1, tokenAmount: 990, program: 'Jupiter' });
+  });
+
+  it('X → SOL paid into a pre-existing WSOL ATA that is then closed to unwrap', () => {
+    // ALICE: native +(1,488,440 refund + 500,000,000 unwrapped) − fee; the WSOL ATA held 0 before and is gone after.
+    const tx = buildTx({
+      accounts: [
+        { pubkey: ALICE, pre: 1_000_000_000, post: 1_000_000_000 - FEE + RENT_2026 + 500_000_000 },
+        { pubkey: ALICE_WSOL, pre: RENT_2026, post: 0, signer: false },
+        { pubkey: ALICE_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: POOL_WSOL, pre: RENT + 10_000_000_000, post: RENT + 9_500_000_000, signer: false },
+        { pubkey: POOL_X, pre: RENT, post: RENT, signer: false },
+      ],
+      tokens: [
+        { account: 1, mint: MINTS.SOL, owner: ALICE, decimals: 9, pre: '0' },
+        { account: 2, mint: X, owner: ALICE, decimals: 6, pre: '1000000000', post: '0' },
+        { account: 3, mint: MINTS.SOL, owner: POOL, decimals: 9, pre: '10000000000', post: '9500000000' },
+        { account: 4, mint: X, owner: POOL, decimals: 6, pre: '5000000000', post: '6000000000' },
+      ],
+      instructions: [ix.call(JUPITER), ix.closeAccount(ALICE_WSOL, ALICE, ALICE)],
+    });
+    expect(walletBalanceChanges(tx, ALICE)).toEqual({ wallet: ALICE, solDelta: 0.5, feeSol: 0.000005, tokens: [{ mint: X, delta: -1000, decimals: 6 }], rentSol: -0.00148844 });
+    expect(deriveTradeForMint(tx, X, { pool: POOL })).toMatchObject({ side: 'sell', solAmount: 0.5, tokenAmount: 1000, priceQuote: 0.0005, quoteSide: 'trader' });
+    expect(classifyWalletActivity(tx, ALICE)).toMatchObject({ kind: 'sell', solAmount: 0.5 });
+  });
+
+  it('sums several token accounts of the same mint owned by the wallet', () => {
+    const tx = buildTx({
+      accounts: [
+        { pubkey: ALICE, pre: 1_000_000_000, post: 900_000_000 - FEE },
+        { pubkey: ALICE_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: ALICE_X_AUX, pre: RENT, post: RENT, signer: false },
+        { pubkey: POOL, pre: 1_000_000_000, post: 1_100_000_000, signer: false },
+      ],
+      tokens: [
+        { account: 1, mint: X, owner: ALICE, decimals: 6, pre: '0', post: '600000' },
+        { account: 2, mint: X, owner: ALICE, decimals: 6, pre: '100000', post: '500000' },
+      ],
+    });
+    // 600,000 + 400,000 = 1,000,000 raw = 1 X for 0.1 SOL
+    expect(walletBalanceChanges(tx, ALICE).tokens).toEqual([{ mint: X, delta: 1, decimals: 6 }]);
+    expect(deriveTradeForMint(tx, X)).toMatchObject({ side: 'buy', tokenAmount: 1, solAmount: 0.1, priceQuote: 0.1 });
+  });
+});
+
+describe('synthetic: quote from the pool side when the trader shows no quote leg', () => {
+  /** BOT (signer) pays `lamports` natively to the pool; ALICE's ATA receives 1,000 X from the pool vault. */
+  function botPaidBuy(lamports = 1_000_000_000, extraToken = false) {
+    return buildTx({
+      accounts: [
+        { pubkey: CAROL, pre: 5_000_000_000, post: 5_000_000_000 - FEE - lamports },
+        { pubkey: ALICE_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: ALICE_Y, pre: RENT, post: RENT, signer: false },
+        { pubkey: POOL, pre: 1_000_000_000, post: 1_000_000_000 + lamports, signer: false },
+        { pubkey: POOL_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: POOL_Y, pre: RENT, post: RENT, signer: false },
+      ],
+      tokens: [
+        { account: 1, mint: X, owner: ALICE, decimals: 6, pre: '0', post: '1000000000' },
+        { account: 4, mint: X, owner: POOL, decimals: 6, pre: '5000000000', post: '4000000000' },
+        ...(extraToken
+          ? [
+              { account: 2, mint: Y, owner: ALICE, decimals: 6, pre: '0', post: '2000000000' },
+              { account: 5, mint: Y, owner: POOL, decimals: 6, pre: '5000000000', post: '3000000000' },
+            ]
+          : []),
+      ],
+      instructions: [ix.call(PROGRAMS.PUMP_AMM)],
+    });
+  }
+
+  it('prices a bot-paid buy from what the pool received', () => {
+    const tx = botPaidBuy();
+    for (const trade of [deriveTradeForMint(tx, X, { pool: POOL }), deriveTradeForMint(tx, X)]) {
+      // The pool received 1 SOL for 1,000 X: 0.001 SOL per token, attributed to the pool side.
+      expect(trade).toMatchObject({ side: 'buy', wallet: ALICE, tokenAmount: 1000, solAmount: 1, priceQuote: 0.001, quoteSide: 'pool', program: 'PumpSwap' });
+    }
+    // Wallet views stay honest: ALICE paid nothing (a transfer in), the bot sent the SOL.
+    expect(classifyWalletActivity(tx, ALICE)).toMatchObject({ kind: 'transfer_in', tokenAmount: 1000, counterparty: POOL, feeSol: 0 });
+    expect(classifyWalletActivity(tx, CAROL)).toMatchObject({ kind: 'sol_out', solAmount: 1, counterparty: POOL });
+  });
+
+  it('prices a sniper program whose token vault and treasury are different PDAs', () => {
+    // BOT signs; TREASURY_PDA pays 0.5 SOL to POOL2; VAULT_PDA's token account receives 500 X.
+    const tx = buildTx({
+      accounts: [
+        { pubkey: CAROL, pre: 1_000_000_000, post: 1_000_000_000 - FEE },
+        { pubkey: TREASURY_PDA, pre: 3_000_000_000, post: 2_500_000_000, signer: false },
+        { pubkey: VAULT_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: POOL2, pre: 1_000_000_000, post: 1_500_000_000, signer: false },
+        { pubkey: POOL_X, pre: RENT, post: RENT, signer: false },
+      ],
+      tokens: [
+        { account: 2, mint: X, owner: VAULT_PDA, decimals: 6, pre: '0', post: '500000000' },
+        { account: 4, mint: X, owner: POOL2, decimals: 6, pre: '5000000000', post: '4500000000' },
+      ],
+    });
+    expect(deriveTradeForMint(tx, X, { pool: POOL2 })).toMatchObject({ side: 'buy', wallet: VAULT_PDA, tokenAmount: 500, solAmount: 0.5, priceQuote: 0.001, quoteSide: 'pool' });
+  });
+
+  it('prices a sell whose proceeds the pool paid to a third party', () => {
+    // ALICE's 1,000 X go to the pool; the pool pays 0.5 SOL natively to BOB.
+    const tx = buildTx({
+      accounts: [
+        { pubkey: ALICE, pre: 1_000_000_000, post: 1_000_000_000 - FEE },
+        { pubkey: ALICE_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: POOL, pre: 5_000_000_000, post: 4_500_000_000, signer: false },
+        { pubkey: POOL_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: BOB, pre: 10_000, post: 500_010_000, signer: false },
+      ],
+      tokens: [
+        { account: 1, mint: X, owner: ALICE, decimals: 6, pre: '1000000000', post: '0' },
+        { account: 3, mint: X, owner: POOL, decimals: 6, pre: '4000000000', post: '5000000000' },
+      ],
+    });
+    expect(deriveTradeForMint(tx, X, { pool: POOL })).toMatchObject({ side: 'sell', wallet: ALICE, tokenAmount: 1000, solAmount: 0.5, priceQuote: 0.0005, quoteSide: 'pool' });
+    expect(classifyWalletActivity(tx, ALICE)).toMatchObject({ kind: 'transfer_out', counterparty: POOL });
+  });
+
+  it('prices a token-quoted trade the pool received', () => {
+    // BOT pays 10 USDC into the pool's USDC vault; ALICE receives 500 X.
+    const tx = buildTx({
+      accounts: [
+        { pubkey: CAROL, pre: 1_000_000_000, post: 1_000_000_000 - FEE },
+        { pubkey: ALICE_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: ALICE_USDC, pre: RENT, post: RENT, signer: false },
+        { pubkey: POOL_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: POOL_USDC, pre: RENT, post: RENT, signer: false },
+      ],
+      tokens: [
+        { account: 1, mint: X, owner: ALICE, decimals: 6, pre: '0', post: '500000000' },
+        { account: 2, mint: MINTS.USDC, owner: CAROL, decimals: 6, pre: '10000000', post: '0' },
+        { account: 3, mint: X, owner: POOL, decimals: 6, pre: '1000000000', post: '500000000' },
+        { account: 4, mint: MINTS.USDC, owner: POOL, decimals: 6, pre: '0', post: '10000000' },
+      ],
+    });
+    expect(deriveTradeForMint(tx, X, { pool: POOL })).toMatchObject({ side: 'buy', wallet: ALICE, quoteMint: MINTS.USDC, quoteAmount: 10, priceQuote: 0.02, quoteSide: 'pool' });
+  });
+
+  it('never invents a price: two tokens for one payment, a wrong-way pool, dust, or an on-curve counterparty', () => {
+    // ALICE received X and Y for the bot's single SOL payment: unattributable.
+    expect(deriveTradeForMint(botPaidBuy(1_000_000_000, true), X, { pool: POOL })).toBeNull();
+    // The pool paid 999 lamports: below the dust floor.
+    expect(deriveTradeForMint(botPaidBuy(999), X, { pool: POOL })).toBeNull();
+    // The pool sent X to ALICE and ALSO paid SOL out (a reward / distribution, not a trade).
+    const wrongWay = buildTx({
+      accounts: [
+        { pubkey: CAROL, pre: 1_000_000_000, post: 1_000_000_000 - FEE },
+        { pubkey: ALICE_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: POOL, pre: 5_000_000_000, post: 4_000_000_000, signer: false },
+        { pubkey: POOL_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: BOB, pre: 10_000, post: 1_000_010_000, signer: false },
+      ],
+      tokens: [
+        { account: 1, mint: X, owner: ALICE, decimals: 6, pre: '0', post: '1000000000' },
+        { account: 3, mint: X, owner: POOL, decimals: 6, pre: '5000000000', post: '4000000000' },
+      ],
+    });
+    expect(deriveTradeForMint(wrongWay, X, { pool: POOL })).toBeNull();
+    // BOB (an on-curve wallet) sent X to ALICE while receiving SOL from the bot: without a pool hint that is a transfer.
+    const wallets = buildTx({
+      accounts: [
+        { pubkey: CAROL, pre: 5_000_000_000, post: 4_000_000_000 - FEE },
+        { pubkey: ALICE_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: BOB_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: BOB, pre: 10_000, post: 1_000_010_000, signer: false },
+      ],
+      tokens: [
+        { account: 1, mint: X, owner: ALICE, decimals: 6, pre: '0', post: '1000000000' },
+        { account: 2, mint: X, owner: BOB, decimals: 6, pre: '1000000000', post: '0' },
+      ],
+    });
+    expect(deriveTradeForMint(wallets, X)).toBeNull();
+    expect(classifyWalletActivity(wallets, ALICE)).toMatchObject({ kind: 'transfer_in', counterparty: BOB });
+  });
+
+  it('labels the quote side on the real fixtures and prefers the curve event over the pool side', () => {
+    expect(deriveTradeForMint(fixture(F.buyExactSolIn), '4axcD14CCqvTXiVgi1Wwo6LeXR6fL3WiLVtMY3hTpump')?.quoteSide).toBe('trader');
+    expect(deriveTradeForMint(fixture(F.relayerUsdc), 'BfK1fZuZjcgtxpdKowafwDzFTywdVzyQb5mRYAdHpump')?.quoteSide).toBe('trader');
+    // Hide the trader's SOL leg of the BuyV2 fixture (as if a router had paid): the TradeEvent prices it.
+    const routerPaid = clone(fixture(F.buyV2));
+    routerPaid.meta.postBalances = routerPaid.meta.preBalances.map((b, i) => (i === 0 ? b - routerPaid.meta.fee : (routerPaid.meta.postBalances[i] as number)));
+    const trade = deriveTradeForMint(routerPaid, '7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump', { pool: '9ZZuz4cVoYhbAFomLMHJjpPijY7EXryqHRjY79f9VC7A' });
+    expect(trade).toMatchObject({ side: 'buy', venueSolAmount: 0.987650071, quoteSide: 'event' });
+    expect(trade?.solAmount).toBeUndefined();
+    // 0.987650071 / 20,682,995.874269 = 4.7751…e-8 SOL per token (curve price, pump fees excluded)
+    expectRel(trade?.priceQuote, 0.987650071 / 20682995.874269);
+    // Without the event, the curve's own +987,650,071 lamports price it from the pool side.
+    const noEvent = clone(routerPaid);
+    noEvent.meta.innerInstructions = [];
+    noEvent.meta.logMessages = [];
+    expect(deriveTradeForMint(noEvent, '7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump', { pool: '9ZZuz4cVoYhbAFomLMHJjpPijY7EXryqHRjY79f9VC7A' })).toMatchObject({
+      side: 'buy',
+      solAmount: 0.987650071,
+      quoteSide: 'pool',
+    });
+  });
+});
+
 describe('synthetic: encodings, big numbers and program labels', () => {
+  it('tolerates the pre-2022 token balance shape without owners', () => {
+    const tx = buildTx({
+      accounts: [
+        { pubkey: ALICE, pre: 1_000_000_000, post: 1_000_000_000 - FEE },
+        { pubkey: ALICE_X, pre: RENT, post: RENT, signer: false },
+      ],
+      tokens: [{ account: 1, mint: X, decimals: 6, pre: '0', post: '1000000' }],
+    });
+    expect(walletBalanceChanges(tx, ALICE).tokens).toEqual([]);
+    expect(deriveTradeForMint(tx, X)).toBeNull();
+    expect(classifyWalletActivity(tx, ALICE)).toMatchObject({ kind: 'other', legs: [] });
+  });
+
+  it('reads a wallet that only appears through its token account (not an account key)', () => {
+    // BOB pays the fee and sends 1 X to ALICE's ATA; ALICE's own pubkey is not in accountKeys.
+    const tx = buildTx({
+      accounts: [
+        { pubkey: BOB, pre: 1_000_000_000, post: 1_000_000_000 - FEE },
+        { pubkey: ALICE_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: BOB_X, pre: RENT, post: RENT, signer: false },
+      ],
+      tokens: [
+        { account: 1, mint: X, owner: ALICE, decimals: 6, pre: '0', post: '1000000' },
+        { account: 2, mint: X, owner: BOB, decimals: 6, pre: '1000000', post: '0' },
+      ],
+    });
+    expect(walletBalanceChanges(tx, ALICE)).toEqual({ wallet: ALICE, solDelta: 0, feeSol: 0, tokens: [{ mint: X, delta: 1, decimals: 6 }] });
+    expect(classifyWalletActivity(tx, ALICE)).toMatchObject({ kind: 'transfer_in', counterparty: BOB, feeSol: 0 });
+  });
+
+  it('accepts lamports and fees as digit strings and raw amounts as safe integers', () => {
+    const tx = buildTx({
+      accounts: [
+        { pubkey: ALICE, pre: 1_000_000_000, post: 900_000_000 - FEE },
+        { pubkey: ALICE_X, pre: RENT, post: RENT, signer: false },
+        { pubkey: POOL, pre: 1, post: 100_000_001, signer: false },
+      ],
+      tokens: [{ account: 1, mint: X, owner: ALICE, decimals: 6, pre: '0', post: '1000000' }],
+    });
+    const meta = must(tx.meta) as unknown as { fee: unknown; preBalances: unknown[]; postTokenBalances: Array<{ uiTokenAmount: { amount: unknown } }> };
+    meta.fee = '5000';
+    meta.preBalances = meta.preBalances.map(String);
+    must(meta.postTokenBalances[0]).uiTokenAmount.amount = 1_000_000;
+    expect(deriveTradeForMint(tx, X)).toMatchObject({ side: 'buy', solAmount: 0.1, tokenAmount: 1, priceQuote: 0.1 });
+  });
+
+  it('turns lamports into SOL exactly for representative amounts', () => {
+    for (const lamports of [1_965_998_170, 2_584_865_588, 10_000, 1_000_995_698, 4_005_000, 123_456_789, 1_488_440]) {
+      const tx = buildTx({
+        accounts: [
+          { pubkey: ALICE, pre: 10_000_000_000, post: 10_000_000_000 - FEE - lamports },
+          { pubkey: POOL, pre: 1, post: 1 + lamports, signer: false },
+        ],
+      });
+      expect(walletBalanceChanges(tx, ALICE).solDelta).toBe(-lamports / 1e9);
+    }
+  });
+
   it('keeps raw token math exact beyond 2^53', () => {
     // 9,007,199,254,740,993 → 9,007,199,254,741,000 is +7; float math would say +8.
     const tx = buildTx({

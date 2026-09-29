@@ -33,6 +33,7 @@ import type {
   PulseColumn,
   PulseToken,
   Socials,
+  Sourced,
   TokenRow,
 } from '@/lib/core/types';
 import { isProviderError } from '@/lib/net/errors';
@@ -693,6 +694,33 @@ export function pickBatch(
   return out;
 }
 
+/**
+ * One result from a request that was split into sub-batches (the browser
+ * RPC caps getMultipleAccounts at 10 addresses): keyed data merged, the
+ * newest part's provenance, notes de-duplicated.
+ */
+export function mergeSourcedRecords<T>(
+  parts: ReadonlyArray<Sourced<Record<string, T>>>,
+  fallback: { source: ProviderId; freshness: Freshness },
+): Sourced<Record<string, T>> {
+  const data: Record<string, T> = {};
+  const notes = new Set<string>();
+  let newest: Sourced<Record<string, T>> | undefined;
+  for (const part of parts) {
+    Object.assign(data, part.data);
+    if (!newest || part.fetchedAt > newest.fetchedAt) newest = part;
+    part.notes?.forEach((note) => notes.add(note));
+  }
+  const out: Sourced<Record<string, T>> = {
+    data,
+    source: newest?.source ?? fallback.source,
+    fetchedAt: newest?.fetchedAt ?? Date.now(),
+    freshness: newest?.freshness ?? fallback.freshness,
+  };
+  if (notes.size) out.notes = [...notes];
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Readings from each source
 // ---------------------------------------------------------------------------
@@ -983,6 +1011,7 @@ export function verifyCandidate(c: PendingCandidate, row: TokenRow | undefined, 
 
 export type PulseFeedId =
   | 'jupRecent'
+  | 'jupTrending'
   | 'geckoNew'
   | 'geckoPump'
   | 'curves'
@@ -1007,8 +1036,8 @@ export type PulseFeeds = Partial<Record<PulseFeedId, PulseFeedStatus>>;
 /** Which polled feeds back each column (the PumpPortal stream is handled separately). */
 export const COLUMN_BACKFILL: Readonly<Record<PulseColumn, readonly PulseFeedId[]>> = {
   new: ['jupRecent', 'geckoNew', 'serverNew'],
-  final: ['geckoPump', 'jupUltra', 'serverFinal'],
-  migrated: ['jupRows', 'geckoNew', 'serverMigrated'],
+  final: ['geckoPump', 'jupUltra', 'jupTrending', 'serverFinal'],
+  migrated: ['jupRows', 'jupTrending', 'geckoNew', 'serverMigrated'],
 };
 
 export function feedFailing(status: PulseFeedStatus | undefined): boolean {

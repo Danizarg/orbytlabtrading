@@ -5,7 +5,7 @@ import type { ProviderId } from '@/lib/core/providers';
 import { MINTS } from '@/lib/core/solana';
 import { isProviderError, ProviderError } from '@/lib/net/errors';
 import type { JsonFetcher, JsonRequest } from '@/lib/net/types';
-import { birdeyeDex, birdeyeLaunchpad, BIRDEYE_INTERVALS, createBirdeye } from './index';
+import { birdeyeDex, birdeyeLaunchpad, BIRDEYE_INTERVALS, BIRDEYE_TOP10_NOTE, createBirdeye } from './index';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -374,6 +374,23 @@ describe('birdeye getHolders', () => {
     const { fetcher } = fakeFetcher([['/defi/v3/token/holder', HOLDERS]]);
     const res = await createBirdeye({ apiKey: API_KEY, fetcher }).getHolders(HOLDER_MINT, 1);
     expect(res.data.top).toHaveLength(1);
+  });
+
+  it('caveats the top-10 share when an unlabelled program-derived owner is among the top 10', async () => {
+    // D45QQ… is a PumpSwap pool account: off-curve, but not one of the static vault authorities.
+    const pool = 'D45QQMsxGhohYXGZKDJEowMv2HArrKAsw5V3JnyDZWeS';
+    const list = items(HOLDERS).map((i, n) => ({ ...(i as object), owner: n === 1 ? pool : (i as { owner: string }).owner }));
+    const res = await createBirdeye({ apiKey: API_KEY, fetcher: fakeFetcher([['/defi/v3/token/holder', withItems(HOLDERS, list)]]).fetcher }).getHolders(HOLDER_MINT);
+    expect(res.data.top[1]).toMatchObject({ owner: pool, isProgramAccount: true });
+    expect(res.data.top[1] && 'label' in res.data.top[1]).toBe(false);
+    expect(res.data.distribution).toEqual({ top10Pct: 22.15 });
+    expect(res.notes).toEqual([BIRDEYE_TOP10_NOTE]);
+
+    // Plain wallets only: Birdeye's figure stands without a caveat.
+    const wallets = list.map((i) => ({ ...(i as object), owner: '6Zk9e3nfXdYLXHYu5NvDiPHGMcjujVBv6gWRr7ckSdhP' }));
+    const plain = await createBirdeye({ apiKey: API_KEY, fetcher: fakeFetcher([['/defi/v3/token/holder', withItems(HOLDERS, wallets)]]).fetcher }).getHolders(HOLDER_MINT);
+    expect(plain.data.top.every((h) => h.isProgramAccount === false && !h.label)).toBe(true);
+    expect(plain.notes).toBeUndefined();
   });
 });
 

@@ -8,6 +8,7 @@ export {
   BIRDEYE_MAX_TRADES,
   BIRDEYE_OHLCV_TYPE,
   BIRDEYE_PULSE_LIMIT,
+  BIRDEYE_TOP10_NOTE,
   createBirdeye,
 } from './adapter';
 export type { BirdeyeAdapter, BirdeyeOptions } from './adapter';

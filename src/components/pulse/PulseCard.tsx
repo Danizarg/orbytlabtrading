@@ -3,12 +3,15 @@
 import { Boxes, ChefHat, Coins, Crosshair, Droplets, Ghost, Globe, Send, UserStar, Users, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { memo, useState, type MouseEvent, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { memo, useEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import { useCapabilities } from '@/client/capabilities';
 import { useFlash } from '@/client/hooks/useFlash';
 import { useNow } from '@/client/hooks/useNow';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { TokenAvatar } from '@/components/ui/TokenAvatar';
 import { cn } from '@/components/ui/cn';
+import { prefetchTokenPage } from '@/data/hooks/useTokenOverview';
 import { DASH, formatAge, formatAmount, formatCompact, formatDateTime, formatPct, formatUsd } from '@/lib/core/format';
 import { shortAddress } from '@/lib/core/solana';
 import type { PulseColumn, Socials } from '@/lib/core/types';
@@ -140,6 +143,9 @@ const FLASH_CLASS: Record<string, string> = {
   'animate-flash-down': 'motion-safe:animate-flash-down',
 };
 
+/** The pointer must rest on a card this long before its token data is prefetched (a sweep across the column costs nothing). */
+const HOVER_INTENT_MS = 150;
+
 // ---------------------------------------------------------------------------
 // Card
 // ---------------------------------------------------------------------------
@@ -155,6 +161,9 @@ export interface PulseCardProps {
 
 function PulseCardView({ item, column, mcUsd, animateIn }: PulseCardProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const capabilities = useCapabilities();
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [animate] = useState(animateIn);
   const flash = FLASH_CLASS[useFlash(mcUsd)] ?? '';
   const href = `/trade/${item.mint}`;
@@ -180,10 +189,25 @@ function PulseCardView({ item, column, mcUsd, animateIn }: PulseCardProps) {
     if (event.button === 0) router.push(href);
   };
 
+  // Prefetch on hover only: New Pairs churns every few seconds, so viewport
+  // prefetching would hit the route for cards nobody opens. The route is
+  // prefetched at once; the token page queries (same keys as /trade/[mint])
+  // wait for hover intent because each warm-up spends keyless budget.
+  const onPointerEnter = (event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType !== 'mouse') return;
+    router.prefetch(href);
+    clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => prefetchTokenPage(queryClient, item.mint, capabilities), HOVER_INTENT_MS);
+  };
+  const onPointerLeave = () => clearTimeout(hoverTimer.current);
+  useEffect(() => () => clearTimeout(hoverTimer.current), []);
+
   return (
     <article
       onClick={open}
       onAuxClick={open}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
       className={cn(
         'relative flex cursor-pointer flex-col gap-1.5 border-b border-line px-3 py-2 transition-colors duration-150 hover:bg-hover/60',
         animate && 'motion-safe:animate-slide-in',

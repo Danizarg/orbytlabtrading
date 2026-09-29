@@ -24,6 +24,7 @@ import {
   marketCapUsdOf,
   matchesFilter,
   mergeItem,
+  mergeSourcedRecords,
   MIGRATED_WINDOW_MS,
   NEW_PAIRS_WINDOW_MS,
   observedAt,
@@ -698,6 +699,23 @@ describe('column freshness', () => {
     const all = columnFreshness('new', { streamOpen: false, feeds: { jupRecent: failing }, now });
     expect(all.error).toBe(failing.error);
     expect(columnFreshness('new', { streamOpen: true, streamLastAt: now - 60_000, feeds: { jupRecent: failing }, now }).error).toBeUndefined();
+  });
+});
+
+describe('mergeSourcedRecords', () => {
+  it('merges sub-batch results, keeps the newest provenance and de-duplicates notes', () => {
+    const merged = mergeSourcedRecords(
+      [
+        { data: { a: 1, b: 2 }, source: 'solana-rpc', fetchedAt: T0, freshness: 'realtime', notes: ['x'] },
+        { data: { c: 3 }, source: 'solana-rpc', fetchedAt: T0 + 50, freshness: 'realtime', notes: ['x', 'y'] },
+      ],
+      { source: 'orbyt', freshness: 'fast' },
+    );
+    expect(merged).toEqual({ data: { a: 1, b: 2, c: 3 }, source: 'solana-rpc', fetchedAt: T0 + 50, freshness: 'realtime', notes: ['x', 'y'] });
+    const empty = mergeSourcedRecords([], { source: 'orbyt', freshness: 'fast' });
+    expect(empty.data).toEqual({});
+    expect(empty.source).toBe('orbyt');
+    expect(empty.notes).toBeUndefined();
   });
 });
 

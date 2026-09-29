@@ -56,10 +56,10 @@ export const PULSE_COLUMNS: readonly PulseColumnConfig[] = [
     sources: [
       { label: 'Solana RPC', feeds: ['curves'], note: 'pump.fun bonding curves decoded on-chain every 4 s' },
       { label: 'GeckoTerminal', feeds: ['geckoPump'], href: GECKO_HREF, note: GECKO_NOTE },
-      { label: 'Jupiter', feeds: ['jupUltra', 'jupRows'], note: 'Jupiter: launchpad progress, holders and risk' },
+      { label: 'Jupiter', feeds: ['jupUltra', 'jupRows', 'jupTrending'], note: 'Jupiter: launchpad progress, holders, risk and 1 h trending launches' },
     ],
     serverFeed: 'serverFinal',
-    settle: { feeds: ['curves', 'jupUltra', 'serverFinal'], stream: false },
+    settle: { feeds: ['curves', 'jupUltra', 'jupTrending', 'serverFinal'], stream: false },
   },
   {
     id: 'migrated',
@@ -67,14 +67,14 @@ export const PULSE_COLUMNS: readonly PulseColumnConfig[] = [
     short: 'Migrated',
     empty: {
       title: 'No migrations in view yet',
-      body: 'Migrations arrive live from PumpPortal. Jupiter and GeckoTerminal confirm graduations from other launchpads over the last 24 h.',
+      body: 'Migrations arrive live from PumpPortal. Jupiter trending and token rows and GeckoTerminal new pools backfill graduations from the last 24 h.',
     },
     sources: [
       PUMPPORTAL,
-      { label: 'Jupiter', feeds: ['jupRows'], note: 'Jupiter Tokens V2: graduation pool and time' },
+      { label: 'Jupiter', feeds: ['jupRows', 'jupTrending'], note: 'Jupiter Tokens V2: graduation pool and time; 1 h trending launches' },
       { label: 'GeckoTerminal', feeds: ['geckoNew'], href: GECKO_HREF, note: GECKO_NOTE },
     ],
     serverFeed: 'serverMigrated',
-    settle: { feeds: ['jupRows', 'serverMigrated'], stream: false },
+    settle: { feeds: ['jupRows', 'jupTrending', 'serverMigrated'], stream: false },
   },
 ];

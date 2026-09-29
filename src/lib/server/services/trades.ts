@@ -37,10 +37,23 @@ function positive(n: number | undefined): n is number {
   return typeof n === 'number' && Number.isFinite(n) && n > 0;
 }
 
+const SOL_SYMBOLS: ReadonlySet<string> = new Set(['SOL', 'WSOL']);
+
+/**
+ * SOL exchanged in a trade: the dedicated field, or the quote amount of a
+ * trade whose quote asset is (wrapped) SOL. Undefined for every other quote.
+ */
+function solAmountOf(trade: Trade): number | undefined {
+  if (positive(trade.solAmount)) {
+    return trade.quoteSymbol === undefined || SOL_SYMBOLS.has(trade.quoteSymbol) ? trade.solAmount : undefined;
+  }
+  if (trade.quoteSymbol !== undefined && SOL_SYMBOLS.has(trade.quoteSymbol) && positive(trade.quoteAmount)) return trade.quoteAmount;
+  return undefined;
+}
+
 /** True when a trade was quoted in SOL (so its price can be expressed via SOL/USD). */
 function isSolQuoted(trade: Trade): boolean {
-  if (!positive(trade.solAmount)) return false;
-  return trade.quoteSymbol === undefined || trade.quoteSymbol === 'SOL' || trade.quoteSymbol === 'WSOL';
+  return solAmountOf(trade) !== undefined;
 }
 
 type UsdPatch = Pick<Trade, 'usdValue' | 'priceUsd' | 'marketCapUsd'>;
@@ -93,8 +106,8 @@ export function enrichTradesUsd(
   let usedSupply = false;
   const out = trades.map((trade) => {
     const patch = selfCompleted(trade);
-    if (solUsd !== undefined && isSolQuoted(trade)) {
-      const sol = trade.solAmount as number;
+    const sol = solUsd !== undefined ? solAmountOf(trade) : undefined;
+    if (solUsd !== undefined && sol !== undefined) {
       if (trade.usdValue === undefined && patch.usdValue === undefined) {
         patch.usdValue = sol * solUsd;
         usedSolPrice = true;

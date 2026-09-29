@@ -2,17 +2,18 @@
 
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/components/ui/cn';
 import type { DiscoverWindow } from '@/lib/core/providers';
 import { shortAddress } from '@/lib/core/solana';
 import type { TokenRow } from '@/lib/core/types';
-import type { SortKey, SortState } from '@/lib/services/discover';
+import { ROWS_PER_CHUNK, type SortKey, type SortState } from '@/lib/services/discover';
 import { RemoveButton } from './cells';
 import { COLUMNS, TABLE_MIN_WIDTH, type ColumnDef } from './columns';
-import { TD, TD_ACTION, TD_RANK, TD_TOKEN, TH, TH_RANK, TH_TOKEN } from './tableStyles';
+import { tradeHref } from './prefetch';
+import { ROW_H, TD, TD_ACTION, TD_RANK, TD_TOKEN, TH, TH_RANK, TH_TOKEN } from './tableStyles';
 import { TokenTableRow, type TableVariant } from './TokenTableRow';
 
 export interface TokenTableProps {
@@ -31,6 +32,10 @@ export interface TokenTableProps {
   missing?: readonly string[];
   /** Shown under the header when there is nothing to list (empty, filtered out, error). */
   empty?: ReactNode;
+  /** Hover intent on a row (token page prefetch). */
+  onHover?: (mint: string) => void;
+  /** When this changes the rendered chunk count resets (e.g. the list tab). */
+  resetKey?: unknown;
   caption: string;
 }
 
@@ -71,12 +76,12 @@ function HeaderCell({ col, win, sort, onSort, variant }: { col: ColumnDef; win: 
 
 function SkeletonRow() {
   return (
-    <tr className="h-9" aria-hidden>
+    <tr className={ROW_H} aria-hidden>
       {COLUMNS.map((c) => (
         <td key={c.id} className={c.id === 'rank' ? TD_RANK : c.id === 'token' ? TD_TOKEN : TD}>
           {c.id === 'token' ? (
             <div className="flex items-center gap-2">
-              <Skeleton className="size-6 shrink-0 rounded-full" />
+              <Skeleton className="size-[22px] shrink-0 rounded-full" />
               <div className="flex flex-col gap-1.5">
                 <Skeleton className="h-2.5 w-20" />
                 <Skeleton className="h-2 w-14" />
@@ -93,7 +98,7 @@ function SkeletonRow() {
 
 function MissingRow({ mint }: { mint: string }) {
   return (
-    <tr className="group h-9">
+    <tr className={cn('group', ROW_H)}>
       <td className={TD_RANK} />
       <td className={TD_TOKEN}>
         <span className="flex items-center gap-1 text-2xs text-muted">
@@ -116,7 +121,9 @@ function MissingRow({ mint }: { mint: string }) {
 /**
  * Dense sortable token table (Discover and watchlist). Real <table>
  * semantics, sticky header and sticky rank/token columns inside its own
- * scroll container (horizontal scroll on narrow screens).
+ * scroll container (horizontal scroll on narrow screens). Long lists render
+ * in chunks: the next chunk mounts when the sentinel row scrolls near the
+ * viewport (or on the fallback button), so 500+ rows never paint at once.
  */
 export function TokenTable({
   rows,
@@ -129,23 +136,47 @@ export function TokenTable({
   dimmed = false,
   missing,
   empty,
+  onHover,
+  resetKey,
   caption,
 }: TokenTableProps) {
   const router = useRouter();
   const onOpen = useCallback(
     (mint: string, newTab: boolean) => {
-      const href = `/trade/${mint}`;
+      const href = tradeHref(mint);
       if (newTab) window.open(href, '_blank', 'noopener,noreferrer');
       else router.push(href);
     },
     [router],
   );
 
+  const [limit, setLimit] = useState(ROWS_PER_CHUNK);
+  const [prevReset, setPrevReset] = useState(resetKey);
+  if (prevReset !== resetKey) {
+    setPrevReset(resetKey);
+    setLimit(ROWS_PER_CHUNK);
+  }
+  const shown = rows.length > limit ? rows.slice(0, limit) : rows;
+  const remaining = rows.length - shown.length;
+  const grow = useCallback(() => setLimit((l) => l + ROWS_PER_CHUNK), []);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    const root = containerRef.current;
+    if (!el || !root || remaining <= 0 || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && grow(), { root, rootMargin: '0px 0px 480px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+    // `limit` remounts the sentinel after each chunk so a still-visible sentinel re-triggers.
+  }, [remaining, limit, grow]);
+
   const skeletons = loading && !rows.length ? 16 : skeletonRows;
   const showEmpty = !loading && !rows.length && !missing?.length && !skeletons && empty;
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-auto bg-panel" aria-busy={loading || dimmed || undefined}>
+    <div ref={containerRef} className="relative min-h-0 flex-1 overflow-auto bg-panel" aria-busy={loading || dimmed || undefined}>
       <table className={cn('w-full table-fixed border-separate border-spacing-0 text-xs', TABLE_MIN_WIDTH)}>
         <caption className="sr-only">{caption}</caption>
         <colgroup>
@@ -161,9 +192,20 @@ export function TokenTable({
           </tr>
         </thead>
         <tbody className={cn('transition-opacity duration-150', dimmed && 'opacity-50')}>
-          {rows.map((row) => (
-            <TokenTableRow key={row.token.mint} row={row} win={win} variant={variant} onOpen={onOpen} />
+          {shown.map((row) => (
+            <TokenTableRow key={row.token.mint} row={row} win={win} variant={variant} onOpen={onOpen} onHover={onHover} />
           ))}
+          {remaining > 0 && (
+            <tr key={`more-${limit}`} ref={sentinelRef} className={ROW_H}>
+              <td className={TD_RANK} />
+              <td className={cn(TD_TOKEN, 'text-2xs text-muted')} colSpan={COLUMNS.length - 1}>
+                <button type="button" onClick={grow} className="rounded-sm text-muted hover:text-fg">
+                  Show {Math.min(ROWS_PER_CHUNK, remaining)} more
+                </button>
+                <span className="text-faint"> · {remaining.toLocaleString('en-US')} below</span>
+              </td>
+            </tr>
+          )}
           {missing?.map((mint) => (
             <MissingRow key={mint} mint={mint} />
           ))}

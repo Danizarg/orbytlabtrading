@@ -1,7 +1,7 @@
 'use client';
 
 import qrcode from 'qrcode-generator';
-import { ArrowDownToLine, Check, Copy, ExternalLink, ShieldCheck, X } from 'lucide-react';
+import { ArrowDownToLine, Check, Copy, ExternalLink, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SITE } from '@/config/site';
 import { explorer } from '@/lib/core/solana';
@@ -146,20 +146,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <ul className="space-y-1.5 rounded-md border border-line bg-panel-2 px-3 py-2.5 text-2xs leading-relaxed text-fg-dim">
-          <li className="flex gap-2">
-            <ShieldCheck className="mt-px size-3.5 shrink-0 text-up" />
-            Send only SOL or SPL tokens on the Solana network. Assets sent on other networks cannot be recovered.
-          </li>
-          <li className="flex gap-2">
-            <ShieldCheck className="mt-px size-3.5 shrink-0 text-up" />
-            Check the first and last characters of the address before sending. Solana transfers are irreversible.
-          </li>
-          <li className="flex gap-2">
-            <ShieldCheck className="mt-px size-3.5 shrink-0 text-up" />
-            ORBYT will never ask for your seed phrase or private key.
-          </li>
-        </ul>
+        <p className="text-center text-2xs text-muted">Only send SOL and SPL tokens on the Solana network.</p>
       </div>
     </dialog>
   );

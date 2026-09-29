@@ -382,6 +382,19 @@ describe('helius error mapping', () => {
     expect(err.code).toBe('not_configured');
     expect(calls).toHaveLength(0);
   });
+
+  it('classifies JSON-RPC errors by message when the code is unknown, and never reads a chain error as an auth failure', async () => {
+    const run = (error: Record<string, unknown>) =>
+      rejectionOf(createHelius({ apiKey: API_KEY, fetcher: fakeRpc({ getAssetBatch: { jsonrpc: '2.0', id: 1, error } }).fetcher }).getMetadata([MINT]));
+    expect((await run({ code: -32000, message: 'Rate limit exceeded' })).code).toBe('rate_limited');
+    expect((await run({ message: 'Too Many Requests' })).code).toBe('rate_limited');
+    expect((await run({ code: -32000, message: 'invalid api key' })).code).toBe('not_configured');
+    expect((await run({ code: 401, message: 'Unauthorized' })).code).toBe('not_configured');
+    expect((await run({ code: -32401, message: 'missing api key' })).code).toBe('not_configured');
+    // Solana's -32001 (block cleaned up) is a data error: a not_configured code would make chains skip Helius silently.
+    expect((await run({ code: -32001, message: 'Block cleaned up' })).code).toBe('http');
+    expect((await run({ code: -32005, message: 'Node is unhealthy' })).code).toBe('http');
+  });
 });
 
 // ---------------------------------------------------------------------------

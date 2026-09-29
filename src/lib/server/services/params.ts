@@ -42,11 +42,10 @@ export function parseAddressList(value: Raw, name: string, max: number): string[
   const seen = new Set<string>();
   for (const part of v.split(',')) {
     const item = part.trim();
-    if (!item) continue;
-    if (!isSolanaAddress(item)) throw new BadRequestError(`${name} contains an invalid Solana address`);
-    if (seen.has(item)) continue;
+    if (!item || seen.has(item)) continue;
     // Stop at the first extra entry instead of base58-decoding an arbitrarily long list.
     if (out.length === max) throw new BadRequestError(`${name} accepts at most ${max} addresses`);
+    if (!isSolanaAddress(item)) throw new BadRequestError(`${name} contains an invalid Solana address`);
     seen.add(item);
     out.push(item);
   }

@@ -9,7 +9,6 @@ import { useSystemHealth } from './useSystemHealth';
 
 export const ATTRIBUTION =
   'Data: Jupiter · GeckoTerminal (on-chain data powered by GeckoTerminal) · DEX Screener · PumpPortal · Solana RPC · Charts: TradingView Lightweight Charts';
-export const DISCLAIMER = 'Market data only · No custody · No trade execution · Not financial advice';
 
 const LINKS: Partial<Record<BarEntry['id'], string>> = {
   geckoterminal: 'https://www.geckoterminal.com',
@@ -43,7 +42,6 @@ export function StatusBar() {
           </a>
         </span>
       </p>
-      <p className="ml-auto shrink-0 text-muted">{DISCLAIMER}</p>
     </footer>
   );
 }
