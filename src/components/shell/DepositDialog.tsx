@@ -1,17 +1,14 @@
 'use client';
 
-import { ExternalLink, Wallet, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { usePreferences } from '@/client/store/preferences';
-import { useHydrated } from '@/client/hooks/useHydrated';
+import qrcode from 'qrcode-generator';
+import { ArrowDownToLine, Check, Copy, ExternalLink, ShieldCheck, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { SITE } from '@/config/site';
-import { explorer, isSolanaAddress } from '@/lib/core/solana';
-import { CopyButton } from '@/components/ui/CopyButton';
+import { explorer } from '@/lib/core/solana';
 
 /**
- * Deposit panel carried over from the original site: shows the configured
- * public receiving address (site default or a browser-local override).
- * ORBYT does not hold funds, verify deposits, or credit balances.
+ * Deposit panel showing ORBYT's central deposit address, the same fixed public
+ * Solana address for every visitor. It cannot be edited in the UI.
  */
 export function DepositButton() {
   const [open, setOpen] = useState(false);
@@ -20,9 +17,9 @@ export function DepositButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-8 items-center gap-2 rounded-md bg-brand px-3 text-xs font-bold text-bg hover:bg-brand-strong"
+        className="flex h-8 items-center gap-1.5 rounded-md bg-brand px-3 text-xs font-semibold text-bg transition-colors hover:bg-brand-strong"
       >
-        <Wallet className="size-3.5" />
+        <ArrowDownToLine className="size-3.5" />
         <span className="hidden sm:inline">Deposit</span>
       </button>
       {open && <DepositDialog onClose={() => setOpen(false)} />}
@@ -30,20 +27,54 @@ export function DepositButton() {
   );
 }
 
+/** QR code for the address as a crisp SVG (no network, no third-party image). */
+function AddressQr({ value, size = 168 }: { value: string; size?: number }) {
+  const path = useMemo(() => {
+    const qr = qrcode(0, 'M');
+    qr.addData(`solana:${value}`);
+    qr.make();
+    const count = qr.getModuleCount();
+    let d = '';
+    for (let r = 0; r < count; r++) {
+      for (let c = 0; c < count; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
+    }
+    return { d, count };
+  }, [value]);
+  const quiet = 2;
+  return (
+    <svg
+      viewBox={`${-quiet} ${-quiet} ${path.count + quiet * 2} ${path.count + quiet * 2}`}
+      width={size}
+      height={size}
+      role="img"
+      aria-label="QR code of the deposit address"
+      shapeRendering="crispEdges"
+      className="rounded-md bg-white"
+    >
+      <path d={path.d} fill="#0b0c10" />
+    </svg>
+  );
+}
+
 function DepositDialog({ onClose }: { onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
-  const hydrated = useHydrated();
-  const override = usePreferences((s) => s.depositOverride);
-  const setOverride = usePreferences((s) => s.setDepositOverride);
-  const address = (hydrated && override) || SITE.depositAddress;
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
-  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+  const address = SITE.depositAddress;
 
   useEffect(() => {
     const dialog = ref.current;
     if (dialog && !dialog.open) dialog.showModal();
   }, []);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1_500);
+    } catch {
+      /* clipboard unavailable: the address stays selectable */
+    }
+  }
 
   return (
     <dialog
@@ -53,97 +84,97 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
         if (e.target === ref.current) ref.current?.close();
       }}
       aria-labelledby="deposit-title"
-      className="m-auto w-[min(440px,calc(100vw-2rem))] rounded-xl border border-line-strong bg-panel p-0 text-fg backdrop:bg-black/70"
+      className="m-auto w-[min(420px,calc(100vw-2rem))] rounded-lg border border-line-strong bg-panel p-0 text-fg shadow-2xl backdrop:bg-black/75"
     >
-      <div className="flex items-center justify-between border-b border-line px-5 py-4">
-        <h2 id="deposit-title" className="font-display text-lg font-semibold">
-          Deposit address
+      <div className="flex h-12 items-center justify-between border-b border-line px-4">
+        <h2 id="deposit-title" className="text-sm font-semibold">
+          Deposit
         </h2>
         <button type="button" aria-label="Close" onClick={() => ref.current?.close()} className="rounded p-1 text-muted hover:bg-hover hover:text-fg">
           <X className="size-4" />
         </button>
       </div>
-      <div className="space-y-4 p-5">
-        <p className="text-xs text-muted">Receive SOL and SPL tokens on the Solana network at this public address.</p>
-        <div className="rounded-lg border border-line bg-panel-2 p-3">
-          <div className="mb-1 flex items-center justify-between text-2xs tracking-wide text-muted uppercase">
-            <span>{override && hydrated ? 'This browser (override)' : 'Site default'}</span>
-            <span className="flex items-center gap-1">
-              <CopyButton value={address} label="Copy deposit address" />
-              <a href={explorer.account(address)} target="_blank" rel="noopener noreferrer" aria-label="View on Solscan" className="text-muted hover:text-fg">
-                <ExternalLink className="size-3" />
-              </a>
-            </span>
+
+      <div className="space-y-4 p-4">
+        <div className="grid grid-cols-2 gap-2 text-2xs">
+          <div className="rounded-md border border-line bg-panel-2 px-3 py-2">
+            <div className="text-muted">Network</div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-fg">
+              <SolanaGlyph /> Solana
+            </div>
           </div>
-          <p className="font-mono text-xs break-all text-fg">{address}</p>
+          <div className="rounded-md border border-line bg-panel-2 px-3 py-2">
+            <div className="text-muted">Accepted</div>
+            <div className="mt-0.5 text-xs font-medium text-fg">SOL · SPL tokens</div>
+          </div>
         </div>
 
-        {editing ? (
-          <form
-            className="space-y-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const value = draft.trim();
-              if (!isSolanaAddress(value)) {
-                setError('Enter a valid 32-byte Solana public address.');
-                return;
-              }
-              setOverride(value);
-              setEditing(false);
-              setError('');
-            }}
-          >
-            <label htmlFor="deposit-input" className="text-xs text-fg-dim">
-              Solana public address
-            </label>
-            <input
-              id="deposit-input"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="Paste a public Solana address"
-              className="h-9 w-full rounded-md border border-line-strong bg-panel-2 px-3 font-mono text-xs outline-none focus:border-brand"
-            />
-            {error && (
-              <p role="alert" className="text-xs text-down">
-                {error}
-              </p>
-            )}
-            <div className="flex gap-2">
-              <button type="submit" className="h-8 rounded-md bg-brand px-3 text-xs font-bold text-bg hover:bg-brand-strong">
-                Save on this browser
-              </button>
-              <button type="button" onClick={() => setEditing(false)} className="h-8 rounded-md px-3 text-xs text-muted hover:bg-hover">
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <div className="flex flex-wrap gap-2">
+        <div className="flex justify-center rounded-md border border-line bg-panel-2 py-4">
+          <AddressQr value={address} />
+        </div>
+
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-2xs text-muted">
+            <span>ORBYT deposit address</span>
+            <a
+              href={explorer.account(address)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 hover:text-fg"
+            >
+              Solscan <ExternalLink className="size-3" />
+            </a>
+          </div>
+          <div className="flex items-stretch overflow-hidden rounded-md border border-line-strong bg-panel-2">
+            <p className="min-w-0 flex-1 px-3 py-2.5 font-mono text-xs leading-relaxed break-all text-fg select-all">{address}</p>
             <button
               type="button"
-              onClick={() => {
-                setDraft(address);
-                setEditing(true);
-              }}
-              className="h-8 rounded-md border border-line-strong px-3 text-xs hover:bg-hover"
+              onClick={copy}
+              aria-label="Copy deposit address"
+              className="flex w-20 shrink-0 items-center justify-center gap-1 border-l border-line-strong text-xs font-medium text-fg-dim hover:bg-hover hover:text-fg"
             >
-              Edit for this browser
+              {copied ? (
+                <>
+                  <Check className="size-3.5 text-up" /> Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="size-3.5" /> Copy
+                </>
+              )}
             </button>
-            {override && hydrated && (
-              <button type="button" onClick={() => setOverride(null)} className="h-8 rounded-md px-3 text-xs text-muted hover:bg-hover">
-                Use site default
-              </button>
-            )}
           </div>
-        )}
+        </div>
 
-        <p className="rounded-md bg-warn-soft px-3 py-2 text-2xs leading-relaxed text-warn">
-          Transfers go directly to this address. ORBYT does not hold funds, verify deposits, credit balances or execute trades. Never
-          enter a seed phrase or private key anywhere on this site.
-        </p>
+        <ul className="space-y-1.5 rounded-md border border-line bg-panel-2 px-3 py-2.5 text-2xs leading-relaxed text-fg-dim">
+          <li className="flex gap-2">
+            <ShieldCheck className="mt-px size-3.5 shrink-0 text-up" />
+            Send only SOL or SPL tokens on the Solana network. Assets sent on other networks cannot be recovered.
+          </li>
+          <li className="flex gap-2">
+            <ShieldCheck className="mt-px size-3.5 shrink-0 text-up" />
+            Check the first and last characters of the address before sending. Solana transfers are irreversible.
+          </li>
+          <li className="flex gap-2">
+            <ShieldCheck className="mt-px size-3.5 shrink-0 text-up" />
+            ORBYT will never ask for your seed phrase or private key.
+          </li>
+        </ul>
       </div>
     </dialog>
+  );
+}
+
+function SolanaGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-3.5" aria-hidden>
+      <defs>
+        <linearGradient id="sol-g" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stopColor="#9945ff" />
+          <stop offset="1" stopColor="#14f195" />
+        </linearGradient>
+      </defs>
+      <path fill="url(#sol-g)" d="M5.2 16.4a.7.7 0 0 1 .5-.2h16.1c.3 0 .5.4.3.6l-3.2 3.2a.7.7 0 0 1-.5.2H2.3c-.3 0-.5-.4-.3-.6zm0-12.2a.7.7 0 0 1 .5-.2h16.1c.3 0 .5.4.3.6l-3.2 3.2a.7.7 0 0 1-.5.2H2.3c-.3 0-.5-.4-.3-.6zm13.6 6a.7.7 0 0 0-.5-.2H2.2c-.3 0-.5.4-.3.6l3.2 3.2c.1.1.3.2.5.2h16.1c.3 0 .5-.4.3-.6z" />
+    </svg>
   );
 }

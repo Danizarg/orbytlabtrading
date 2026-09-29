@@ -27,8 +27,8 @@
   --color-warn-soft: #2d2415;
   --color-info: #7cb4ff;
 
-  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-space-grotesk), var(--font-dm-sans), ui-sans-serif, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --text-2xs: 0.6875rem;
@@ -69,7 +69,10 @@
   body {
     font-family: var(--font-sans);
     font-size: 13px;
+    font-feature-settings: 'cv11', 'ss01', 'tnum';
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
   ::selection {
     background: rgb(168 149 255 / 0.35);

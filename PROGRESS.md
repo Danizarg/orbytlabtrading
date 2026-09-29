@@ -130,13 +130,9 @@ Per-IP rate limits drive where each call runs.
 
 ## Next concrete step
 
-The stage 2 run (2026-09-29 00:20–01:20) stopped at the session usage limit. Its state:
-- **Finished builds:** stage1-swaps (swap parser fixed, 70 tests, full suite 1063 tests passing), stage1-keyed (Birdeye fix, Solana Tracker tests), api-routes, shell.
-- **Review status:** shell was reviewed. The reviews of stage1-swaps, stage1-keyed and api-routes did NOT run.
-- **Failed mid-build (files may be partial or placeholder):** discover, pulse, trade, wallet-tracker.
+Stage 3 (`docs/build/stage3-complete.workflow.js`) launched 2026-09-29 ~08:10. Modes:
+- review-only: stage1-swaps, stage1-keyed, api-routes
+- complete: discover, pulse
+- build: trade (Axiom-style trade panel + TradingView Lightweight Charts), wallet-tracker
 
-Next session:
-1. Run `npm run check` and fix anything broken.
-2. Finish the discover, pulse, trade and wallet-tracker slices per their specs in `docs/build/stage2-features.workflow.js`. Inspect the partial files first and complete them rather than rewriting.
-3. Review api-routes.
-4. Integration: `npm run build`, browser verification with live data, README, then merge to main.
+Owner feedback applied 2026-09-29: deposit address is central/read-only (per-browser override removed), Inter typography, "every memecoin" discovery universe, working tracker, faster loads, stronger connections, institutional look. After stage 3: integration (`npm run build`, browser verification with live data), README, merge to main.
