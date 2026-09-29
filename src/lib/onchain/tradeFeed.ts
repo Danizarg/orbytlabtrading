@@ -7,7 +7,7 @@ import { describeError, isAbortError, isProviderError, type ProviderError } from
 import type { RpcSignatureInfo, SignaturesQuery } from '@/lib/providers/solana/rpc';
 import { toTrade } from '@/lib/providers/solana/trades';
 import type { Commitment, LogsNotification } from '@/lib/streams/solana-ws';
-import { PUMP_DECIMALS, priceWithSol, pumpTradeFromEvents, type NativeTrade } from './pumpTrades';
+import { PUMP_DECIMALS, priceWithSol, pumpTradeFromEvents, type NativeTrade, type QuoteUsd } from './pumpTrades';
 import { corroborateWithPool } from './tradeGuard';
 
 /**
@@ -50,8 +50,9 @@ import { corroborateWithPool } from './tradeGuard';
  * A 429 pauses the feed (at least 5 s, or the error's retry hint).
  *
  * Nothing is invented: a trade exists only when a real transaction proved it,
- * USD figures need the live SOL price (they stay undefined until it is
- * known), market cap needs the on-chain supply. "Mentions the pool" proves
+ * USD figures need the live SOL price, or for a pool quoted in another
+ * asset (e.g. GLDx) that asset's live USD price (they stay undefined until it
+ * is known), market cap needs the on-chain supply. "Mentions the pool" proves
  * nothing (any transaction may list any account): a pump.fun curve trade needs
  * pump's own TradeEvent for the mint, and a balance-derived trade needs the
  * pool to have taken the other side (src/lib/onchain/tradeGuard.ts).
@@ -222,6 +223,8 @@ export interface OnchainTradeFeedOptions {
   ws?: FeedWs;
   /** SOL/USD at creation; update with `setSolPriceUsd`. */
   solPriceUsd?: number;
+  /** USD price of the pool's quote asset when it is neither SOL nor a stablecoin; update with `setQuotePriceUsd`. */
+  quoteUsd?: QuoteUsd;
   /** On-chain supply (UI units) for market cap at trade; update with `setSupply`. */
   supply?: number;
   tokenDecimals?: number;
@@ -316,6 +319,8 @@ export interface OnchainTradeFeed {
   subscribe(listener: FeedListener): () => void;
   getSnapshot(): OnchainFeedSnapshot;
   setSolPriceUsd(price: number | undefined): void;
+  /** USD price of the pool's quote asset (non-SOL, non-stable quotes, e.g. GLDx): prices the trades held in it. */
+  setQuotePriceUsd(quote: QuoteUsd | undefined): void;
   setSupply(supply: number | undefined): void;
   teardown(): void;
   readonly tornDown: boolean;
@@ -357,6 +362,11 @@ function documentVisibility(): FeedVisibility | null {
 
 const positive = (n: number | undefined): number | undefined => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined);
 
+function validQuoteUsd(quote: QuoteUsd | undefined): QuoteUsd | undefined {
+  const priceUsd = positive(quote?.priceUsd);
+  return quote && quote.mint && priceUsd !== undefined ? { mint: quote.mint, priceUsd } : undefined;
+}
+
 export function createOnchainTradeFeed(options: OnchainTradeFeedOptions): OnchainTradeFeed {
   const { mint, pool, isPumpCurve, rpc, ws } = options;
   const cfg: FeedConfig = { ...FEED_DEFAULTS, ...options.config };
@@ -365,6 +375,7 @@ export function createOnchainTradeFeed(options: OnchainTradeFeedOptions): Onchai
   const tokenDecimals = options.tokenDecimals ?? PUMP_DECIMALS;
 
   let solUsd = positive(options.solPriceUsd);
+  let quoteUsd = validQuoteUsd(options.quoteUsd);
   let supply = positive(options.supply);
 
   // Trades: native (SOL terms) and priced (USD fields added).
@@ -545,7 +556,7 @@ export function createOnchainTradeFeed(options: OnchainTradeFeedOptions): Onchai
     for (const native of list) {
       const signature = native.trade.signature;
       natives.set(signature, native);
-      priced.set(signature, priceWithSol(native, solUsd, supply));
+      priced.set(signature, priceWithSol(native, solUsd, supply, quoteUsd));
       if (arrivedLive) freshAt.set(signature, now);
       signatures.push(signature);
     }
@@ -567,7 +578,7 @@ export function createOnchainTradeFeed(options: OnchainTradeFeedOptions): Onchai
       const current = priced.get(signature);
       if (!current) continue;
       if (current.priceUsd !== undefined && current.usdValue !== undefined && (current.marketCapUsd !== undefined || supply === undefined)) continue;
-      const next = priceWithSol(native, solUsd, supply);
+      const next = priceWithSol(native, solUsd, supply, quoteUsd);
       if (next.priceUsd !== current.priceUsd || next.usdValue !== current.usdValue || next.marketCapUsd !== current.marketCapUsd) {
         priced.set(signature, next);
         changed.push(signature);
@@ -848,11 +859,21 @@ export function createOnchainTradeFeed(options: OnchainTradeFeedOptions): Onchai
       delete trade.priceUsd;
       const { quoteMint, price } = check.poolPrice;
       if (quoteMint === MINTS.SOL) return { trade, priceSol: price };
-      if (STABLE_MINTS.has(quoteMint)) trade.priceUsd = price;
-      return { trade };
+      if (STABLE_MINTS.has(quoteMint)) {
+        trade.priceUsd = price;
+        return { trade };
+      }
+      // A pool quoted in another asset (e.g. GLDx): priced in it, in USD once that asset's price is known.
+      return { trade, quote: { mint: quoteMint, price } };
     }
     const priceSol = trade.solAmount !== undefined ? positive(derived.priceQuote) : undefined;
-    return priceSol !== undefined ? { trade, priceSol } : { trade };
+    if (priceSol !== undefined) return { trade, priceSol };
+    const quotePrice = trade.solAmount === undefined && trade.priceUsd === undefined && derived.quoteMint ? positive(derived.priceQuote) : undefined;
+    if (derived.quoteMint && quotePrice !== undefined) {
+      const amount = positive(derived.quoteAmount);
+      return { trade, quote: { mint: derived.quoteMint, price: quotePrice, ...(amount !== undefined ? { amount } : {}) } };
+    }
+    return { trade };
   }
 
   // -------------------------------------------------------------------------
@@ -1236,6 +1257,12 @@ export function createOnchainTradeFeed(options: OnchainTradeFeedOptions): Onchai
       const next = positive(price);
       if (next === solUsd) return;
       solUsd = next;
+      if (next !== undefined) reprice();
+    },
+    setQuotePriceUsd(quote) {
+      const next = validQuoteUsd(quote);
+      if (next?.mint === quoteUsd?.mint && next?.priceUsd === quoteUsd?.priceUsd) return;
+      quoteUsd = next;
       if (next !== undefined) reprice();
     },
     setSupply(value) {

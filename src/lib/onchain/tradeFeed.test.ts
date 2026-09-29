@@ -6,7 +6,8 @@ import type { RpcParsedTransaction } from '@/lib/analytics/tx-types';
 import { ProviderError } from '@/lib/net/errors';
 import type { RpcSignatureInfo, SignaturesQuery } from '@/lib/providers/solana/rpc';
 import type { Commitment, LogsNotification } from '@/lib/streams/solana-ws';
-import { p2pMentioningPool, WALLET_B } from '@/test/synthTx';
+import { candleSeriesFromTrades } from '@/lib/analytics/candles';
+import { LAMPORTS, p2pMentioningPool, synthTx, WALLET_A, WALLET_B } from '@/test/synthTx';
 import {
   createOnchainTradeFeed,
   sharedOnchainTradeFeed,
@@ -686,6 +687,93 @@ describe('transactions that only list the pool are not trades', () => {
     await clock.advance(1_000);
     expect(feed.getSnapshot().trades.map((t) => t.signature)).toEqual([sig(1)]);
     expect(feed.getSnapshot().status.skipped).toBe(0);
+    feed.teardown();
+  });
+});
+
+describe('pools quoted in another asset than SOL or a stablecoin (e.g. StonkFun / GLDx)', () => {
+  // A quote asset that is neither SOL nor a stablecoin (a StonkFun pool's GLDx, say), 9 decimals.
+  const GLDX = 'GLDxQuoteAsset11111111111111111111111111111';
+  const OTHER_POOL = '3JsCd8LjmmyPT1PhfQZnJeZQwxr5FD6YgzZQDM61Btwc';
+  const tokens = (raw: bigint) => ({ owner: WALLET_A, mint: AMM_MINT, decimals: 6, pre: 0n, post: raw });
+  const poolLegs = [
+    { owner: AMM_POOL, mint: AMM_MINT, decimals: 6, pre: 5_000_000_000n, post: 4_000_000_000n },
+    { owner: AMM_POOL, mint: GLDX, decimals: 9, pre: 10_000_000_000n, post: 10_200_000_000n },
+  ];
+  // The trader pays 0.2 GLDx for 1,000 tokens.
+  const direct = (signature: string, blockTime: number) =>
+    synthTx(
+      signature,
+      [
+        { pubkey: WALLET_A, signer: true, pre: 10 * LAMPORTS, post: 10 * LAMPORTS - 5_000 },
+        { pubkey: AMM_POOL, pre: LAMPORTS, post: LAMPORTS },
+      ],
+      [tokens(1_000_000_000n), { owner: WALLET_A, mint: GLDX, decimals: 9, pre: 1_000_000_000n, post: 800_000_000n }, ...poolLegs],
+      [],
+      blockTime,
+    );
+  // The trader pays 0.5 SOL; another pool swaps it into the 0.2 GLDx this pool takes for 1,000 tokens.
+  const routed = (signature: string, blockTime: number) =>
+    synthTx(
+      signature,
+      [
+        { pubkey: WALLET_A, signer: true, pre: 10 * LAMPORTS, post: 9.5 * LAMPORTS - 5_000 },
+        { pubkey: AMM_POOL, pre: LAMPORTS, post: LAMPORTS },
+        { pubkey: OTHER_POOL, pre: LAMPORTS, post: 1.5 * LAMPORTS },
+      ],
+      [tokens(1_000_000_000n), ...poolLegs, { owner: OTHER_POOL, mint: GLDX, decimals: 9, pre: 5_000_000_000n, post: 4_800_000_000n }],
+      [],
+      blockTime,
+    );
+
+  it('prices trades in the quote asset and values them in USD once its USD price is known, so the chart can draw them', async () => {
+    const rpc = mockRpc(
+      [listed(sig(2), BASE_TIME + 90), listed(sig(1), BASE_TIME + 1)],
+      new Map([
+        [sig(1), direct(sig(1), BASE_TIME + 1)],
+        [sig(2), routed(sig(2), BASE_TIME + 90)],
+      ]),
+    );
+    const clock = manualClock();
+    const feed = createOnchainTradeFeed({ mint: AMM_MINT, pool: AMM_POOL, isPumpCurve: false, rpc, clock, visibility: null, solPriceUsd: 100 });
+    const batches: FeedBatch[] = [];
+    feed.subscribe((b) => batches.push(b));
+    await clock.advance(1_000);
+
+    // Both trades are real and held, but without GLDx/USD neither has a USD price: no bar can be drawn yet.
+    const before = feed.getSnapshot().trades;
+    expect(before.map((t) => t.signature)).toEqual([sig(2), sig(1)]);
+    expect(before.every((t) => t.priceUsd === undefined)).toBe(true);
+    expect(before[0]?.usdValue).toBeCloseTo(50, 9); // the 0.5 SOL the routed trader paid
+    expect(before[1]?.usdValue).toBeUndefined();
+    expect(candleSeriesFromTrades(before, '1m').candles).toEqual([]);
+
+    feed.setQuotePriceUsd({ mint: GLDX, priceUsd: 400 });
+    expect(batches.at(-1)).toMatchObject({ via: 'reprice' });
+    const [routedTrade, directTrade] = feed.getSnapshot().trades;
+    // Venue price 0.0002 GLDx per token × $400, for both: the routed trade is priced by the pool, not by its SOL leg.
+    expect(directTrade?.priceUsd).toBeCloseTo(0.08, 12);
+    expect(directTrade?.usdValue).toBeCloseTo(80, 9);
+    expect(routedTrade?.priceUsd).toBeCloseTo(0.08, 12);
+    expect(routedTrade?.usdValue).toBeCloseTo(50, 9);
+    const series = candleSeriesFromTrades(feed.getSnapshot().trades, '1m');
+    expect(series.derivation?.trades).toBe(2);
+    expect(series.candles).toHaveLength(2);
+
+    // Trades keep the value they were first priced at when the quote price goes away.
+    feed.setQuotePriceUsd(undefined);
+    expect(feed.getSnapshot().trades[1]?.priceUsd).toBeCloseTo(0.08, 12);
+    feed.teardown();
+  });
+
+  it('never values GLDx trades with a price for another asset', async () => {
+    const rpc = mockRpc([listed(sig(1), BASE_TIME + 1)], new Map([[sig(1), direct(sig(1), BASE_TIME + 1)]]));
+    const clock = manualClock();
+    const feed = createOnchainTradeFeed({ mint: AMM_MINT, pool: AMM_POOL, isPumpCurve: false, rpc, clock, visibility: null, solPriceUsd: 100, quoteUsd: { mint: OTHER_POOL, priceUsd: 5 } });
+    feed.subscribe(() => {});
+    await clock.advance(1_000);
+    expect(feed.getSnapshot().trades).toHaveLength(1);
+    expect(feed.getSnapshot().trades[0]?.priceUsd).toBeUndefined();
     feed.teardown();
   });
 });

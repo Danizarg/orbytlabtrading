@@ -8,6 +8,7 @@ import { ChainError, runChain, type ChainAttempt } from '@/lib/core/chain';
 import type { ProviderId } from '@/lib/core/providers';
 import { isSolanaAddress } from '@/lib/core/solana';
 import type { Freshness, Trade } from '@/lib/core/types';
+import type { QuoteUsd } from '@/lib/onchain/pumpTrades';
 import { feedRpcFromClient, sharedOnchainTradeFeed, type OnchainFeedSnapshot, type OnchainTradeFeed } from '@/lib/onchain/tradeFeed';
 import { derivePumpCurveAddress } from '@/lib/providers/solana/pump';
 import { chainWinner, pollForWinner } from '@/lib/services/token';
@@ -188,7 +189,7 @@ const noSnapshot = () => undefined;
  * torn down a few seconds after the last subscriber left, so StrictMode
  * remounts reuse it). SOL price and supply updates re-price held trades.
  */
-function useOnchainFeed(input: { mint: string; pool: string | undefined; pumpCurve: boolean; enabled: boolean; solUsd?: number; supply?: number }) {
+function useOnchainFeed(input: { mint: string; pool: string | undefined; pumpCurve: boolean; enabled: boolean; solUsd?: number; quoteUsd?: QuoteUsd; supply?: number }) {
   const { mint, pool, pumpCurve, enabled, solUsd, supply } = input;
   const feed = useMemo<OnchainTradeFeed | undefined>(
     () => (enabled && pool ? sharedOnchainTradeFeed({ mint, pool, isPumpCurve: pumpCurve, rpc: onchainRpc, ws: solanaWs }) : undefined),
@@ -198,6 +199,9 @@ function useOnchainFeed(input: { mint: string; pool: string | undefined; pumpCur
   const getSnapshot = useCallback(() => feed?.getSnapshot(), [feed]);
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, noSnapshot);
   useEffect(() => feed?.setSolPriceUsd(solUsd), [feed, solUsd]);
+  const quoteMint = input.quoteUsd?.mint;
+  const quotePriceUsd = input.quoteUsd?.priceUsd;
+  useEffect(() => feed?.setQuotePriceUsd(quoteMint !== undefined && quotePriceUsd !== undefined ? { mint: quoteMint, priceUsd: quotePriceUsd } : undefined), [feed, quoteMint, quotePriceUsd]);
   useEffect(() => feed?.setSupply(supply), [feed, supply]);
   return { feed, snapshot };
 }
@@ -209,6 +213,8 @@ export interface UseTradesOptions {
   pumpCurve?: boolean;
   /** Live SOL/USD for USD values of SOL-quoted on-chain trades. */
   solUsd?: number;
+  /** USD price of the pool's quote asset when it is neither SOL nor a stablecoin (e.g. GLDx). */
+  quoteUsd?: QuoteUsd;
   /** On-chain supply (UI units) for market cap at each trade. */
   supply?: number;
 }
@@ -236,6 +242,7 @@ export function useTrades(mint: string, pool: string | undefined, opts: UseTrade
     pumpCurve,
     enabled: onchainWanted,
     solUsd: opts.solUsd,
+    quoteUsd: opts.quoteUsd,
     supply: opts.supply,
   });
   const onchainFailed = !!snapshot && snapshot.status.failed && snapshot.trades.length === 0;

@@ -7,11 +7,27 @@ import { useNow } from '@/client/hooks/useNow';
 import { MAX_WATCHLIST, usePreferences } from '@/client/store/preferences';
 import { cn } from '@/components/ui/cn';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { DASH, formatAge } from '@/lib/core/format';
+import { DASH, formatAge, formatPrice } from '@/lib/core/format';
 import type { ProviderId } from '@/lib/core/providers';
 import type { Freshness, Socials } from '@/lib/core/types';
 import type { ChainAttempt } from '@/lib/core/chain';
+import type { QuotePrice } from '@/data/hooks/useQuotePrice';
 import { describeAttempt, isGecko, providerLabel, safeHttpUrl, visibleFailures } from '@/lib/services/token';
+
+/**
+ * Provenance of USD figures for trades on a pool quoted in another asset than
+ * SOL or a stablecoin (e.g. "USD via GLDx $385.20 · Jupiter").
+ */
+export function QuotePriceNote({ quote }: { quote: QuotePrice | undefined }) {
+  if (!quote) return null;
+  const symbol = quote.symbol ?? 'quote asset';
+  const via = quote.implied ? `implied by ${providerLabel(quote.source)} pool prices` : providerLabel(quote.source);
+  return (
+    <span title={`Trades on this pool are priced in ${symbol}; USD figures use ${symbol}'s live USD price (${via}).`}>
+      USD via {symbol} {formatPrice(quote.priceUsd)} · {via}
+    </span>
+  );
+}
 
 /** Quiet em dash for unknown values (never 0). */
 export function Dash() {
