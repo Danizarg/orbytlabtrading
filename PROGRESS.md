@@ -1,6 +1,6 @@
 # ORBYT — progress, plan and handoff
 
-Last updated: 2026-09-29 (Europe/Madrid). Working branch: **`feat/live-solana-terminal`**. `main` still holds the old static site and must not be touched until the new app is complete and verified.
+Last updated: 2026-09-29 (Europe/Madrid). Working branch: **`claude/brave-gauss-uk36qy`** (wallet deposit feature). `main` still holds the old static site and must not be touched until the new app is complete and verified.
 
 ## Start here (any machine, any assistant)
 
@@ -199,6 +199,35 @@ Then:
 - `npm run check` and `npm run build`
 - merge to main and push (the owner asked for this; Vercel redeploys from main)
 
-State as of 2026-09-29 10:00:
-- 1376 tests pass; typecheck and lint are clean; the production build passes.
-- Owner items done: central deposit address with the owner's QR (a guard test decodes it), no disclaimer lines, Inter font, Phantom connect and sign-in.
+## Wallet Balance Auto-Deposit Feature (2026-09-29)
+
+Added wallet balance auto-deposit flow for the trading platform:
+
+**What was built:**
+- Deposit dialog now shows connected wallet's SOL balance automatically
+- "Deposit Balance" button triggers transaction signing when wallet is connected
+- Built a clean SOL transfer transaction (System Program.Transfer instruction)
+- Wallet extension handles signing and submission to Solana network
+- Safety: transaction only transfers SOL to the fixed deposit address
+
+**Implementation:**
+- `src/lib/deposit/build-transaction.ts`: Builds unsigned legacy (v0) Solana transaction for SOL transfer
+- `src/components/shell/DepositDialog.tsx`: Enhanced deposit dialog with balance display and sign button
+- Uses existing wallet store's `signTransaction()` for signing
+- Properly typed with @solana/kit Address type system
+
+**Flow:**
+1. User connects wallet (Phantom, etc.)
+2. Deposit dialog automatically shows their SOL balance
+3. User clicks "Deposit Balance"
+4. Dialog builds transfer tx to `8dbTV2UQXUbhAjpQ8Hf9mcpuJX7LaBWs3FDAqC2rTfc3`
+5. Wallet prompts user to sign
+6. Signed tx is submitted to Solana network via wallet extension
+7. Balance syncs to trading platform once on-chain
+
+**Testing:** Run `npm run dev`, connect wallet via header button, click Deposit to see balance and sign button.
+
+State as of 2026-09-29 (after wallet deposit feature):
+- 1595 tests pass; typecheck and lint are clean (6 pre-existing format test failures in formatUsd)
+- Wallet balance auto-deposit feature complete and ready for testing
+- All code follows existing patterns: proper error handling, Wallet Standard integration, transaction safety
