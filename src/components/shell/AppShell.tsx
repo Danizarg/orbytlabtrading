@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { ConnectWalletButton } from '@/components/connect/ConnectWalletButton';
 import { DepositButton } from './DepositDialog';
 import { GlobalSearch, MobileSearch } from './GlobalSearch';
 import { Logo } from './Logo';
@@ -10,7 +11,8 @@ import { StreamStatus } from './StreamStatus';
 
 /**
  * Application frame: sticky 48 px header (logo, nav, search, SOL price,
- * connection status, deposit), the page, and a sticky 28 px status bar.
+ * connection status, wallet connect, deposit), the page, and a sticky 28 px
+ * status bar.
  * Feature pages that need a full-height terminal layout can size against
  * `--shell-header-h` / `--shell-footer-h`, e.g.
  * `h-[calc(100dvh-var(--shell-header-h)-var(--shell-footer-h))]`.
@@ -42,6 +44,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             </ShellBoundary>
             <ShellBoundary label="Status">
               <StreamStatus />
+            </ShellBoundary>
+            <ShellBoundary label="Wallet">
+              <ConnectWalletButton />
             </ShellBoundary>
             <DepositButton />
           </div>
