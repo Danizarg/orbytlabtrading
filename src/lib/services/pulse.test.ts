@@ -14,6 +14,7 @@ import {
   COLUMN_CAPS,
   createItem,
   DEFAULT_PULSE_FILTER,
+  dexLabelForPoolOwner,
   feedErrorText,
   geckoMigrationAction,
   inColumn,
@@ -32,16 +33,20 @@ import {
   patchFromGeckoPool,
   patchFromMigration,
   patchFromNewToken,
+  patchFromPoolOwner,
   patchFromServerToken,
   patchFromTokenRow,
   patchFromUltra,
   pickBatch,
+  poolDexTargets,
+  poolOwnersFromRpc,
   pruneItems,
   READING_HOLD_MS,
   sameCardData,
   sanitizeFilter,
   selectColumn,
   sourceHealth,
+  upsert,
   verifyCandidate,
   type PendingCandidate,
   type PulseItem,
@@ -133,6 +138,13 @@ describe('createItem / mergeItem', () => {
     expect(onChainAgain.launchpad).toMatchObject({ progressPct: 73, progressSource: 'solana-rpc' });
     const staleOnChain = mergeItem(a, patch({ source: 'jupiter', freshness: 'fast', at: T0 + 31_000, progressPct: 66 }));
     expect(staleOnChain.launchpad).toMatchObject({ progressPct: 66, progressSource: 'jupiter' });
+    // A provider claiming realtime / stream freshness still does not beat a fresh on-chain read.
+    const keyed = mergeItem(a, patch({ source: 'solanatracker', freshness: 'realtime', at: T0 + 5_000, progressPct: 64 }));
+    expect(keyed.launchpad).toMatchObject({ progressPct: 71.2, progressSource: 'solana-rpc' });
+    const stream = mergeItem(a, patch({ source: 'pumpportal', freshness: 'stream', at: T0 + 5_000, progressPct: 64 }));
+    expect(stream.launchpad.progressSource).toBe('solana-rpc');
+    // Other live groups from the same reading still apply.
+    expect(mergeItem(a, patch({ source: 'solanatracker', freshness: 'realtime', at: T0 + 5_000, progressPct: 64, holders: 120 })).holders).toBe(120);
   });
 
   it('clamps progress to 0–100', () => {
@@ -226,6 +238,29 @@ describe('createItem / mergeItem', () => {
     const a = item({ socials: { twitter: 'https://x.com/a' } });
     const b = mergeItem(a, patch({ socials: { twitter: 'https://x.com/b', website: 'https://a.io' } }));
     expect(b.socials).toEqual({ twitter: 'https://x.com/a', website: 'https://a.io' });
+  });
+});
+
+describe('upsert', () => {
+  it('creates, merges a reading under the given source and moves the stage forward only', () => {
+    const created = upsert(undefined, { mint: MINT_A, freshness: 'stream', at: T0, receivedAt: T0, stage: 'bonding', launchpad: 'pump.fun', symbol: 'A' }, 'pumpportal');
+    expect(created).toMatchObject({ mint: MINT_A, symbol: 'A', detectedAt: T0, sources: ['pumpportal'], launchpad: { stage: 'bonding', launchpad: 'pump.fun' } });
+
+    const onChain = upsert(created, { mint: MINT_A, freshness: 'realtime', at: T0 + 1_000, receivedAt: T0 + 1_000, updateOnly: true, progressPct: 71 }, 'solana-rpc');
+    expect(onChain?.launchpad).toMatchObject({ progressPct: 71, progressSource: 'solana-rpc' });
+    expect(onChain?.sources).toEqual(['pumpportal', 'solana-rpc']);
+    // A provider-reported progress does not displace the fresh on-chain reading.
+    const reported = upsert(onChain, { mint: MINT_A, freshness: 'fast', at: T0 + 2_000, receivedAt: T0 + 2_000, progressPct: 55 }, 'jupiter');
+    expect(reported?.launchpad.progressPct).toBe(71);
+
+    const graduated = upsert(reported, { mint: MINT_A, freshness: 'stream', at: T0 + 3_000, receivedAt: T0 + 3_000, stage: 'graduated', graduatedAt: T0 + 3_000 }, 'pumpportal');
+    expect(graduated?.launchpad).toMatchObject({ stage: 'graduated', graduatedAt: T0 + 3_000 });
+    const stale = upsert(graduated, { mint: MINT_A, freshness: 'fast', at: T0 + 4_000, receivedAt: T0 + 4_000, stage: 'bonding' }, 'jupiter');
+    expect(stale).toBe(graduated);
+  });
+
+  it('ignores update-only readings for untracked tokens', () => {
+    expect(upsert(undefined, { mint: MINT_B, freshness: 'fast', at: T0, receivedAt: T0, holders: 3, updateOnly: true }, 'jupiter')).toBeUndefined();
   });
 });
 
@@ -430,6 +465,13 @@ describe('pickBatch', () => {
     ]);
     expect(pickBatch([['a', 'b', 'c']], [], last, 2)).toEqual(['b', 'c']);
   });
+
+  it('caps a tier so a full priority tier cannot starve the later tiers', () => {
+    const final = ['f1', 'f2', 'f3', 'f4', 'f5'];
+    expect(pickBatch([final, ['c1', 'c2'], ['n1', 'n2']], ['r1'], new Map(), 5, [3, 1])).toEqual(['f1', 'f2', 'f3', 'c1', 'n1']);
+    // Slots a capped tier leaves unused flow on to the next tiers and the pool.
+    expect(pickBatch([['f1'], ['c1', 'c2'], ['n1']], ['r1', 'r2'], new Map(), 5, [3, 1])).toEqual(['f1', 'c1', 'n1', 'r1', 'r2']);
+  });
 });
 
 describe('readings from sources', () => {
@@ -605,6 +647,15 @@ describe('readings from sources', () => {
     expect(patchFromTokenRow(row({ launchpad: { stage: 'amm' } }), jupMeta).marketCapUsd).toBeUndefined();
   });
 
+  it('token rows name the destination DEX only when their main pool is the migration pool', () => {
+    const graduated = row({ launchpad: { stage: 'graduated', launchpad: 'pump.fun', migratedPool: POOL, graduatedAt: T0 - 60_000 } });
+    const same: TokenRow = { ...graduated, pool: { address: POOL, dex: 'pumpswap', dexLabel: 'PumpSwap' } };
+    expect(patchFromTokenRow(same, jupMeta)).toMatchObject({ stage: 'graduated', migratedPool: POOL, migratedDex: 'PumpSwap', graduatedAt: T0 - 60_000 });
+    const other: TokenRow = { ...graduated, pool: { address: POOL_2, dex: 'raydium', dexLabel: 'Raydium' } };
+    expect(patchFromTokenRow(other, jupMeta).migratedDex).toBeUndefined();
+    expect(patchFromTokenRow(graduated, jupMeta).migratedDex).toBeUndefined();
+  });
+
   it('server tokens keep provider provenance', () => {
     const p = patchFromServerToken(
       {
@@ -673,6 +724,63 @@ describe('readings from sources', () => {
   });
 });
 
+describe('destination DEX from the migration pool owner', () => {
+  const PUMP_AMM = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA';
+  const SYSTEM = '11111111111111111111111111111111';
+
+  it('labels known AMM programs only', () => {
+    expect(dexLabelForPoolOwner(PUMP_AMM)).toBe('PumpSwap');
+    expect(dexLabelForPoolOwner('CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C')).toBe('Raydium CPMM');
+    expect(dexLabelForPoolOwner('675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8')).toBe('Raydium');
+    expect(dexLabelForPoolOwner('cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG')).toBe('Meteora DAMM v2');
+    expect(dexLabelForPoolOwner('LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo')).toBe('Meteora DLMM');
+    expect(dexLabelForPoolOwner(SYSTEM)).toBeUndefined();
+    expect(dexLabelForPoolOwner(undefined)).toBeUndefined();
+  });
+
+  it('reads owners aligned with the requested pools and leaves malformed entries out', () => {
+    const result = {
+      context: { slot: 1 },
+      value: [{ owner: PUMP_AMM, lamports: 1, data: ['', 'base64'], executable: false }, null, { lamports: 1 }],
+    };
+    expect(poolOwnersFromRpc(result, [POOL, POOL_2, MINT_C])).toEqual({ [POOL]: PUMP_AMM, [POOL_2]: null });
+    // Misaligned or malformed results yield nothing (the pools are retried).
+    expect(poolOwnersFromRpc({ value: [null] }, [POOL, POOL_2])).toEqual({});
+    expect(poolOwnersFromRpc(null, [POOL])).toEqual({});
+  });
+
+  it('targets graduations without a DEX, visible ones first, skipping settled pools', () => {
+    const labelledPool = mintN(2);
+    const tokens = [
+      item({ mint: MINT_A, stage: 'graduated', graduatedAt: T0, migratedPool: POOL }),
+      item({ mint: MINT_B, stage: 'graduated', graduatedAt: T0, migratedPool: POOL_2 }),
+      item({ mint: MINT_C, stage: 'graduated', graduatedAt: T0, migratedPool: labelledPool, migratedDex: 'PumpSwap' }),
+      item({ mint: mintN(1), stage: 'bonding' }),
+      item({ mint: mintN(3), stage: 'graduated', graduatedAt: T0 }),
+    ];
+    const items = new Map(tokens.map((t) => [t.mint, t]));
+    expect(poolDexTargets(items, [MINT_B], new Set(), 10)).toEqual([
+      { mint: MINT_B, pool: POOL_2 },
+      { mint: MINT_A, pool: POOL },
+    ]);
+    expect(poolDexTargets(items, [], new Set([POOL]), 10)).toEqual([{ mint: MINT_B, pool: POOL_2 }]);
+    expect(poolDexTargets(items, [MINT_A, MINT_B], new Set(), 1)).toEqual([{ mint: MINT_A, pool: POOL }]);
+  });
+
+  it('applies the destination DEX to a tracked graduation only', () => {
+    const p = patchFromPoolOwner(MINT_A, POOL, PUMP_AMM, T0 + 1_000);
+    if (!p) throw new Error('expected a reading');
+    expect(p).toMatchObject({ source: 'solana-rpc', freshness: 'realtime', stage: 'graduated', migratedPool: POOL, migratedDex: 'PumpSwap', updateOnly: true });
+    const graduated = item({ stage: 'graduated', graduatedAt: T0, migratedPool: POOL });
+    expect(mergeItem(graduated, p)).toMatchObject({ migratedDex: 'PumpSwap', launchpad: { stage: 'graduated', graduatedAt: T0, migratedPool: POOL } });
+    // A DEX already known from the stream or GeckoTerminal is kept.
+    const known = item({ stage: 'graduated', graduatedAt: T0, migratedPool: POOL, migratedDex: 'Raydium CPMM' });
+    expect(mergeItem(known, p).migratedDex).toBe('Raydium CPMM');
+    expect(applyPatches(new Map(), [p]).changed).toBe(false);
+    expect(patchFromPoolOwner(MINT_A, POOL, SYSTEM, T0)).toBeNull();
+  });
+});
+
 describe('column freshness', () => {
   const now = T0;
 
@@ -690,6 +798,13 @@ describe('column freshness', () => {
       updatedAt: now - 50_000,
       live: false,
     });
+  });
+
+  it('shows the age of the newest successful reading once no longer live', () => {
+    const feeds = { curves: { lastOkAt: now - 11_000 }, geckoPump: { lastOkAt: now - 50_000 } };
+    expect(columnFreshness('final', { streamOpen: false, feeds, now })).toEqual({ updatedAt: now - 11_000, live: false });
+    const quiet = columnFreshness('new', { streamOpen: true, streamLastAt: now - 12_000, feeds: { jupRecent: { lastOkAt: now - 40_000 } }, now });
+    expect(quiet).toEqual({ updatedAt: now - 12_000, live: false });
   });
 
   it('reports an error only when every source of the column is failing', () => {
@@ -743,6 +858,16 @@ describe('feedErrorText', () => {
         ]),
       ),
     ).toBe('Solana RPC rate limited · ORBYT unavailable');
+    // A 501 from an unconfigured server route is skipped silently.
+    expect(
+      feedErrorText(
+        new ChainError('recent', [
+          { provider: 'orbyt', ok: false, code: 'not_configured' },
+          { provider: 'jupiter', ok: false, code: 'rate_limited' },
+        ]),
+      ),
+    ).toBe('Jupiter rate limited');
+    expect(feedErrorText(new ChainError('recent', [{ provider: 'orbyt', ok: false, code: 'not_configured' }]))).toBe('Source unavailable');
     expect(feedErrorText(new Error('boom'))).toBe('Source unavailable');
   });
 });

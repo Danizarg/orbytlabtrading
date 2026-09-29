@@ -197,6 +197,9 @@ describe('solanatracker getPulse', () => {
   });
 
   it('maps latest → new: curvePercentage → progress, created_time SECONDS → ms, risk and socials', async () => {
+    // As seen at the pool's own lastUpdated (the pool is 100 s old, so its lifetime counters are 24h counts).
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(1_790_000_100_000);
     const res = await tracker([['/tokens/multi/all', MULTI]]).st.getPulse('new');
     expect(res.data[0]).toEqual({
       mint: CC,
@@ -231,6 +234,8 @@ describe('solanatracker getPulse', () => {
   });
 
   it('maps graduating → final with the curve launchpad name, real zeros and object risks', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(1_752_091_418_185);
     const res = await tracker([['/tokens/multi/all', MULTI]]).st.getPulse('final');
     const token = res.data[0];
     expect(token?.launchpad).toEqual({ stage: 'bonding', launchpad: 'letsbonk', progressPct: 89.2, progressSource: 'solanatracker' });
@@ -267,11 +272,42 @@ describe('solanatracker getPulse', () => {
   });
 
   it('maps 24h volume only, never the pool lifetime volume', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(1_790_000_100_000);
     const latest = structuredClone(MULTI.latest);
     delete (((latest[0]?.pools as Json[])[0] as Json).txns as Json).volume24h;
     const res = await tracker([['/tokens/multi/all', { ...MULTI, latest }]]).st.getPulse('new');
     expect(res.data[0] && 'volumeUsd' in res.data[0]).toBe(false);
     expect(res.data[0]?.txns).toEqual({ buys: 41, sells: 12 });
+  });
+
+  it('maps the pool buy / sell counters (lifetime) as 24h counts only while the pool is younger than 24 hours', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const created = 1_790_000_000_500;
+    vi.setSystemTime(created + 86_400_000);
+    const young = await tracker([['/tokens/multi/all', MULTI]]).st.getPulse('new');
+    expect(young.data[0]?.txns).toEqual({ buys: 41, sells: 12 });
+
+    // One millisecond later the lifetime counters no longer equal a 24h window: unknown, not guessed.
+    vi.setSystemTime(created + 86_400_001);
+    const old = await tracker([['/tokens/multi/all', MULTI]]).st.getPulse('new');
+    expect(old.data[0] && 'txns' in old.data[0]).toBe(false);
+    expect(old.data[0]?.volumeUsd).toBe(2400.5);
+
+    // A pool without createdAt has no known age either.
+    vi.setSystemTime(created + 1_000);
+    const latest = structuredClone(MULTI.latest);
+    delete ((latest[0]?.pools as Json[])[0] as Json).createdAt;
+    const undated = await tracker([['/tokens/multi/all', { ...MULTI, latest }]]).st.getPulse('new');
+    expect(undated.data[0] && 'txns' in undated.data[0]).toBe(false);
+
+    // The migrated doc example: a PumpSwap pool 1,000 s old, then 2 days old.
+    vi.setSystemTime(1_770_720_000_000);
+    const migrated = await tracker([['/tokens/multi/all', MULTI]]).st.getPulse('migrated');
+    expect(migrated.data[0]?.txns).toEqual({ buys: 1200, sells: 900 });
+    vi.setSystemTime(1_770_719_000_000 + 2 * 86_400_000);
+    const later = await tracker([['/tokens/multi/all', MULTI]]).st.getPulse('migrated');
+    expect(later.data[0] && 'txns' in later.data[0]).toBe(false);
   });
 
   it('treats a full curve, or a primary AMM pool next to the curve, as graduated', async () => {
@@ -455,13 +491,26 @@ describe('solanatracker getCandles', () => {
   });
 
   it('uses the pool path, pages with `before`, trims to `limit` and drops invalid rows', async () => {
-    const rows = [...CHART.oclhv, { time: 1710010800, open: 'x', high: 1, low: 1, close: 1 }, null, { ...CHART.oclhv[0], close: 6.5 }];
+    const rows = [...CHART.oclhv, { time: 1710010800, open: 'x', high: 1, low: 1, close: 1 }, null, { ...CHART.oclhv[0], close: 5.92 }];
     const { st, calls } = tracker([[`/chart/${TRUMP}/${TRUMP_POOL}`, { oclhv: rows }]]);
     const res = await st.getCandles({ mint: TRUMP, pool: TRUMP_POOL, interval: '1h', before: 1710007200, limit: 1 });
     expect(calls[0]?.url.pathname).toBe(`/chart/${TRUMP}/${TRUMP_POOL}`);
     expect(res.data.pool).toBe(TRUMP_POOL);
     // 1710007200 is excluded by `before`; the duplicate 1710003600 keeps the last row; `limit` keeps the newest.
-    expect(res.data.candles).toEqual([{ ...SORTED[1], close: 6.5 }]);
+    expect(res.data.candles).toEqual([{ ...SORTED[1], close: 5.92 }]);
+  });
+
+  it('drops candles that cannot be charted as reported instead of repairing them', async () => {
+    const [second, first, third] = CHART.oclhv as [Json, Json, Json];
+    const rows = [
+      first,
+      // close above high, a zero open, a negative low.
+      { ...second, close: 6.5 },
+      { ...third, open: 0 },
+      { ...third, time: 1710010800, low: -1 },
+    ];
+    const res = await tracker([[`/chart/${TRUMP}`, { oclhv: rows }]]).st.getCandles({ mint: TRUMP, interval: '1h' });
+    expect(res.data.candles).toEqual([SORTED[0]]);
   });
 
   it('returns an honest empty series and rejects unknown shapes', async () => {
@@ -588,6 +637,19 @@ describe('solanatracker getHolders', () => {
     // 19 rows are below the cap: the list is complete and both buckets are exact.
     const short = await tracker([[`/tokens/${CC}/holders`, withCurve.slice(0, 19)]]).st.getHolders(CC, 100);
     expect(short.data.distribution).toEqual({ top10Pct: 10, top11to20Pct: 8 });
+  });
+
+  it("labels a graduated coin's canonical PumpSwap pool without an identity and leaves it out of concentration", async () => {
+    // Live-verified vector: tests/fixtures/pump/pumpswap_canonical_pool_decoded_rpc_2026-09-28.json
+    const mint = '4ov9rwwS4iBHeTWGCrVaQYW1HzWK51MSfs8csGAApump';
+    const pool = '8HbgiXuiNbHRcxiNG8UBD8GLewoy6QVDnPFPgjFGmszf';
+    const wallets = Array.from({ length: 10 }, (_, i) => ({ wallet: fakeAddress(i + 1), amount: 1_000 - i, percentage: 1 }));
+    const body = { total: 11, accounts: [{ wallet: pool, amount: 900_000_000, percentage: 90 }, ...wallets] };
+    const res = await tracker([[`/tokens/${mint}/holders`, body]]).st.getHolders(mint, 100);
+    expect(res.data.top[0]).toMatchObject({ owner: pool, label: 'PumpSwap pool', isProgramAccount: true });
+    // Without the label the pool's 90% would have been counted as the largest holder.
+    expect(res.data.distribution).toEqual({ top10Pct: 10 });
+    expect(res.notes).toEqual(['Top-holder shares exclude bonding-curve and pool accounts.']);
   });
 
   it('slices to the requested limit (max 100) without changing the distribution', async () => {

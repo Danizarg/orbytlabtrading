@@ -38,7 +38,7 @@ interface RowProps {
   /** Navigate to the token page (newTab for cmd/ctrl/shift or middle click). */
   onOpen: (mint: string, newTab: boolean) => void;
   /** Hover / focus intent: prefetch the token page. */
-  onHover?: (mint: string) => void;
+  onHover?: (row: TokenRow) => void;
 }
 
 const INTERACTIVE = 'a,button,input,select,textarea,label';
@@ -74,7 +74,7 @@ export const TokenTableRow = memo(function TokenTableRow({ row, win, variant, on
     onOpen(mint, true);
   }
 
-  const hover = onHover ? () => onHover(mint) : undefined;
+  const hover = onHover ? () => onHover(row) : undefined;
 
   return (
     <tr className={cn('group cursor-pointer', ROW_H)} onClick={handleClick} onAuxClick={handleAuxClick} onMouseEnter={hover} onFocus={hover}>

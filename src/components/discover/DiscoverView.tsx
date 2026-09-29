@@ -120,12 +120,11 @@ export function DiscoverView() {
       <LoadError what="Discover" error={named.query.error} onRetry={() => void named.query.refetch()} retrying={named.query.isFetching} />
     );
   } else if (rows && rows.length === 0) {
-    empty = (
-      <EmptyState title="No tokens returned">
-        {isAll ? 'Every source answered with an empty list.' : `${source ?? 'The provider'} returned an empty ${LIST_LABEL[list]} list.`} It refreshes
-        automatically.
-      </EmptyState>
-    );
+    let detail: string;
+    if (!isAll) detail = `${source ?? 'The provider'} returned an empty ${LIST_LABEL[list]} list.`;
+    else if (summary.failing > 0) detail = `Sources that answered returned empty lists; ${summary.failing} of ${summary.sourcesTotal} are failing and retrying.`;
+    else detail = 'Every source answered with an empty list.';
+    empty = <EmptyState title="No tokens returned">{detail} It refreshes automatically.</EmptyState>;
   } else if (rows && visible.length === 0) {
     empty = (
       <EmptyState title="No tokens match the filters">
@@ -138,7 +137,7 @@ export function DiscoverView() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-76px)] min-h-[460px] flex-col">
+    <div className="flex h-[calc(100dvh-var(--shell-header-h)-var(--shell-footer-h))] min-h-[460px] flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-panel px-3 py-2 lg:h-11 lg:flex-nowrap lg:py-0">
         <h1 className="font-display text-sm font-semibold tracking-tight text-fg">Discover</h1>
         <div className="max-w-full min-w-0 overflow-x-auto scrollbar-none">
@@ -183,7 +182,8 @@ export function DiscoverView() {
           loading={loading}
           dimmed={placeholder}
           empty={empty}
-          onHover={prefetch}
+          onHover={prefetch.intent}
+          onHoverEnd={prefetch.cancel}
           resetKey={list}
           caption={`${LIST_LABEL[list]} Solana tokens, ${win} window`}
         />

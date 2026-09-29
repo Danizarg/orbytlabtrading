@@ -5,15 +5,16 @@ import { memo, useMemo, type ReactNode } from 'react';
 import { useNow } from '@/client/hooks/useNow';
 import { TxLink, WalletLink } from '@/components/ui/AddressLink';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/components/ui/cn';
 import { useMintIdentities, type MintIdentities } from '@/data/hooks/usePortfolio';
-import { ACTIVITY_HEAD_POLL_MS, type WalletActivityView } from '@/data/hooks/useWalletActivity';
+import { ACTIVITY_HEAD_POLL_MS, type ActivitySection, type WalletActivityView } from '@/data/hooks/useWalletActivity';
 import { formatAge } from '@/lib/core/format';
 import { PROVIDER_LABELS } from '@/lib/core/providers';
 import type { WalletActivity } from '@/lib/core/types';
 import { describeError } from '@/lib/net/errors';
-import { activityMints, signedSol, usdEstimate } from '@/lib/services/wallet';
+import { activityMints, IDENTITY_LOOKUP_MAX, signedSol, usdEstimate } from '@/lib/services/wallet';
 import { AmountCell, Dash, KindBadge, ProgramCell, SolCell, TimeCell, TokenCell, UsdCell } from './cells';
 import { BTN, FOOTER, TD, TD_STICKY, TH, TH_STICKY } from './styles';
 
@@ -65,14 +66,23 @@ const ActivityRow = memo(function ActivityRow({ activity, identities, solPriceUs
   );
 });
 
-function SectionRow({ page, scanned, count }: { page: number; scanned: number; count: number }) {
+function SectionRow({ section }: { section: ActivitySection }) {
+  const { page, scanned, items, added, gap } = section;
+  const count = items.length;
   return (
     <tr className="h-6">
       <td colSpan={COLS.length} className="sticky left-0 border-b border-line bg-panel-2 px-2 text-2xs whitespace-nowrap text-muted">
         <span className="tabular">
           Page {page} · scanned {scanned} signature{scanned === 1 ? '' : 's'} · {count} activit{count === 1 ? 'y' : 'ies'}
+          {added > 0 && ` · ${added} new since load`}
         </span>
         {page === 1 && <span className="text-faint"> · newest page refreshes every {ACTIVITY_HEAD_POLL_MS / 1000} s</span>}
+        {gap && (
+          <span className="text-warn" title="A refresh returned a full page of transactions newer than everything shown, so some in between may be missing. Reload the page to re-read from the newest.">
+            {' '}
+            · possible gap between refreshes
+          </span>
+        )}
       </td>
     </tr>
   );
@@ -101,8 +111,8 @@ function Ago({ at }: { at?: number }) {
  * page with the number of signatures scanned per page, and "Load older".
  */
 export function ActivityFeed({ activity, solPriceUsd }: { activity: WalletActivityView; solPriceUsd?: number }) {
-  const { infinite, head, items, sections, coverage, updatedAt, refreshError } = activity;
-  const mints = useMemo(() => activityMints(items), [items]);
+  const { infinite, head, items, sections, coverage, updatedAt, refreshError, olderError } = activity;
+  const mints = useMemo(() => activityMints(items, IDENTITY_LOOKUP_MAX), [items]);
   const identities = useMintIdentities(mints);
   const loading = infinite.isPending;
   const first = infinite.data?.pages[0];
@@ -157,7 +167,7 @@ export function ActivityFeed({ activity, solPriceUsd }: { activity: WalletActivi
           </thead>
           <tbody>
             {sections.map((s) => (
-              <SectionGroup key={s.page} page={s.page} scanned={s.scanned} items={s.items} identities={identities} solPriceUsd={solPriceUsd} />
+              <SectionGroup key={s.page} section={s} identities={identities} solPriceUsd={solPriceUsd} />
             ))}
             {loading && Array.from({ length: 10 }, (_, i) => <SkeletonRow key={i} />)}
             {infinite.isFetchingNextPage && Array.from({ length: 3 }, (_, i) => <SkeletonRow key={`next-${i}`} />)}
@@ -165,10 +175,16 @@ export function ActivityFeed({ activity, solPriceUsd }: { activity: WalletActivi
         </table>
         {empty && <div className="sticky left-0 w-full">{empty}</div>}
         {first && infinite.hasNextPage && (
-          <div className="sticky left-0 flex w-full justify-center border-b border-line py-2">
+          <div className="sticky left-0 flex w-full items-center justify-center gap-3 border-b border-line py-2">
+            {olderError !== undefined && !infinite.isFetchingNextPage && (
+              <span role="alert" className="inline-flex items-center gap-1 text-2xs text-warn">
+                <TriangleAlert aria-hidden className="size-3" strokeWidth={1.75} />
+                Older page failed · {describeError(olderError)}
+              </span>
+            )}
             <button type="button" onClick={() => void infinite.fetchNextPage({ cancelRefetch: false })} disabled={infinite.isFetchingNextPage} className={BTN}>
-              <ChevronDown aria-hidden className="size-3" strokeWidth={1.75} />
-              {infinite.isFetchingNextPage ? 'Loading older…' : 'Load older'}
+              {olderError !== undefined ? <RotateCw aria-hidden className="size-3" strokeWidth={1.75} /> : <ChevronDown aria-hidden className="size-3" strokeWidth={1.75} />}
+              {infinite.isFetchingNextPage ? 'Loading older…' : olderError !== undefined ? 'Retry' : 'Load older'}
             </button>
           </div>
         )}
@@ -184,7 +200,7 @@ export function ActivityFeed({ activity, solPriceUsd }: { activity: WalletActivi
               ·
             </span>
             <span>
-              Source: <span className="text-fg-dim">{source}</span> · <Ago at={updatedAt} />
+              Source: <span className="text-fg-dim">{source}</span>
               {head.isFetching && <span className="text-faint"> · refreshing</span>}
             </span>
           </>
@@ -197,17 +213,24 @@ export function ActivityFeed({ activity, solPriceUsd }: { activity: WalletActivi
             <span title={notes.join('\n')}>{notes[notes.length - 1]}</span>
           </>
         )}
-        <span className="ml-auto pl-3 text-faint">USD ≈ at the current SOL price</span>
+        <span className="ml-auto flex items-center gap-2 pl-3">
+          <span className="text-faint">USD ≈ now (SOL × current SOL price)</span>
+          <FreshnessBadge
+            updatedAt={updatedAt}
+            error={refreshError !== undefined ? describeError(refreshError) : infinite.isError && !first ? describeError(infinite.error) : null}
+            staleAfterMs={ACTIVITY_HEAD_POLL_MS * 3}
+          />
+        </span>
       </footer>
     </div>
   );
 }
 
-function SectionGroup({ page, scanned, items, identities, solPriceUsd }: { page: number; scanned: number; items: WalletActivity[]; identities: MintIdentities; solPriceUsd?: number }) {
+function SectionGroup({ section, identities, solPriceUsd }: { section: ActivitySection; identities: MintIdentities; solPriceUsd?: number }) {
   return (
     <>
-      <SectionRow page={page} scanned={scanned} count={items.length} />
-      {items.map((a) => (
+      <SectionRow section={section} />
+      {section.items.map((a) => (
         <ActivityRow key={a.signature} activity={a} identities={identities} solPriceUsd={solPriceUsd} />
       ))}
     </>

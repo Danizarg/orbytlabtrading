@@ -1,20 +1,20 @@
 'use client';
 
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useCapabilities } from '@/client/capabilities';
 import { runChain, type ChainResult } from '@/lib/core/chain';
 import type { QuoteRequest } from '@/lib/core/providers';
 import type { SwapQuote } from '@/lib/core/types';
-import { buildQuoteRequest, type QuoteSide } from '@/lib/services/token';
+import { buildQuoteRequest, quoteMatchesRequest, type QuoteSide } from '@/lib/services/token';
 import { POLL } from '../query';
 import { jup, server } from '../sources';
 
 /**
- * Read-only swap preview. ORBYT's quote route (keyed Jupiter) when
- * configured, else the keyless Jupiter quote from the browser. Debounced
- * 400 ms, only while the panel is mounted and the amount is positive, and
- * refreshed every 10 s while visible. Nothing here signs or sends anything.
+ * Swap quote preview. ORBYT's quote route (keyed Jupiter) when configured,
+ * else the keyless Jupiter quote from the browser. Debounced 400 ms, only
+ * while the panel is mounted and the amount is positive, and refreshed every
+ * 10 s while the tab is visible.
  */
 
 export const QUOTE_DEBOUNCE_MS = 400;
@@ -65,17 +65,24 @@ export function useQuote(input: QuoteInput) {
     enabled,
     refetchInterval: POLL.fast,
     staleTime: 5_000,
-    placeholderData: keepPreviousData,
+    // While a new amount is quoted, keep the previous quote on screen (marked stale) only for the same
+    // pair direction: a buy quote must never stand in for a sell and vice versa.
+    placeholderData: (previous) => (quoteMatchesRequest(previous?.data, request) ? previous : undefined),
     retry: 1,
   });
 
+  const debouncing = input.amount !== amount;
+  // A cleared or invalid amount disables the query: show no quote rather than the last one.
+  const result = enabled ? query.data : undefined;
   return {
-    quote: query.data?.data,
-    result: query.data,
+    quote: result?.data,
+    result,
     request,
     /** The typed amount is newer than the debounced one. */
-    debouncing: input.amount !== amount,
-    error: query.error,
+    debouncing,
+    /** The quote on screen belongs to a previous amount / slippage (a new one is loading). */
+    stale: result !== undefined && (query.isPlaceholderData || debouncing),
+    error: enabled ? (query.error ?? undefined) : undefined,
     isPending: enabled && query.isPending,
     isFetching: query.isFetching,
     query,

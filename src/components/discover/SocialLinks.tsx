@@ -35,7 +35,7 @@ export function SocialLinks({ socials, symbol, className }: { socials?: Socials;
     <span className={cn('inline-flex items-center gap-0.5', className)}>
       {website && (
         <a href={website} target="_blank" rel="noopener noreferrer nofollow" aria-label={`${name} website`} title={website} className={LINK}>
-          <Globe className="size-3" />
+          <Globe aria-hidden className="size-3" strokeWidth={1.75} />
         </a>
       )}
       {twitter && (
@@ -45,7 +45,7 @@ export function SocialLinks({ socials, symbol, className }: { socials?: Socials;
       )}
       {telegram && (
         <a href={telegram} target="_blank" rel="noopener noreferrer nofollow" aria-label={`${name} on Telegram`} title={telegram} className={LINK}>
-          <Send className="size-3" />
+          <Send aria-hidden className="size-3" strokeWidth={1.75} />
         </a>
       )}
     </span>

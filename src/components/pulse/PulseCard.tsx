@@ -56,8 +56,8 @@ function XMark({ className }: { className?: string }) {
 function SocialLinks({ socials }: { socials?: Socials }) {
   const candidates: Array<{ href: string | undefined; label: string; icon: ReactNode }> = [
     { href: safeHref(socials?.twitter), label: 'X (Twitter)', icon: <XMark className="size-3" /> },
-    { href: safeHref(socials?.telegram), label: 'Telegram', icon: <Send aria-hidden className="size-3" /> },
-    { href: safeHref(socials?.website), label: 'Website', icon: <Globe aria-hidden className="size-3" /> },
+    { href: safeHref(socials?.telegram), label: 'Telegram', icon: <Send aria-hidden className="size-3" strokeWidth={1.75} /> },
+    { href: safeHref(socials?.website), label: 'Website', icon: <Globe aria-hidden className="size-3" strokeWidth={1.75} /> },
   ];
   const links = candidates.filter((l): l is { href: string; label: string; icon: ReactNode } => !!l.href);
   if (!links.length) return null;
@@ -103,7 +103,7 @@ function Stat({
           : 'text-fg-dim';
   return (
     <span className={cn('inline-flex shrink-0 items-center gap-0.5 tabular', tone)} title={`${label}: ${value === undefined ? 'unknown' : pctText(value)}`}>
-      <Icon aria-hidden className="size-3 opacity-80" />
+      <Icon aria-hidden className="size-3 opacity-80" strokeWidth={1.75} />
       <span className="sr-only">{label}</span>
       {value === undefined ? DASH : pctText(value)}
     </span>
@@ -145,6 +145,21 @@ const FLASH_CLASS: Record<string, string> = {
 
 /** The pointer must rest on a card this long before its token data is prefetched (a sweep across the column costs nothing). */
 const HOVER_INTENT_MS = 150;
+/**
+ * Token-data prefetches are spaced this far apart across all cards. Each one
+ * can cost a keyless Jupiter call, and Pulse's own polls already use ≈ 3 of
+ * the 4 calls per 10 s a browser gets; unthrottled hovering would starve them.
+ */
+const PREFETCH_SPACING_MS = 10_000;
+let lastDataPrefetchAt = 0;
+
+/** Claim the shared prefetch slot: 0 when claimed now, otherwise the ms to wait. */
+function claimPrefetchSlot(now: number): number {
+  const wait = lastDataPrefetchAt + PREFETCH_SPACING_MS - now;
+  if (wait > 0) return wait;
+  lastDataPrefetchAt = now;
+  return 0;
+}
 
 // ---------------------------------------------------------------------------
 // Card
@@ -174,9 +189,12 @@ function PulseCardView({ item, column, mcUsd, animateIn }: PulseCardProps) {
   const risk = item.risk ?? {};
   const badge = launchpadShort(lp.launchpad);
   const created = pulseTime(item);
-  const createdTitle = item.createdAtApprox
-    ? `Detected ${formatDateTime(created)} (PumpPortal receipt, within ~1 s of the create transaction)`
-    : `Created ${formatDateTime(created)}`;
+  const createdTitle =
+    item.createdAt === undefined
+      ? `First seen ${formatDateTime(created)} (creation time not reported yet)`
+      : item.createdAtApprox
+        ? `Detected ${formatDateTime(created)} (PumpPortal receipt, within ~1 s of the create transaction)`
+        : `Created ${formatDateTime(created)}`;
 
   const open = (event: MouseEvent<HTMLElement>) => {
     if (event.defaultPrevented) return;
@@ -192,12 +210,20 @@ function PulseCardView({ item, column, mcUsd, animateIn }: PulseCardProps) {
   // Prefetch on hover only: New Pairs churns every few seconds, so viewport
   // prefetching would hit the route for cards nobody opens. The route is
   // prefetched at once; the token page queries (same keys as /trade/[mint])
-  // wait for hover intent because each warm-up spends keyless budget.
+  // wait for hover intent and a free prefetch slot, because each warm-up
+  // spends keyless budget. Leaving the card cancels the pending prefetch.
+  const schedulePrefetch = (delayMs: number) => {
+    clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => {
+      const wait = claimPrefetchSlot(Date.now());
+      if (wait > 0) schedulePrefetch(wait);
+      else prefetchTokenPage(queryClient, item.mint, capabilities);
+    }, delayMs);
+  };
   const onPointerEnter = (event: PointerEvent<HTMLElement>) => {
     if (event.pointerType !== 'mouse') return;
     router.prefetch(href);
-    clearTimeout(hoverTimer.current);
-    hoverTimer.current = setTimeout(() => prefetchTokenPage(queryClient, item.mint, capabilities), HOVER_INTENT_MS);
+    schedulePrefetch(HOVER_INTENT_MS);
   };
   const onPointerLeave = () => clearTimeout(hoverTimer.current);
   useEffect(() => () => clearTimeout(hoverTimer.current), []);
@@ -209,15 +235,16 @@ function PulseCardView({ item, column, mcUsd, animateIn }: PulseCardProps) {
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
       className={cn(
-        'relative flex cursor-pointer flex-col gap-1.5 border-b border-line px-3 py-2 transition-colors duration-150 hover:bg-hover/60',
+        // ≈ 88 px: 8 + 52 (three 16 px lines) + 4 + 16 (strip) + 8.
+        'relative flex cursor-pointer flex-col gap-1 border-b border-line px-3 py-2 transition-colors duration-150 hover:bg-hover/60',
         animate && 'motion-safe:animate-slide-in',
       )}
     >
-      <div className="flex min-w-0 items-start gap-2">
+      <div className="flex h-[52px] min-w-0 items-start gap-2">
         <TokenAvatar src={item.image} symbol={item.symbol} size={40} progress={migrated ? undefined : progress} />
 
-        <div className="min-w-0 flex-1 pt-0.5">
-          <div className="flex min-w-0 items-baseline gap-1.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex h-4 min-w-0 items-baseline gap-1.5">
             <Link
               href={href}
               prefetch={false}
@@ -233,7 +260,7 @@ function PulseCardView({ item, column, mcUsd, animateIn }: PulseCardProps) {
             )}
           </div>
 
-          <div className="mt-1 flex h-4 min-w-0 items-center gap-1.5 overflow-hidden text-2xs text-muted">
+          <div className="mt-0.5 flex h-4 min-w-0 items-center gap-1.5 overflow-hidden text-2xs text-muted">
             {migrated ? (
               <span className="inline-flex shrink-0 items-center gap-1" title={lp.graduatedAt ? `Migrated ${formatDateTime(lp.graduatedAt)}` : undefined}>
                 <span>migrated</span>
@@ -281,10 +308,10 @@ function PulseCardView({ item, column, mcUsd, animateIn }: PulseCardProps) {
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-0.5 pt-0.5 text-right">
-          <div className={cn('-mx-1 rounded px-1 leading-4', flash)}>
-            <span className="mr-1 text-2xs text-muted">MC</span>
-            <span className="font-display text-sm font-semibold text-fg tabular">{formatUsd(mcUsd)}</span>
+        <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+          <div className={cn('-mx-1 h-4 rounded px-1 leading-4', flash)}>
+            <span className="mr-1 text-2xs leading-4 text-muted">MC</span>
+            <span className="font-display text-sm leading-4 font-semibold text-fg tabular">{formatUsd(mcUsd)}</span>
           </div>
           <div className="text-2xs leading-4">
             <span className="text-muted">V</span> <span className="text-fg-dim tabular">{formatUsd(item.volumeUsd)}</span>
@@ -297,7 +324,7 @@ function PulseCardView({ item, column, mcUsd, animateIn }: PulseCardProps) {
               <span className={cn('tabular', item.txns?.sells === undefined ? 'text-faint' : 'text-down')}>{formatCompact(item.txns?.sells)}</span>
             </span>
             <span className="inline-flex items-center gap-0.5 text-fg-dim" title={`Holders: ${item.holders ?? 'unknown'}`}>
-              <Users aria-hidden className="size-3 text-muted" />
+              <Users aria-hidden className="size-3 text-muted" strokeWidth={1.75} />
               <span className="sr-only">Holders</span>
               <span className={cn('tabular', item.holders === undefined && 'text-faint')}>{formatCompact(item.holders)}</span>
             </span>
@@ -305,10 +332,12 @@ function PulseCardView({ item, column, mcUsd, animateIn }: PulseCardProps) {
         </div>
       </div>
 
-      <div className="flex h-4 min-w-0 items-center gap-3 overflow-hidden text-2xs">
+      {/* One 16 px line: stats that do not fit wrap onto a hidden second line
+          instead of being cut mid-value (narrow columns at 360 / 1024 px). */}
+      <div className="flex h-4 min-w-0 flex-wrap content-start items-center gap-x-3 gap-y-4 overflow-hidden text-2xs">
         {migrated ? (
           <span className="inline-flex shrink-0 items-center gap-0.5 text-fg-dim tabular" title="Liquidity">
-            <Droplets aria-hidden className="size-3 opacity-80" />
+            <Droplets aria-hidden className="size-3 opacity-80" strokeWidth={1.75} />
             <span className="sr-only">Liquidity</span>
             <span className={cn(item.liquidityUsd === undefined && 'text-faint')}>{formatUsd(item.liquidityUsd)}</span>
           </span>
@@ -319,7 +348,7 @@ function PulseCardView({ item, column, mcUsd, animateIn }: PulseCardProps) {
           className={cn('inline-flex shrink-0 items-center gap-0.5 tabular', item.devBuySol === undefined ? 'text-faint' : 'text-fg-dim')}
           title={item.devBuySol === undefined ? 'Dev buy: unknown' : `Dev buy: ${formatAmount(item.devBuySol)} SOL spent by the creator at launch`}
         >
-          <Coins aria-hidden className="size-3 opacity-80" />
+          <Coins aria-hidden className="size-3 opacity-80" strokeWidth={1.75} />
           <span className="sr-only">Dev buy</span>
           {item.devBuySol === undefined ? DASH : `${formatAmount(item.devBuySol, { maxDecimals: item.devBuySol >= 10 ? 1 : 2 })}◎`}
         </span>
@@ -339,23 +368,24 @@ export const PulseCard = memo(
   (a, b) => a.column === b.column && a.mcUsd === b.mcUsd && sameCardData(a.item, b.item),
 );
 
+/** Same footprint as a card (≈ 88 px), so the column does not jump when data lands. */
 export function PulseCardSkeleton() {
   return (
-    <div aria-hidden className="flex flex-col gap-2 border-b border-line px-3 py-2">
-      <div className="flex items-start gap-2">
-        <span className="block size-12 shrink-0 animate-pulse rounded-full bg-panel-3" />
-        <div className="flex flex-1 flex-col gap-1.5 pt-1">
+    <div aria-hidden className="flex flex-col gap-1 border-b border-line px-3 py-2">
+      <div className="flex h-[52px] items-start gap-2">
+        <span className="m-1 block size-10 shrink-0 animate-pulse rounded-full bg-panel-3" />
+        <div className="flex flex-1 flex-col gap-2.5">
           <span className="block h-3 w-28 animate-pulse rounded bg-panel-3" />
           <span className="block h-2.5 w-40 animate-pulse rounded bg-panel-3" />
           <span className="block h-2.5 w-24 animate-pulse rounded bg-panel-3" />
         </div>
-        <div className="flex flex-col items-end gap-1.5 pt-1">
-          <span className="block h-3.5 w-16 animate-pulse rounded bg-panel-3" />
+        <div className="flex flex-col items-end gap-2.5">
+          <span className="block h-3 w-16 animate-pulse rounded bg-panel-3" />
           <span className="block h-2.5 w-12 animate-pulse rounded bg-panel-3" />
           <span className="block h-2.5 w-20 animate-pulse rounded bg-panel-3" />
         </div>
       </div>
-      <span className="block h-2.5 w-full animate-pulse rounded bg-panel-3" />
+      <span className="my-0.5 block h-3 w-full animate-pulse rounded bg-panel-3" />
     </div>
   );
 }

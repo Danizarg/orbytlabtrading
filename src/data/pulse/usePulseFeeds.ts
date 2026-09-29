@@ -5,9 +5,9 @@ import { useEffect } from 'react';
 import { useCapabilities } from '@/client/capabilities';
 import { usePumpPortalMigrations, usePumpPortalNewTokens } from '@/client/hooks/usePumpPortal';
 import { useSolPrice } from '@/data/hooks/useSolPrice';
-import { browserCurves, gecko, jup, server } from '@/data/sources';
+import { browserCurves, browserRpc, gecko, jup, server } from '@/data/sources';
 import { PUBLIC_ENDPOINTS } from '@/lib/config/capabilities';
-import { chunk, runChain, type ChainStep } from '@/lib/core/chain';
+import { ChainError, chunk, runChain, type ChainStep } from '@/lib/core/chain';
 import { PROVIDER_LABELS, type DiscoverQuery } from '@/lib/core/providers';
 import type { BondingCurveState, PulseColumn, Sourced, TokenRow } from '@/lib/core/types';
 import { isAbortError, isProviderError } from '@/lib/net/errors';
@@ -22,10 +22,13 @@ import {
   patchFromGeckoPool,
   patchFromMigration,
   patchFromNewToken,
+  patchFromPoolOwner,
   patchFromServerToken,
   patchFromTokenRow,
   patchFromUltra,
   pickBatch,
+  poolDexTargets,
+  poolOwnersFromRpc,
   verifyCandidate,
   type PatchMeta,
   type PendingCandidate,
@@ -50,12 +53,16 @@ import { useVisibleInterval } from './timers';
  *    (6 RPC calls per 4 s ≈ 15 / 10 s against a 30 / 10 s budget); a keyed
  *    server RPC takes 100 per poll.
  * 4. Enrichment: Jupiter token rows (15 s) and Ultra risk extras (60 s).
+ *    Graduations whose destination DEX is unknown get it on-chain from the
+ *    migration pool's owner program (10 s, ≤ 10 pools, one owner-only
+ *    getMultipleAccounts on the browser RPC).
  * 5. Keyed server lists when configured (10 s per column).
  *
  * Jupiter keyless budget (4 calls / 10 s per browser): recent 1.7 + rows 0.7
  * + Ultra 0.2 + trending 0.1 + SOL price 0.3 ≈ 3.0 calls / 10 s, leaving
  * headroom for the global search. React Query pauses polling while the tab
- * is hidden; the manual timers here do the same.
+ * is hidden; the manual timers here do the same. The poll observers never
+ * re-render their host: results land in the store, not in component state.
  */
 
 export const PULSE_CADENCE = {
@@ -64,6 +71,7 @@ export const PULSE_CADENCE = {
   geckoNew: 60_000,
   geckoPump: 60_000,
   curves: 4_000,
+  poolDex: 10_000,
   jupRows: 15_000,
   jupUltra: 60_000,
   server: 10_000,
@@ -71,12 +79,22 @@ export const PULSE_CADENCE = {
 } as const;
 
 /** Re-check sooner when the previous run had nothing to request (no network call was made). */
-const IDLE_RETRY_MS = { curves: 1_500, jupRows: 3_000, jupUltra: 20_000 } as const;
+const IDLE_RETRY_MS = { curves: 1_500, poolDex: 3_000, jupRows: 3_000, jupUltra: 20_000 } as const;
 
 const BATCH = { curvesBrowser: 30, curvesServer: 100, rows: 100, ultra: 100 } as const;
+/** Largest share of a curve batch visible Final Stretch tokens and GeckoTerminal candidates may take (browser: 18 + 6 of 30). */
+const CURVE_TIER_SHARE = { final: 0.6, candidates: 0.2 } as const;
 /** Largest getMultipleAccounts the browser RPC (publicnode) serves; larger requests are blocked with HTTP 403. */
 export const BROWSER_ACCOUNTS_PER_CALL = 10;
+/**
+ * A mint whose pump.fun curve account was missing this many times in a row is
+ * skipped for CURVE_MISS_BACKOFF_MS, then read once more (an account not yet
+ * visible at 'confirmed' must not lose on-chain progress for the whole session).
+ */
 const MAX_CURVE_MISSES = 2;
+const CURVE_MISS_BACKOFF_MS = 2 * 60_000;
+/** A migration pool account missing this many times (not yet visible at 'confirmed') is given up on. */
+const MAX_POOL_MISSES = 2;
 const MAX_PENDING = 100;
 const PENDING_TTL_MS = 5 * 60_000;
 const MAX_VERIFY_ATTEMPTS = 4;
@@ -88,13 +106,16 @@ const TRACKING_LIMIT = 1_500;
 // ---------------------------------------------------------------------------
 
 const curveLastPolled = new Map<string, number>();
-const curveMisses = new Map<string, number>();
+const curveMisses = new Map<string, { count: number; at: number }>();
 const rowsLastPicked = new Map<string, number>();
 const ultraLastPicked = new Map<string, number>();
 /** GeckoTerminal pump.fun curves not yet tracked; inserted together with their first on-chain read. */
 const pumpCandidates = new Map<string, PulsePatch>();
 /** Readings waiting for launchpad confirmation (bonk creates, unknown migration pools). */
 const pending = new Map<string, PendingCandidate>();
+/** Migration pools whose owner program has been read (known AMM or not): never read again. */
+const poolOwnerSettled = new Set<string>();
+const poolMisses = new Map<string, number>();
 let pumpSortByVolume = false;
 
 function addPending(candidate: PendingCandidate): void {
@@ -114,6 +135,12 @@ function trimTracking(): void {
   for (const map of [curveLastPolled, curveMisses, rowsLastPicked, ultraLastPicked]) {
     if (map.size <= TRACKING_LIMIT) continue;
     for (const mint of map.keys()) if (!keep(mint)) map.delete(mint);
+  }
+  if (poolOwnerSettled.size + poolMisses.size > TRACKING_LIMIT) {
+    const pools = new Set<string>();
+    for (const item of items.values()) if (item.launchpad.migratedPool) pools.add(item.launchpad.migratedPool);
+    for (const pool of poolOwnerSettled) if (!pools.has(pool)) poolOwnerSettled.delete(pool);
+    for (const pool of poolMisses.keys()) if (!pools.has(pool)) poolMisses.delete(pool);
   }
   const now = Date.now();
   for (const [mint, c] of pending) if (now - c.addedAt > PENDING_TTL_MS) pending.delete(mint);
@@ -148,7 +175,8 @@ async function runFeed(id: PulseFeedId, task: () => Promise<PollResult | null>):
     return result;
   } catch (error) {
     if (!isAbortError(error)) {
-      if (isProviderError(error) && error.code === 'not_configured') store.disableFeed(id);
+      const notConfigured = (isProviderError(error) && error.code === 'not_configured') || (error instanceof ChainError && error.allNotConfigured);
+      if (notConfigured) store.disableFeed(id);
       else store.reportError(id, feedErrorText(error), Date.now());
     }
     throw error;
@@ -172,6 +200,8 @@ function usePulsePoll(
     retry: false,
     staleTime: Math.min(intervalMs, idleMs),
     gcTime: 60_000,
+    // Results go to the store; the host component never re-renders for a poll.
+    notifyOnChangeProps: [],
   });
 }
 
@@ -308,17 +338,21 @@ async function pollCurves(signal: AbortSignal, serverFirst: boolean, solPriceUsd
   const { items } = usePulseStore.getState();
   const visible = getVisibleMints();
   const eligible = (mint: string) => {
-    if ((curveMisses.get(mint) ?? 0) >= MAX_CURVE_MISSES) return false;
+    const miss = curveMisses.get(mint);
+    if (miss && miss.count >= MAX_CURVE_MISSES && now - miss.at < CURVE_MISS_BACKOFF_MS) return false;
     const item = items.get(mint);
     return item ? isCurveTarget(item) : pumpCandidates.has(mint);
   };
   const rotation: string[] = [];
   for (const item of items.values()) if (eligible(item.mint)) rotation.push(item.mint);
+  const cap = serverFirst ? BATCH.curvesServer : BATCH.curvesBrowser;
+  // Visible Final Stretch first, but a full column (40) must not starve candidates, New Pairs and the rotation.
   const mints = pickBatch(
     [visible.final.filter(eligible), [...pumpCandidates.keys()].filter(eligible), visible.new.filter(eligible)],
     rotation,
     curveLastPolled,
-    serverFirst ? BATCH.curvesServer : BATCH.curvesBrowser,
+    cap,
+    [Math.ceil(cap * CURVE_TIER_SHARE.final), Math.ceil(cap * CURVE_TIER_SHARE.candidates)],
   );
   if (!mints.length) return null;
   for (const mint of mints) curveLastPolled.set(mint, now);
@@ -333,7 +367,7 @@ async function pollCurves(signal: AbortSignal, serverFirst: boolean, solPriceUsd
     const curve = result.data[mint];
     if (!curve) {
       // No pump.fun curve account for this mint.
-      curveMisses.set(mint, (curveMisses.get(mint) ?? 0) + 1);
+      curveMisses.set(mint, { count: (curveMisses.get(mint)?.count ?? 0) + 1, at: now });
       if (!tracked.has(mint)) pumpCandidates.delete(mint);
       continue;
     }
@@ -350,13 +384,55 @@ async function pollCurves(signal: AbortSignal, serverFirst: boolean, solPriceUsd
   return { polled: mints.length, applied: patches.length, via };
 }
 
+/**
+ * Destination DEX of graduations known only by pool address (Jupiter
+ * `graduatedPool`): the pool account's owner program names the AMM. One
+ * owner-only read (dataSlice length 0) of ≤ 10 pools; optional enrichment.
+ */
+async function pollPoolDex(signal: AbortSignal): Promise<PollResult | null> {
+  const targets = poolDexTargets(usePulseStore.getState().items, getVisibleMints().migrated, poolOwnerSettled, BROWSER_ACCOUNTS_PER_CALL);
+  if (!targets.length) return null;
+  const pools = targets.map((t) => t.pool);
+  const result = await browserRpc.call<unknown>(
+    'getMultipleAccounts',
+    [pools, { encoding: 'base64', dataSlice: { offset: 0, length: 0 }, commitment: 'confirmed' }],
+    signal,
+  );
+  const fetchedAt = Date.now();
+  const owners = poolOwnersFromRpc(result, pools);
+  const tracked = usePulseStore.getState().items;
+  const patches: PulsePatch[] = [];
+  for (const { mint, pool } of targets) {
+    const owner = owners[pool];
+    if (owner === undefined) continue;
+    if (owner === null) {
+      const misses = (poolMisses.get(pool) ?? 0) + 1;
+      poolMisses.set(pool, misses);
+      if (misses >= MAX_POOL_MISSES) poolOwnerSettled.add(pool);
+      continue;
+    }
+    poolOwnerSettled.add(pool);
+    poolMisses.delete(pool);
+    // Only label the pool the token still reports as its migration pool.
+    if (tracked.get(mint)?.launchpad.migratedPool !== pool) continue;
+    const patch = patchFromPoolOwner(mint, pool, owner, fetchedAt);
+    if (patch) patches.push(patch);
+  }
+  enqueuePatches(patches);
+  return { polled: pools.length, applied: patches.length, via: browserRpcLabel };
+}
+
 /** Token rows: identity, holders, 24 h activity, audit, graduation; also confirms pending candidates. */
 async function pollRows(signal: AbortSignal, serverFirst: boolean): Promise<PollResult | null> {
   const now = Date.now();
   const { items } = usePulseStore.getState();
   const visible = getVisibleMints();
   const shown = [...visible.final, ...visible.new, ...visible.migrated];
-  const missingIdentity = shown.filter((mint) => !items.get(mint)?.symbol);
+  // Stream creates carry no image (only a metadata URI): fill logos first.
+  const missingIdentity = shown.filter((mint) => {
+    const item = items.get(mint);
+    return !item?.symbol || !item.image;
+  });
   const awaitingMigration: string[] = [];
   for (const item of items.values()) if (item.launchpad.stage === 'bonding' && item.curveComplete === true) awaitingMigration.push(item.mint);
   const mints = pickBatch([[...pending.keys()], missingIdentity, awaitingMigration, shown], items.keys(), rowsLastPicked, BATCH.rows);
@@ -400,7 +476,8 @@ async function pollUltra(signal: AbortSignal): Promise<PollResult | null> {
     if (item.launchpad.stage !== 'bonding' || item.curveComplete === true) continue;
     (item.launchpad.launchpad === 'pump.fun' ? bonding : nonPump).push(item.mint);
   }
-  const mints = pickBatch([visible.final, visible.new, visible.migrated], [...nonPump, ...bonding], ultraLastPicked, BATCH.ultra);
+  // All visible cards share one least-recently-picked tier: a full Final Stretch + New Pairs (100) must not keep Migrated cards without risk data.
+  const mints = pickBatch([[...visible.final, ...visible.new, ...visible.migrated]], [...nonPump, ...bonding], ultraLastPicked, BATCH.ultra);
   if (!mints.length) return null;
   const now = Date.now();
   for (const mint of mints) ultraLastPicked.set(mint, now);
@@ -466,6 +543,7 @@ export function usePulseFeeds(): void {
   usePulsePoll('geckoNew', PULSE_CADENCE.geckoNew, pollGeckoNew);
   usePulsePoll('geckoPump', PULSE_CADENCE.geckoPump, pollGeckoPump);
   usePulsePoll('curves', PULSE_CADENCE.curves, (signal) => pollCurves(signal, serverRpcFirst, solPriceUsd), { idleMs: IDLE_RETRY_MS.curves });
+  usePulsePoll('poolDex', PULSE_CADENCE.poolDex, pollPoolDex, { idleMs: IDLE_RETRY_MS.poolDex });
   usePulsePoll('jupRows', PULSE_CADENCE.jupRows, (signal) => pollRows(signal, caps.serverDiscover), { idleMs: IDLE_RETRY_MS.jupRows });
   usePulsePoll('jupUltra', PULSE_CADENCE.jupUltra, pollUltra, { idleMs: IDLE_RETRY_MS.jupUltra });
   usePulsePoll('serverNew', PULSE_CADENCE.server, (signal) => pollServer('new', signal), { enabled: caps.serverPulse && !serverNewOff });

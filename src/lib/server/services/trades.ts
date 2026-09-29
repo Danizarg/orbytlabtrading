@@ -151,7 +151,8 @@ export async function loadTrades(query: TradesQueryInput, deps: TradesDeps): Pro
     run: () => provider.getTrades({ mint: query.mint, pool: query.pool, limit: query.limit }),
   }));
   const result = await runChain('trades', steps);
-  const trades = result.data.slice(0, query.limit);
+  // Newest first before capping, whatever order the provider used (a stable copy: cached values are shared).
+  const trades = [...result.data].sort((a, b) => b.timestamp - a.timestamp).slice(0, query.limit);
 
   const needUsd = tradesNeedUsd(trades);
   const [solUsd, mint] = await Promise.all([

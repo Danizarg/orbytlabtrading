@@ -69,7 +69,7 @@ export function PulseFilterMenu({ column, title }: { column: PulseColumn; title:
           count || open ? 'bg-brand-soft text-brand-strong' : 'text-muted hover:bg-hover hover:text-fg',
         )}
       >
-        <SlidersHorizontal aria-hidden className="size-3.5" />
+        <SlidersHorizontal aria-hidden className="size-3.5" strokeWidth={1.75} />
         {count > 0 && <span className="tabular">{count}</span>}
       </button>
 

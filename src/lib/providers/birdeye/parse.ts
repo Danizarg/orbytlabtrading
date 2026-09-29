@@ -14,13 +14,13 @@ import 'server-only';
  * - Trade legs carry raw `amount` (string) and decimal-adjusted `ui_amount`.
  */
 
+import { isValidCandle } from '@/lib/analytics/candles';
 import { num, toMs } from '@/lib/core/chain';
 import { normalizeDex } from '@/lib/core/dex';
 import { isSolanaAddress, MINTS } from '@/lib/core/solana';
 import type {
   Candle,
   HolderEntry,
-  HolderSnapshot,
   LaunchpadState,
   PulseColumn,
   PulseToken,
@@ -134,11 +134,15 @@ export interface ParsedCandles {
   candles: Candle[];
   /** Distinct `currency` values reported by the items (lower-case). */
   currencies: string[];
+  /** Rows in the upstream page, valid or not (a full page means more history may exist). */
+  received: number;
 }
 
 /**
- * v3 OHLCV items → ascending, time-unique candles. Items without finite OHLC
- * or time are dropped; `v_usd` becomes the USD volume.
+ * v3 OHLCV items → ascending, time-unique candles. Rows that cannot be
+ * charted as reported (missing time, non-positive prices, high/low not
+ * bracketing open/close) are dropped, never repaired; `v_usd` becomes the
+ * USD volume.
  */
 export function parseOhlcvItems(items: unknown): ParsedCandles | undefined {
   if (!Array.isArray(items)) return undefined;
@@ -152,15 +156,16 @@ export function parseOhlcvItems(items: unknown): ParsedCandles | undefined {
     const high = num(r.h);
     const low = num(r.l);
     const close = num(r.c);
-    if (time === undefined || time <= 0 || open === undefined || high === undefined || low === undefined || close === undefined) continue;
+    if (time === undefined || open === undefined || high === undefined || low === undefined || close === undefined) continue;
     const candle: Candle = { time: Math.floor(time), open, high, low, close };
+    if (!isValidCandle(candle)) continue;
     const volume = nonNegative(r.v_usd);
     if (volume !== undefined) candle.volume = volume;
     byTime.set(candle.time, candle);
     const currency = text(r.currency)?.toLowerCase();
     if (currency) currencies.add(currency);
   }
-  return { candles: [...byTime.values()].sort((a, b) => a.time - b.time), currencies: [...currencies] };
+  return { candles: [...byTime.values()].sort((a, b) => a.time - b.time), currencies: [...currencies], received: items.length };
 }
 
 // ---------------------------------------------------------------------------
@@ -252,22 +257,24 @@ export function parseHolderItems(items: unknown, isProgram: (owner: string) => b
   return out;
 }
 
-export function parseHolderSnapshot(
-  data: Rec,
-  mint: string,
-  limit: number,
-  fetchedAt: number,
-  isProgram: (owner: string) => boolean | undefined,
-  labelOf?: OwnerLabel,
-): HolderSnapshot | undefined {
-  const top = parseHolderItems(data.items, isProgram, labelOf);
-  if (!top) return undefined;
-  const snapshot: HolderSnapshot = { mint, top: top.slice(0, limit), updatedAt: fetchedAt };
+export interface HolderPage {
+  /** Every parsed row, largest first (token-account mode: one row per token account). */
+  entries: HolderEntry[];
+  totalHolders?: number;
+  /** Birdeye's own top-10 share (0–100) over the top token accounts, liquidity accounts included. */
+  top10Pct?: number;
+}
+
+/** v3 `/defi/v3/token/holder` data (default token-account mode) → rows, holder count and Birdeye's top-10 share. */
+export function parseHolderPage(data: Rec, isProgram: (owner: string) => boolean | undefined, labelOf?: OwnerLabel): HolderPage | undefined {
+  const entries = parseHolderItems(data.items, isProgram, labelOf);
+  if (!entries) return undefined;
+  const page: HolderPage = { entries };
   const holders = count(data.holder);
-  if (holders !== undefined) snapshot.totalHolders = holders;
+  if (holders !== undefined) page.totalHolders = holders;
   const top10 = percent(data.top10HoldPercent);
-  if (top10 !== undefined) snapshot.distribution = { top10Pct: top10 };
-  return snapshot;
+  if (top10 !== undefined) page.top10Pct = top10;
+  return page;
 }
 
 // ---------------------------------------------------------------------------

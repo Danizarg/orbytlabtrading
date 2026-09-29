@@ -1,17 +1,29 @@
-import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChainError } from '@/lib/core/chain';
 import type { DiscoverQuery, ProviderId, TokenDiscoveryProvider, TokenRowsProvider } from '@/lib/core/providers';
+import { MINTS } from '@/lib/core/solana';
 import type { Sourced, TokenRow } from '@/lib/core/types';
+import type { JsonFetcher } from '@/lib/net/types';
 import { ProviderError } from '@/lib/net/errors';
 import type { JupiterUltraInfo } from '@/lib/providers/jupiter';
 import {
   activeFilterCount,
+  baseListOf,
   buyShare,
   CLEAR_FILTERS,
   compareNullable,
+  COOLDOWN_RECHECK_MS,
   createEnrichmentCache,
+  createUniverseLoader,
   DEFAULT_FILTERS,
+  DEFAULT_LIST,
+  DEX_PROMOTED_NOTE,
   describeAttempt,
+  dueAt,
+  emptyEntries,
+  enrichmentTarget,
   enrichRow,
   enrichRows,
   errorLines,
@@ -19,18 +31,28 @@ import {
   flagReasons,
   formatUsdInput,
   GAINERS_NOTE,
+  geckoListPath,
+  geckoRowsFromList,
+  isExcludedMint,
   isFlagged,
   launchpadBadge,
   launchpadVenue,
+  loadDexPromoted,
   loadDiscoverList,
   loadTokenRows,
+  mergeRows,
+  mergeUniverse,
+  mintSetKey,
   needsDex,
   needsUltra,
   nextSort,
   orderByMints,
+  parseDexFeed,
   parseDiscoverParams,
   parseUsdInput,
+  pickNext,
   riskLevel,
+  rowToTokenResult,
   serializeDiscoverParams,
   showsGeckoData,
   sortGainers,
@@ -38,10 +60,21 @@ import {
   sortValue,
   stableFetchSet,
   stageOf,
+  summarizeUniverse,
   toGainers,
   txCount,
+  UNIVERSE_SOURCES,
+  universeBackoffMs,
+  UNIVERSE_SPACING_MS,
   visibleFailures,
+  withoutExcluded,
   type DiscoverFilters,
+  type EnrichmentSnapshot,
+  type MergeCache,
+  type ProviderClock,
+  type UniverseEntries,
+  type UniverseEntry,
+  type UniverseSourceDef,
 } from './discover';
 
 // ---------------------------------------------------------------------------
@@ -133,10 +166,23 @@ describe('parseUsdInput / formatUsdInput', () => {
 });
 
 describe('parseDiscoverParams / serializeDiscoverParams', () => {
-  it('defaults and ignores invalid values', () => {
+  it('defaults to the full universe ("All") and ignores invalid values', () => {
+    expect(DEFAULT_LIST).toBe('all');
     const p = parseDiscoverParams({ list: 'bogus', w: '2h', stage: 'x', age: '9y', liq: 'nope' });
-    expect(p).toEqual({ list: 'trending', window: '1h', filters: { stage: 'all', hideFlagged: false } });
+    expect(p).toEqual({ list: 'all', window: '1h', filters: { stage: 'all', hideFlagged: false } });
     expect(serializeDiscoverParams(p)).toBe('');
+  });
+
+  it('keeps a named list in the URL (only the default is omitted)', () => {
+    expect(serializeDiscoverParams({ list: 'trending', window: '1h', filters: DEFAULT_FILTERS })).toBe('list=trending');
+    expect(parseDiscoverParams(new URLSearchParams('list=trending')).list).toBe('trending');
+    expect(parseDiscoverParams(new URLSearchParams('list=all')).list).toBe('all');
+  });
+
+  it('maps tabs to their upstream list', () => {
+    expect(baseListOf('gainers')).toBe('trending');
+    expect(baseListOf('all')).toBe('trending');
+    expect(baseListOf('organic')).toBe('organic');
   });
 
   it('round-trips every field', () => {
@@ -343,6 +389,17 @@ describe('enrichRow (fillMissing precedence)', () => {
     expect(enrichRow(row({ mint: 'y' }), { ultra: ultra({ progressPct: 100 }) }).token.launchpad).toEqual({ stage: 'graduated' });
   });
 
+  it('keeps a known launchpad name when Ultra reveals the stage', () => {
+    const named = row({ mint: 'n', token: { launchpad: { stage: 'unknown', launchpad: 'pump.fun' } } });
+    expect(enrichRow(named, { ultra: ultra({ progressPct: 40 }) }).token.launchpad).toStrictEqual({
+      launchpad: 'pump.fun',
+      stage: 'bonding',
+      progressPct: 40,
+      progressSource: 'jupiter',
+    });
+    expect(enrichRow(named, { ultra: ultra({ progressPct: 100 }) }).token.launchpad).toStrictEqual({ launchpad: 'pump.fun', stage: 'graduated' });
+  });
+
   it('fills pool, logo and socials from DEX Screener without overriding', () => {
     const base = row({ mint: 'm', token: { image: 'https://primary/logo.png', socials: { twitter: 'https://x.com/primary' } } });
     const dexRow = row({
@@ -472,6 +529,47 @@ describe('createEnrichmentCache', () => {
     advance(30_000);
     await cache.load([row({ mint: 'a' })]);
     expect(ultraCalls).toHaveLength(2);
+  });
+
+  it('covers a target longer than one batch over successive calls, new mints first', async () => {
+    let t = NOW;
+    const ultraCalls: string[][] = [];
+    const cache = createEnrichmentCache(
+      {
+        ultra: async (list) => {
+          ultraCalls.push(list);
+          return Object.fromEntries(list.map((m) => [m, { risk: { snipersPct: 1 } }]));
+        },
+        dexRows: async () => [],
+      },
+      { ttlMs: 55_000, ultraMinGapMs: 30_000, dexMinGapMs: 0, maxMints: 2, now: () => t },
+    );
+    const rows = ['a', 'b', 'c', 'd', 'e'].map((m) => row({ mint: m }));
+    await cache.load(rows);
+    t += 30_000;
+    await cache.load(rows);
+    t += 30_000; // a and b are stale now, but e has never been fetched
+    await cache.load(rows);
+    t += 30_000;
+    await cache.load(rows);
+    expect(ultraCalls).toEqual([['a', 'b'], ['c', 'd'], ['e', 'a'], ['b', 'c']]);
+  });
+
+  it('serves cached data for every row, not only the fetch cap, until it is too old', async () => {
+    let t = NOW;
+    const cache = createEnrichmentCache(
+      {
+        ultra: async (list) => Object.fromEntries(list.map((m) => [m, { risk: { snipersPct: 1 } }])),
+        dexRows: async () => [],
+      },
+      { ttlMs: 55_000, maxServeAgeMs: 120_000, maxMints: 1, now: () => t },
+    );
+    await cache.load([row({ mint: 'deep' })]);
+    // A later view lists the mint far below the fetch cap: its cached data still renders.
+    const view = [row({ mint: 'top', risk: { snipersPct: 1, insidersPct: 1, bundlersPct: 1 }, pool: { address: 'p', dex: 'orca', dexLabel: 'Orca' } }), row({ mint: 'deep' })];
+    expect(cache.revision().peek(view).byMint.deep?.ultra?.risk.snipersPct).toBe(1);
+    t += 120_001;
+    expect(cache.revision().peek(view).byMint.deep).toBeUndefined();
   });
 
   it('serializes overlapping loads so mints are not requested twice', async () => {
@@ -671,5 +769,491 @@ describe('presentation helpers', () => {
     expect(launchpadVenue('stonkfun')).toBe('StonkFun');
     expect(launchpadVenue('new-pad')).toBe('New Pad');
     expect(launchpadVenue(' ')).toBeUndefined();
+  });
+});
+
+describe('enrichRows memo / rowToTokenResult', () => {
+  it('returns the same enriched object while its inputs are unchanged', () => {
+    const base = row({ mint: 'm' });
+    const ultra: JupiterUltraInfo = { risk: { snipersPct: 3 } };
+    const snap = (u: JupiterUltraInfo): EnrichmentSnapshot => ({ byMint: { m: { ultra: u } }, errors: {} });
+    const first = enrichRows([base], snap(ultra))[0];
+    expect(first?.risk?.snipersPct).toBe(3);
+    expect(enrichRows([base], snap(ultra))[0]).toBe(first);
+    const next = enrichRows([base], snap({ risk: { snipersPct: 4 } }))[0];
+    expect(next).not.toBe(first);
+    expect(next?.risk?.snipersPct).toBe(4);
+  });
+
+  it('turns a row into a token-page result with its real source and age', () => {
+    const jup = rowToTokenResult(row({ mint: 'a', market: { updatedAt: NOW - 20_000 } }));
+    expect(jup).toMatchObject({ source: 'jupiter', fetchedAt: NOW - 20_000, freshness: 'fast', attempts: [{ provider: 'jupiter', ok: true }] });
+    expect(rowToTokenResult(row({ mint: 'b', market: { source: 'geckoterminal' } })).freshness).toBe('indexed');
+    expect(rowToTokenResult(row({ mint: 'c', market: { source: 'dexscreener' } })).freshness).toBe('indexed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Universe ("All")
+// ---------------------------------------------------------------------------
+
+function fixture(rel: string): unknown {
+  return JSON.parse(readFileSync(path.join(process.cwd(), 'tests/fixtures', rel), 'utf8'));
+}
+
+const WSOL = 'So11111111111111111111111111111111111111112';
+const JUP = 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN';
+
+function okEntry(rows: TokenRow[], source: ProviderId, extra: Partial<UniverseEntry> = {}): UniverseEntry {
+  return { status: 'ok', rows, fetchedAt: NOW, source, window: '1h', failures: 0, ...extra };
+}
+
+const J_TREND: UniverseSourceDef = { id: 'jup-trending', provider: 'jupiter', label: 'Jupiter trending', refreshMs: 30_000, windowed: true };
+const J_NEW: UniverseSourceDef = { id: 'jup-new', provider: 'jupiter', label: 'Jupiter recent', refreshMs: 30_000, windowed: false };
+const G_VOL: UniverseSourceDef = { id: 'gt-vol-1', provider: 'geckoterminal', label: 'GeckoTerminal top volume p1', refreshMs: 60_000, windowed: false };
+const D_PROMO: UniverseSourceDef = { id: 'ds-promoted', provider: 'dexscreener', label: 'DEX Screener promoted', refreshMs: 60_000, windowed: false };
+const DEFS: UniverseSourceDef[] = [J_TREND, J_NEW, G_VOL, D_PROMO];
+
+describe('mergeRows', () => {
+  const pool = { address: 'p1', dex: 'raydium' as const, dexLabel: 'Raydium' };
+
+  it('fills gaps only, whole stats windows at a time, and keeps the lead source', () => {
+    const primary = row({ mint: 'm', token: { name: 'Primary' }, market: { priceUsd: 1, stats: { h1: { volumeUsd: 10, buys: 1, sells: 2 } } } });
+    const secondary = row({
+      mint: 'm',
+      token: { name: 'Other', image: 'https://img.example/x.png' },
+      market: { source: 'geckoterminal', priceUsd: 2, liquidityUsd: 500, stats: { h1: { volumeUsd: 99, traders: 7 }, h24: { volumeUsd: 1_000 } } },
+      pool,
+      risk: { top10Pct: 12 },
+    });
+    const out = mergeRows(primary, secondary);
+    expect(out.token.name).toBe('Primary');
+    expect(out.token.image).toBe('https://img.example/x.png');
+    expect(out.market.priceUsd).toBe(1);
+    expect(out.market.liquidityUsd).toBe(500);
+    expect(out.market.stats.h1).toEqual({ volumeUsd: 10, buys: 1, sells: 2 });
+    expect(out.market.stats.h24).toEqual({ volumeUsd: 1_000 });
+    expect(out.market.source).toBe('jupiter');
+    expect(out.pool).toEqual(pool);
+    expect(out.risk).toEqual({ top10Pct: 12 });
+    expect(primary.market.liquidityUsd).toBeUndefined();
+  });
+
+  it('returns the primary object when nothing is filled or the mints differ', () => {
+    const full = row({ mint: 'm', market: { priceUsd: 1, liquidityUsd: 5 }, pool });
+    expect(mergeRows(full, row({ mint: 'm', market: { priceUsd: 9 } }))).toBe(full);
+    expect(mergeRows(full, row({ mint: 'x', market: { holders: 10 } }))).toBe(full);
+  });
+});
+
+describe('mergeUniverse', () => {
+  const entries = (): UniverseEntries => ({
+    'jup-trending': okEntry([row({ mint: 'a', rank: 1 }), row({ mint: 'b', rank: 2 })], 'jupiter'),
+    'gt-vol-1': okEntry(
+      [row({ mint: 'c', market: { source: 'geckoterminal', liquidityUsd: 7 } }), row({ mint: 'a', market: { source: 'geckoterminal', liquidityUsd: 5 } })],
+      'geckoterminal',
+    ),
+    'ds-promoted': okEntry([row({ mint: 'd', market: { source: 'dexscreener' } }), row({ mint: 'c', market: { source: 'dexscreener', holders: 40 } })], 'dexscreener'),
+  });
+
+  it('unions every source by mint in source order, richest source leading', () => {
+    const { rows, contributors } = mergeUniverse(entries(), DEFS);
+    expect(mints(rows)).toEqual(['a', 'b', 'c', 'd']);
+    expect(rows.map((r) => r.rank)).toEqual([1, 2, 3, 4]);
+    expect(rows[0]?.market.source).toBe('jupiter');
+    expect(rows[0]?.market.liquidityUsd).toBe(5);
+    expect(rows[2]?.market.source).toBe('geckoterminal');
+    expect(rows[2]?.market.holders).toBe(40);
+    expect(contributors).toEqual(['jupiter', 'geckoterminal', 'dexscreener']);
+  });
+
+  it('lets a richer source lead a mint first listed by a weaker one', () => {
+    const e: UniverseEntries = {
+      'jup-new': okEntry([row({ mint: 'y' }), row({ mint: 'z', market: { priceUsd: 1 } })], 'jupiter'),
+      'ds-promoted': okEntry([row({ mint: 'z', market: { source: 'dexscreener', priceUsd: 2, liquidityUsd: 9 } })], 'dexscreener'),
+    };
+    const promoFirst: UniverseSourceDef[] = [D_PROMO, J_NEW];
+    const [z, y] = mergeUniverse(e, promoFirst).rows;
+    expect(z?.token.mint).toBe('z');
+    expect(z?.market.source).toBe('jupiter');
+    expect(z?.market.priceUsd).toBe(1);
+    expect(z?.market.liquidityUsd).toBe(9);
+    expect(y?.rank).toBe(2);
+  });
+
+  it('keeps row identity for mints whose inputs did not change', () => {
+    const cache: MergeCache = new Map();
+    const e1 = entries();
+    const first = mergeUniverse(e1, DEFS, cache).rows;
+    const e2: UniverseEntries = { ...e1, 'ds-promoted': okEntry([row({ mint: 'd', market: { source: 'dexscreener', priceUsd: 3 } })], 'dexscreener') };
+    const second = mergeUniverse(e2, DEFS, cache).rows;
+    expect(second[0]).toBe(first[0]);
+    expect(second[1]).toBe(first[1]);
+    expect(second[2]).not.toBe(first[2]); // c lost its DEX Screener input
+    expect(second[3]?.market.priceUsd).toBe(3);
+    const third = mergeUniverse({ 'jup-trending': e1['jup-trending'] }, DEFS, cache).rows;
+    expect(third[1]).toBe(first[1]); // b only ever came from Jupiter
+    expect(third[0]).not.toBe(first[0]); // a lost its GeckoTerminal fill
+    expect(third[0]?.market.liquidityUsd).toBeUndefined();
+    expect([...cache.keys()].sort()).toEqual(['a', 'b']);
+  });
+
+  it('ignores idle and empty sources', () => {
+    expect(mergeUniverse(emptyEntries(DEFS), DEFS)).toEqual({ rows: [], contributors: [] });
+  });
+
+  it('leaves out SOL and stablecoins (base tokens of GeckoTerminal SOL/USDC-style pools)', () => {
+    const e: UniverseEntries = {
+      'gt-vol-1': okEntry(
+        [row({ mint: MINTS.SOL, market: { source: 'geckoterminal' } }), row({ mint: 'meme', market: { source: 'geckoterminal' } }), row({ mint: MINTS.USDC })],
+        'geckoterminal',
+      ),
+    };
+    const { rows } = mergeUniverse(e, DEFS);
+    expect(mints(rows)).toEqual(['meme']);
+    expect(rows[0]?.rank).toBe(1);
+  });
+});
+
+describe('excluded mints', () => {
+  it('drops SOL and stablecoins from a ranked list and renumbers ranks', () => {
+    const list = sourced([row({ mint: MINTS.SOL, rank: 1 }), row({ mint: 'a', rank: 2 }), row({ mint: MINTS.USDT, rank: 3 }), row({ mint: 'b', rank: 4 })], 'geckoterminal');
+    const out = withoutExcluded(list);
+    expect(mints(out.data)).toEqual(['a', 'b']);
+    expect(out.data.map((r) => r.rank)).toEqual([1, 2]);
+    const clean = sourced([row({ mint: 'a', rank: 1 })], 'jupiter');
+    expect(withoutExcluded(clean)).toBe(clean);
+    expect(isExcludedMint('Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB')).toBe(true);
+    expect(isExcludedMint('a')).toBe(false);
+  });
+
+  it('filters every step of a named list, falling back when only excluded tokens came back', async () => {
+    const jupiter = discovery('jupiter', async () => sourced([row({ mint: MINTS.USDC, rank: 1 })], 'jupiter'));
+    const gecko = discovery('geckoterminal', async () => sourced([row({ mint: MINTS.SOL, rank: 1 }), row({ mint: 'g', rank: 2 })], 'geckoterminal'));
+    const result = await loadDiscoverList({ jupiter, gecko }, 'top', '24h');
+    expect(result.source).toBe('geckoterminal');
+    expect(mints(result.data)).toEqual(['g']);
+    expect(result.data[0]?.rank).toBe(1);
+  });
+});
+
+describe('dueAt / pickNext', () => {
+  const spacing = { jupiter: 3_000, geckoterminal: 10_000, dexscreener: 0 };
+  const defs = [J_TREND, J_NEW, G_VOL];
+  const clock = (): ProviderClock => ({ lastStartAt: {}, inflight: {} });
+
+  it('computes when a source is due', () => {
+    const loaded = okEntry([], 'jupiter');
+    expect(dueAt(J_TREND, { status: 'idle', rows: [], failures: 0 }, '1h')).toBe(0);
+    expect(dueAt(J_TREND, loaded, '1h')).toBe(NOW + 30_000);
+    expect(dueAt(J_TREND, loaded, '5m')).toBe(0); // windowed list, new window
+    expect(dueAt(J_NEW, loaded, '5m')).toBe(NOW + 30_000);
+    expect(dueAt(J_TREND, { ...loaded, status: 'loading' }, '1h')).toBeUndefined();
+    expect(dueAt(J_TREND, { ...loaded, retryAt: NOW + 90_000 }, '1h')).toBe(NOW + 90_000);
+  });
+
+  it('runs one call per provider, spaced, never-fetched sources first', () => {
+    const c = clock();
+    let entries = emptyEntries(defs);
+    expect(pickNext(defs, entries, NOW, '1h', c, spacing).task?.id).toBe('jup-trending');
+    c.inflight.jupiter = 1;
+    c.lastStartAt.jupiter = NOW;
+    expect(pickNext(defs, entries, NOW, '1h', c, spacing).task?.id).toBe('gt-vol-1');
+    c.inflight.geckoterminal = 1;
+    c.lastStartAt.geckoterminal = NOW;
+    expect(pickNext(defs, entries, NOW, '1h', c, spacing)).toEqual({});
+    c.inflight.jupiter = 0;
+    entries = { ...entries, 'jup-trending': okEntry([], 'jupiter') };
+    expect(pickNext(defs, entries, NOW + 1_000, '1h', c, spacing)).toEqual({ waitMs: 2_000 });
+    expect(pickNext(defs, entries, NOW + 3_000, '1h', c, spacing).task?.id).toBe('jup-new');
+  });
+
+  it('prefers a first load over a due refresh', () => {
+    const entries: UniverseEntries = { 'jup-trending': okEntry([], 'jupiter', { fetchedAt: NOW - 60_000 }) };
+    expect(pickNext(defs, entries, NOW, '1h', clock(), spacing).task?.id).toBe('jup-new');
+  });
+
+  it('refreshes the most overdue source first so sources listed last never starve', () => {
+    const entries: UniverseEntries = {
+      'jup-trending': okEntry([], 'jupiter', { fetchedAt: NOW - 31_000 }), // due 1 s ago
+      'jup-new': okEntry([], 'jupiter', { fetchedAt: NOW - 50_000 }), // due 20 s ago
+      'gt-vol-1': okEntry([], 'geckoterminal', { fetchedAt: NOW }),
+    };
+    expect(pickNext(defs, entries, NOW, '1h', clock(), spacing).task?.id).toBe('jup-new');
+    // A window change makes windowed lists due immediately, ahead of any refresh.
+    expect(pickNext(defs, entries, NOW, '5m', clock(), spacing).task?.id).toBe('jup-trending');
+  });
+
+  it('waits out a provider cooldown', () => {
+    const entries: UniverseEntries = { 'gt-vol-1': okEntry([], 'geckoterminal') };
+    expect(pickNext(defs, entries, NOW, '1h', clock(), spacing, (p) => p === 'jupiter')).toEqual({ waitMs: COOLDOWN_RECHECK_MS });
+  });
+
+  it('backs off exponentially up to two minutes', () => {
+    expect([1, 2, 3, 4, 10].map(universeBackoffMs)).toEqual([20_000, 40_000, 80_000, 120_000, 120_000]);
+  });
+
+  it('declares every default source once, spaced within the keyless budgets', () => {
+    const ids = UNIVERSE_SOURCES.map((d) => d.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Jupiter ≤ 4 per 10 s per browser (shared with Ultra and the SOL price); GeckoTerminal ≤ 8 per minute,
+    // of which the universe uses at most half so the token page opened next still has budget.
+    expect(Math.floor(10_000 / UNIVERSE_SPACING_MS.jupiter) + 1).toBeLessThanOrEqual(3);
+    expect(Math.floor(60_000 / UNIVERSE_SPACING_MS.geckoterminal) + 1).toBeLessThanOrEqual(5);
+    // Steady-state GeckoTerminal demand fits the spacing (calls per minute).
+    const geckoDemand = UNIVERSE_SOURCES.filter((d) => d.provider === 'geckoterminal').reduce((n, d) => n + 60_000 / d.refreshMs, 0);
+    expect(geckoDemand).toBeLessThanOrEqual(60_000 / UNIVERSE_SPACING_MS.geckoterminal);
+  });
+});
+
+describe('createUniverseLoader', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ now: NOW });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  type Deferred = { resolve: (v: Sourced<TokenRow[]>) => void; reject: (e: unknown) => void };
+
+  function setup(defs: readonly UniverseSourceDef[]) {
+    const pending = new Map<string, Deferred>();
+    const calls: { id: string; window: string }[] = [];
+    const loader = createUniverseLoader({
+      defs,
+      window: '1h',
+      spacing: { jupiter: 1_000, geckoterminal: 5_000, dexscreener: 0 },
+      backoffMs: () => 20_000,
+      fetch: (def, window, signal) =>
+        new Promise<Sourced<TokenRow[]>>((resolve, reject) => {
+          calls.push({ id: def.id, window });
+          pending.set(def.id, { resolve, reject });
+          signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        }),
+    });
+    const settle = async (id: string, outcome: TokenRow[] | Error, source: ProviderId = 'jupiter') => {
+      const d = pending.get(id);
+      if (!d) throw new Error(`no pending call for ${id}`);
+      pending.delete(id);
+      if (outcome instanceof Error) d.reject(outcome);
+      else d.resolve({ data: outcome, source, fetchedAt: Date.now(), freshness: 'fast' });
+      await vi.advanceTimersByTimeAsync(0);
+    };
+    return { loader, calls, settle };
+  }
+
+  it('publishes partial results, spaces calls per provider and keeps rows when a refresh fails', async () => {
+    const jTop: UniverseSourceDef = { ...J_NEW, id: 'jup-top', label: 'Jupiter top traded' };
+    const defs = [J_TREND, jTop, G_VOL];
+    const { loader, calls, settle } = setup(defs);
+    let emits = 0;
+    loader.subscribe(() => emits++);
+    loader.start();
+    expect(calls.map((c) => c.id)).toEqual(['jup-trending', 'gt-vol-1']);
+    expect(loader.getSnapshot()).toMatchObject({ settling: true, running: true, rows: [] });
+
+    await settle('gt-vol-1', [row({ mint: 'c', market: { source: 'geckoterminal' } })], 'geckoterminal');
+    expect(mints(loader.getSnapshot().rows)).toEqual(['c']);
+
+    await settle('jup-trending', [row({ mint: 'a' }), row({ mint: 'b' })]);
+    expect(mints(loader.getSnapshot().rows)).toEqual(['a', 'b', 'c']);
+    expect(calls).toHaveLength(2); // jup-top waits for the Jupiter spacing
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(calls.map((c) => c.id)).toEqual(['jup-trending', 'gt-vol-1', 'jup-top']);
+
+    await settle('jup-top', new ProviderError('jupiter', 'rate_limited', 'jupiter: HTTP 429'));
+    let snap = loader.getSnapshot();
+    expect(snap.settling).toBe(false);
+    expect(snap.entries['jup-top']).toMatchObject({ status: 'error', failures: 1, retryAt: NOW + 1_000 + 20_000 });
+    expect(summarizeUniverse(snap, defs).errors).toEqual(['Jupiter top traded: rate limited']);
+
+    // The failed source retries after its backoff.
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(calls.filter((c) => c.id === 'jup-top')).toHaveLength(2);
+    await settle('jup-top', [row({ mint: 'e' })]);
+    expect(mints(loader.getSnapshot().rows)).toEqual(['a', 'b', 'e', 'c']);
+
+    // jup-trending refreshes 30 s after its answer; that failure keeps its rows on screen.
+    await vi.advanceTimersByTimeAsync(8_999);
+    expect(calls.filter((c) => c.id === 'jup-trending')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(calls.filter((c) => c.id === 'jup-trending')).toHaveLength(2);
+    await settle('jup-trending', new ProviderError('jupiter', 'timeout', 'x'));
+    snap = loader.getSnapshot();
+    expect(mints(snap.rows)).toEqual(['a', 'b', 'e', 'c']);
+    expect(snap.entries['jup-trending']?.status).toBe('error');
+    expect(summarizeUniverse(snap, defs).providers.find((p) => p.provider === 'jupiter')?.stale).toBe(1);
+    expect(emits).toBeGreaterThan(3);
+    loader.stop();
+  });
+
+  it('refetches windowed lists on a window change, and pauses without losing rows', async () => {
+    const { loader, calls, settle } = setup([J_TREND, G_VOL]);
+    loader.start();
+    await settle('jup-trending', [row({ mint: 'a' })]);
+    await settle('gt-vol-1', [row({ mint: 'g', market: { source: 'geckoterminal' } })], 'geckoterminal');
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    loader.setWindow('5m');
+    expect(calls.at(-1)).toEqual({ id: 'jup-trending', window: '5m' });
+    expect(calls.filter((c) => c.id === 'gt-vol-1')).toHaveLength(1);
+
+    loader.stop();
+    await vi.advanceTimersByTimeAsync(0);
+    let snap = loader.getSnapshot();
+    expect(snap.running).toBe(false);
+    expect(snap.entries['jup-trending']?.status).toBe('ok'); // aborted, not failed
+    expect(mints(snap.rows)).toEqual(['a', 'g']);
+
+    loader.start();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(calls.at(-1)).toEqual({ id: 'jup-trending', window: '5m' });
+    await settle('jup-trending', [row({ mint: 'a5' })]);
+    snap = loader.getSnapshot();
+    expect(snap.entries['jup-trending']?.window).toBe('5m');
+    expect(mints(snap.rows)).toEqual(['a5', 'g']);
+    loader.stop();
+  });
+
+  it('retries failing sources immediately on demand', async () => {
+    const { loader, calls, settle } = setup([G_VOL]);
+    loader.start();
+    await settle('gt-vol-1', new ProviderError('geckoterminal', 'rate_limited', 'x'), 'geckoterminal');
+    expect(summarizeUniverse(loader.getSnapshot(), [G_VOL]).allFailed).toBe(true);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(calls).toHaveLength(1);
+    loader.retry();
+    expect(calls).toHaveLength(2);
+    loader.stop();
+  });
+
+  it('keeps a failing source failing while it retries and when a retry is aborted', async () => {
+    const { loader, calls, settle } = setup([G_VOL]);
+    loader.start();
+    await settle('gt-vol-1', new ProviderError('geckoterminal', 'rate_limited', 'geckoterminal: HTTP 429'), 'geckoterminal');
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(calls).toHaveLength(2); // retry in flight
+    let s = summarizeUniverse(loader.getSnapshot(), [G_VOL]);
+    expect(s).toMatchObject({ failing: 1, pending: 0, allFailed: true });
+    expect(s.errors).toEqual(['GeckoTerminal top volume p1: rate limited']);
+
+    loader.stop(); // aborts the retry
+    await vi.advanceTimersByTimeAsync(0);
+    expect(loader.getSnapshot().entries['gt-vol-1']?.status).toBe('error');
+    s = summarizeUniverse(loader.getSnapshot(), [G_VOL]);
+    expect(s.allFailed).toBe(true);
+
+    loader.start(); // due again (its retry time has passed) once the provider spacing allows
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(calls).toHaveLength(3);
+    await settle('gt-vol-1', [row({ mint: 'g', market: { source: 'geckoterminal' } })], 'geckoterminal');
+    s = summarizeUniverse(loader.getSnapshot(), [G_VOL]);
+    expect(s).toMatchObject({ failing: 0, sourcesWithData: 1, allFailed: false, errors: [] });
+    loader.stop();
+  });
+});
+
+describe('summarizeUniverse', () => {
+  it('counts ok, stale, pending and failed sources per provider', () => {
+    const entries: UniverseEntries = {
+      'jup-trending': okEntry([row({ mint: 'a' })], 'jupiter'),
+      'jup-new': { ...okEntry([row({ mint: 'b' })], 'jupiter'), status: 'error', error: 'jupiter: rate limited', failures: 1, retryAt: NOW + 20_000 },
+      'gt-vol-1': { status: 'error', rows: [], error: 'geckoterminal: timed out', failures: 2, retryAt: NOW + 40_000 },
+    };
+    const s = summarizeUniverse({ entries, rows: [row({ mint: 'a' }), row({ mint: 'b' })], updatedAt: NOW }, DEFS);
+    expect(s).toMatchObject({ loaded: 2, sourcesTotal: 4, sourcesWithData: 2, pending: 1, failing: 2, allFailed: false, updatedAt: NOW });
+    expect(s.errors).toEqual(['Jupiter recent: rate limited', 'GeckoTerminal top volume p1: timed out']);
+    const byId = Object.fromEntries(s.providers.map((p) => [p.provider, p]));
+    expect(byId.jupiter).toMatchObject({ label: 'Jupiter', total: 2, ok: 1, stale: 1, retryAt: NOW + 20_000 });
+    expect(byId.geckoterminal).toMatchObject({ failed: 1, error: 'GeckoTerminal top volume p1: timed out' });
+    expect(byId.dexscreener).toMatchObject({ pending: 1 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Universe sources (real provider responses captured 2026-09-28)
+// ---------------------------------------------------------------------------
+
+describe('DEX Screener promoted feeds', () => {
+  it('extracts Solana token addresses in feed order without duplicates', () => {
+    const payload = [
+      { chainId: 'solana', tokenAddress: JUP },
+      { chainId: 'ethereum', tokenAddress: '0x0000000000000000000000000000000000000000' },
+      { chainId: 'solana', tokenAddress: ` ${WSOL} ` },
+      { chainId: 'solana', tokenAddress: JUP },
+      { chainId: 'solana', tokenAddress: 'not-an-address' },
+      null,
+    ];
+    expect(parseDexFeed(payload)).toEqual([JUP, WSOL]);
+    expect(parseDexFeed({ pairs: [] })).toEqual([]);
+    expect(parseDexFeed(fixture('dexscreener/token-boosts-top.solana-filtered.json')).length).toBeGreaterThan(0);
+  });
+
+  it('merges the feeds, looks the mints up for real rows and survives a failed feed', async () => {
+    const feeds: Record<string, unknown> = {
+      '/token-boosts/top/v1': fixture('dexscreener/token-boosts-top.solana-filtered.json'),
+      '/token-boosts/latest/v1': fixture('dexscreener/token-boosts-latest.solana-filtered.json'),
+    };
+    const fetcher = (async (_provider: ProviderId, url: string) => {
+      const body = feeds[new URL(url).pathname];
+      if (body === undefined) throw new ProviderError('dexscreener', 'timeout', 'dexscreener: timeout');
+      return body;
+    }) as JsonFetcher;
+    const expected = [...new Set([...parseDexFeed(feeds['/token-boosts/top/v1']), ...parseDexFeed(feeds['/token-boosts/latest/v1'])])];
+    const known = Object.fromEntries(expected.map((m) => [m, row({ mint: m, market: { source: 'dexscreener' } })]));
+    const provider = rowsProvider('dexscreener', known);
+    const result = await loadDexPromoted(fetcher, provider, 'https://api.dexscreener.com/');
+    expect(provider.calls).toEqual([expected]);
+    expect(mints(result.data)).toEqual(expected);
+    expect(result.notes?.[0]).toBe(DEX_PROMOTED_NOTE);
+    expect(result.notes?.[1]).toContain('1 of 3 DEX Screener feeds failed');
+  });
+
+  it('throws when every feed fails', async () => {
+    const fetcher = (async () => {
+      throw new ProviderError('dexscreener', 'rate_limited', 'x');
+    }) as JsonFetcher;
+    await expect(loadDexPromoted(fetcher, rowsProvider('dexscreener', {}), 'https://api.dexscreener.com')).rejects.toBeInstanceOf(ProviderError);
+  });
+});
+
+describe('GeckoTerminal pool pages', () => {
+  it('builds the same URL shapes as the adapter', () => {
+    expect(geckoListPath('pools', 2, 'h24_tx_count_desc')).toBe('/networks/solana/pools?include=base_token,quote_token,dex&sort=h24_tx_count_desc&page=2');
+    expect(geckoListPath('pools', 0)).toBe('/networks/solana/pools?include=base_token,quote_token,dex&sort=h24_volume_usd_desc&page=1');
+    expect(geckoListPath('new_pools', 12)).toBe('/networks/solana/new_pools?include=base_token,quote_token,dex&page=10');
+  });
+
+  it('turns a pool list into one row per base token', () => {
+    for (const file of ['geckoterminal/top_pools_solana_h24_volume.json', 'geckoterminal/new_pools_solana.json']) {
+      const rows = geckoRowsFromList(fixture(file), NOW, 'test');
+      expect(rows.length).toBeGreaterThan(0);
+      expect(new Set(mints(rows)).size).toBe(rows.length);
+      for (const r of rows) {
+        expect(r.market.source).toBe('geckoterminal');
+        expect(r.pool?.address).toBeTruthy();
+      }
+    }
+  });
+
+  it('keeps the SOL-based top pool out of the universe (real response)', () => {
+    const rows = geckoRowsFromList(fixture('geckoterminal/top_pools_solana_h24_volume.json'), NOW, 'test');
+    expect(mints(rows)).toContain(MINTS.SOL);
+    const merged = mergeUniverse({ 'gt-vol-1': okEntry(rows, 'geckoterminal') }, [G_VOL]).rows;
+    expect(mints(merged)).not.toContain(MINTS.SOL);
+    expect(merged).toHaveLength(rows.length - 1);
+  });
+});
+
+describe('enrichmentTarget / mintSetKey', () => {
+  it('enriches what is on screen first, then the top of the full list, capped', () => {
+    const all = ['a', 'b', 'c', 'd', 'e'].map((m) => row({ mint: m }));
+    expect(mints(enrichmentTarget([all[3]!, all[0]!], all, 4))).toEqual(['d', 'a', 'b', 'c']);
+    expect(mints(enrichmentTarget([], all, 2))).toEqual(['a', 'b']);
+  });
+
+  it('keys a mint set independent of order and duplicates', () => {
+    expect(mintSetKey([row({ mint: 'b' }), row({ mint: 'a' }), row({ mint: 'b' })])).toBe('a,b');
+    expect(mintSetKey(undefined)).toBe('');
   });
 });

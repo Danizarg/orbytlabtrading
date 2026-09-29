@@ -2,14 +2,17 @@
 
 import { RotateCw, TriangleAlert } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { cn } from '@/components/ui/cn';
 import type { WalletPnlView } from '@/data/hooks/useWalletPnl';
 import { formatDateTime, formatDuration, formatPct, formatSol, formatUsd } from '@/lib/core/format';
 import { describeError } from '@/lib/net/errors';
-import { PNL_MAX_PAGES, PNL_MORE_PAGES, solToUsd } from '@/lib/services/wallet';
+import { displayUnrealized, PNL_MAX_PAGES, PNL_MORE_PAGES, solToUsd, tradeSplit } from '@/lib/services/wallet';
 import { Dash, StatTile } from './cells';
 import { BTN } from './styles';
 
 const TILES = 7;
+/** Seven tiles on a 2- or 4-column grid: the last one spans the leftover cells so no hairline block shows. */
+const LAST_TILE = 'col-span-2 xl:col-span-1';
 
 function toneOf(n: number | undefined): 'up' | 'down' | 'neutral' {
   if (n === undefined || n === 0) return 'neutral';
@@ -32,7 +35,7 @@ function approxUsd(sol: number | undefined, solPriceUsd: number | undefined): st
  * says exactly how much history the numbers are based on.
  */
 export function PnlSummary({ pnl }: { pnl: WalletPnlView }) {
-  const { report, coverage, solPriceUsd, analyzing, canAnalyzeMore, analyzeMore, pagesLoaded, target, pricedOpen, openPositions, activity } = pnl;
+  const { report, coverage, solPriceUsd, analyzing, canAnalyzeMore, analyzeMore, moreFailed, retryMore, pagesLoaded, target, positions, activity } = pnl;
   const { infinite } = activity;
   const usdNote = solPriceUsd !== undefined ? `at the current SOL price (${formatUsd(solPriceUsd, { compact: false })})` : 'SOL price unavailable';
 
@@ -48,15 +51,22 @@ export function PnlSummary({ pnl }: { pnl: WalletPnlView }) {
         </div>
       );
     }
+    // Same geometry as the loaded strip (tiles + coverage line) so nothing shifts when data lands.
     return (
-      <div aria-busy="true" aria-label="Loading PnL" className="grid shrink-0 grid-cols-2 gap-px border-b border-line bg-line sm:grid-cols-4 xl:grid-cols-7">
-        {Array.from({ length: TILES }, (_, i) => (
-          <div key={i} className="flex flex-col gap-1.5 bg-panel px-3 py-2">
-            <Skeleton className="h-2 w-12" />
-            <Skeleton className="h-3.5 w-20" />
-            <Skeleton className="h-2 w-14" />
-          </div>
-        ))}
+      <div aria-busy="true" aria-label="Loading PnL" className="shrink-0 border-b border-line">
+        <div className="grid grid-cols-2 gap-px bg-line sm:grid-cols-4 xl:grid-cols-7">
+          {Array.from({ length: TILES }, (_, i) => (
+            <div key={i} className={cn('flex flex-col gap-1.5 bg-panel px-3 py-2', i === TILES - 1 && LAST_TILE)}>
+              <Skeleton className="h-2 w-12" />
+              <Skeleton className="h-3.5 w-20" />
+              <Skeleton className="h-2 w-14" />
+            </div>
+          ))}
+        </div>
+        <div className="flex h-7 items-center gap-2 border-t border-line bg-panel px-3 text-2xs text-muted">
+          <RotateCw aria-hidden className="size-3 motion-safe:animate-spin" strokeWidth={1.75} />
+          Reading wallet history
+        </div>
       </div>
     );
   }
@@ -64,6 +74,10 @@ export function PnlSummary({ pnl }: { pnl: WalletPnlView }) {
   const { totals, window } = report;
   const winners = totals.winners;
   const losers = totals.losers;
+  // Closed positions add an exact 0, so a total over zero valued open positions would read "0 SOL" for an unknown.
+  const unrealized = displayUnrealized(report);
+  const { open, valued } = positions;
+  const split = tradeSplit(report);
 
   return (
     <div className="shrink-0 border-b border-line">
@@ -77,16 +91,18 @@ export function PnlSummary({ pnl }: { pnl: WalletPnlView }) {
         />
         <StatTile
           label="Unrealized"
-          value={totals.unrealizedSol === undefined ? <Dash /> : signedSol(totals.unrealizedSol)}
+          value={unrealized === undefined ? <Dash /> : signedSol(unrealized)}
           sub={
-            totals.unrealizedSol === undefined
-              ? openPositions > 0
-                ? `${pricedOpen}/${openPositions} open priced`
+            unrealized === undefined
+              ? open > 0
+                ? `0/${open} open valued`
                 : 'no open positions'
-              : `${approxUsd(totals.unrealizedSol, solPriceUsd) ?? 'USD unavailable'}${openPositions > pricedOpen ? ` · ${pricedOpen}/${openPositions} priced` : ''}`
+              : open === 0
+                ? 'no open positions'
+                : `${approxUsd(unrealized, solPriceUsd) ?? 'USD unavailable'}${open > valued ? ` · ${valued}/${open} valued` : ''}`
           }
-          tone={toneOf(totals.unrealizedSol)}
-          title={`Open positions at current Jupiter prices ÷ SOL price · USD ${usdNote}`}
+          tone={toneOf(unrealized)}
+          title={`Open positions at current Jupiter prices ÷ SOL price; a position needs a current price and a known cost to be valued · USD ${usdNote}`}
         />
         <StatTile
           label="Win rate"
@@ -105,13 +121,14 @@ export function PnlSummary({ pnl }: { pnl: WalletPnlView }) {
           }
           sub={`${report.tokens.length} token${report.tokens.length === 1 ? '' : 's'} traded`}
         />
-        <StatTile label="Trades" value={totals.trades} sub={`${window.swapsCounted} buys/sells counted`} />
+        <StatTile label="Trades" value={totals.trades} sub={`${split.buys} buys · ${split.sells} sells`} title="SOL-denominated buys and sells counted by the PnL" />
         <StatTile label="Volume" value={formatSol(totals.volumeSol)} sub={approxUsd(totals.volumeSol, solPriceUsd) ?? 'USD unavailable'} title={`SOL moved through buys and sells · USD ${usdNote}`} />
         <StatTile
           label="Avg hold"
           value={totals.avgHoldSeconds === undefined ? <Dash /> : formatDuration(totals.avgHoldSeconds)}
           sub="FIFO matched sells"
           title="Average holding time of sold units, matched FIFO"
+          className={LAST_TILE}
         />
       </div>
 
@@ -144,10 +161,16 @@ export function PnlSummary({ pnl }: { pnl: WalletPnlView }) {
               <RotateCw aria-hidden className="size-3 motion-safe:animate-spin" strokeWidth={1.75} />
               Analyzing · page {pagesLoaded + 1} of {target}
             </span>
-          ) : infinite.isError ? (
-            <span className="text-warn" title={describeError(infinite.error)}>
-              Fetching more history failed
-            </span>
+          ) : moreFailed ? (
+            <>
+              <span className="inline-flex items-center gap-1 text-warn" title={describeError(infinite.error)}>
+                <TriangleAlert aria-hidden className="size-3" strokeWidth={1.75} />
+                Page {pagesLoaded + 1} failed · {describeError(infinite.error)}
+              </span>
+              <button type="button" onClick={retryMore} disabled={infinite.isFetchingNextPage} className={BTN}>
+                <RotateCw aria-hidden className={cn('size-3', infinite.isFetchingNextPage && 'motion-safe:animate-spin')} strokeWidth={1.75} /> Retry
+              </button>
+            </>
           ) : null}
           {canAnalyzeMore && !analyzing && (
             <button type="button" onClick={analyzeMore} className={BTN} title={`Load ${PNL_MORE_PAGES} more pages (up to ${PNL_MAX_PAGES})`}>

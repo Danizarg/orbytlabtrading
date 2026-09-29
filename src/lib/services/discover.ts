@@ -18,7 +18,7 @@ import {
   type TokenDiscoveryProvider,
   type TokenRowsProvider,
 } from '@/lib/core/providers';
-import { isSolanaAddress } from '@/lib/core/solana';
+import { isSolanaAddress, MINTS } from '@/lib/core/solana';
 import type { Freshness, LaunchStage, LaunchpadState, Sourced, StatWindow, TokenRow, WindowStats } from '@/lib/core/types';
 import { describeError, isAbortError, isProviderError } from '@/lib/net/errors';
 import type { JsonFetcher } from '@/lib/net/types';
@@ -403,6 +403,34 @@ export interface DiscoverSources {
   gecko?: TokenDiscoveryProvider | null;
 }
 
+/**
+ * SOL and USD stablecoins are quote assets, not Discover tokens. Jupiter's
+ * lists already drop them, but GeckoTerminal's network-wide pool lists lead
+ * with SOL/USDC-style pools whose base token is SOL or a stablecoin.
+ */
+export const DISCOVER_EXCLUDED_MINTS: ReadonlySet<string> = new Set([
+  MINTS.SOL,
+  MINTS.USDC,
+  MINTS.USDT,
+  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT (canonical SPL mint)
+  '2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo', // PYUSD
+  '2u1tszSeqZ3qBWF3uNGPFc8TzMk2tdiwknnRMWGWjGWH', // USDG
+  'USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB', // USD1
+]);
+
+export function isExcludedMint(mint: string): boolean {
+  return DISCOVER_EXCLUDED_MINTS.has(mint);
+}
+
+/** Drop excluded mints from a ranked list, renumbering ranks so they stay contiguous. */
+export function withoutExcluded(result: Sourced<TokenRow[]>): Sourced<TokenRow[]> {
+  if (!result.data.some((r) => isExcludedMint(r.token.mint))) return result;
+  const data = result.data
+    .filter((r) => !isExcludedMint(r.token.mint))
+    .map((r, i) => (r.rank === undefined || r.rank === i + 1 ? r : { ...r, rank: i + 1 }));
+  return { ...result, data };
+}
+
 /** The upstream list behind a tab (gainers is a view over trending; `all` has no single upstream list). */
 export function baseListOf(list: DiscoverListKey): DiscoverList {
   return list === 'gainers' || list === 'all' ? 'trending' : list;
@@ -426,9 +454,9 @@ export function loadDiscoverList(
   return runChain<TokenRow[]>(
     `discover ${list}`,
     [
-      server && { id: server.id, run: () => server.discover(query, signal) },
-      { id: jupiter.id, run: () => jupiter.discover(query, signal) },
-      gecko && list !== 'organic' && { id: gecko.id, run: () => gecko.discover(query, signal) },
+      server && { id: server.id, run: () => server.discover(query, signal).then(withoutExcluded) },
+      { id: jupiter.id, run: () => jupiter.discover(query, signal).then(withoutExcluded) },
+      gecko && list !== 'organic' && { id: gecko.id, run: () => gecko.discover(query, signal).then(withoutExcluded) },
     ],
     { signal, accept: (r) => r.data.length > 0 },
   );
@@ -587,7 +615,10 @@ export function enrichRow(row: TokenRow, e: RowEnrichment | undefined): TokenRow
       const lp = token.launchpad;
       if (!lp || lp.stage === 'unknown') {
         // Jupiter reports curve progress only for launchpad tokens; 100 means graduated.
-        const next: LaunchpadState = p >= 100 ? { stage: 'graduated' } : { stage: 'bonding', progressPct: p, progressSource: 'jupiter' };
+        // A known launchpad name (stage still unknown) is kept.
+        const known: Pick<LaunchpadState, 'launchpad'> = lp?.launchpad ? { launchpad: lp.launchpad } : {};
+        const next: LaunchpadState =
+          p >= 100 ? { ...known, stage: 'graduated' } : { ...known, stage: 'bonding', progressPct: p, progressSource: 'jupiter' };
         token = { ...token, launchpad: next };
       } else if (lp.stage === 'bonding' && lp.progressPct === undefined) {
         token = { ...token, launchpad: { ...lp, progressPct: p, progressSource: 'jupiter' } };
@@ -602,9 +633,24 @@ export function enrichRow(row: TokenRow, e: RowEnrichment | undefined): TokenRow
   return out;
 }
 
+/**
+ * Per-row memo: the enrichment cache hands out the same Ultra / DEX Screener
+ * objects until it refetches them, so an unchanged (row, ultra, dex) triple
+ * maps to the same output object and memoized table rows skip re-rendering.
+ */
+const enrichMemo = new WeakMap<TokenRow, { ultra?: JupiterUltraInfo; dex?: TokenRow; out: TokenRow }>();
+
 export function enrichRows(rows: readonly TokenRow[], snapshot: EnrichmentSnapshot | undefined): TokenRow[] {
   if (!snapshot) return [...rows];
-  return rows.map((row) => enrichRow(row, snapshot.byMint[row.token.mint]));
+  return rows.map((row) => {
+    const e = snapshot.byMint[row.token.mint];
+    if (!e) return row;
+    const prev = enrichMemo.get(row);
+    if (prev && prev.ultra === e.ultra && prev.dex === e.dex) return prev.out;
+    const out = enrichRow(row, e);
+    enrichMemo.set(row, { ultra: e.ultra, dex: e.dex, out });
+    return out;
+  });
 }
 
 /** Rows that still lack what Ultra supplies (sniper/insider/bundler shares or curve progress). */
@@ -633,8 +679,14 @@ export interface EnrichmentCacheOptions {
   ultraMinGapMs?: number;
   /** Minimum gap between DEX Screener batches. */
   dexMinGapMs?: number;
-  /** Max mints enriched per load. */
+  /** Max mints per Ultra call / DEX Screener batch (one Jupiter Ultra request). */
   maxMints?: number;
+  /**
+   * Cached values older than this are no longer served (the row shows "—"
+   * again): rows that left the enrichment target never display risk shares
+   * from minutes ago as if they were current.
+   */
+  maxServeAgeMs?: number;
   now?: () => number;
 }
 
@@ -678,6 +730,7 @@ export function createEnrichmentCache(fetchers: EnrichmentFetchers, opts: Enrich
   const ultraGap = opts.ultraMinGapMs ?? 30_000;
   const dexGap = opts.dexMinGapMs ?? 10_000;
   const maxMints = opts.maxMints ?? 100;
+  const maxServeAge = opts.maxServeAgeMs ?? ttl * 5;
   const now = opts.now ?? Date.now;
 
   const ultra = new Map<string, Entry<JupiterUltraInfo>>();
@@ -691,12 +744,21 @@ export function createEnrichmentCache(fetchers: EnrichmentFetchers, opts: Enrich
   const listeners = new Set<() => void>();
   let revisionCount = 0;
 
+  function served<T>(entry: Entry<T> | undefined, t: number): T | undefined {
+    return entry && t - entry.at <= maxServeAge ? entry.value : undefined;
+  }
+
+  /**
+   * Cached data for every row (not only the fetch cap): a sorted or filtered
+   * view enriches rows deep in the unsorted list, and those must render too.
+   */
   function snapshot(rows: readonly TokenRow[]): EnrichmentSnapshot {
     const byMint: Record<string, RowEnrichment> = {};
-    for (const row of rows.slice(0, maxMints)) {
+    const t = now();
+    for (const row of rows) {
       const mint = row.token.mint;
-      const u = ultra.get(mint)?.value;
-      const d = dex.get(mint)?.value;
+      const u = served(ultra.get(mint), t);
+      const d = served(dex.get(mint), t);
       if (u || d) byMint[mint] = { ...(u ? { ultra: u } : {}), ...(d ? { dex: d } : {}) };
     }
     return {
@@ -715,26 +777,33 @@ export function createEnrichmentCache(fetchers: EnrichmentFetchers, opts: Enrich
   }
 
   function prune(t: number) {
-    const maxAge = ttl * 10;
     for (const map of [ultra, dex] as Map<string, Entry<unknown>>[]) {
       if (map.size < 1_000) continue;
-      for (const [mint, entry] of map) if (t - entry.at > maxAge) map.delete(mint);
+      for (const [mint, entry] of map) if (t - entry.at > maxServeAge) map.delete(mint);
     }
   }
 
+  /**
+   * Mints to request in one call (≤ maxMints): never-fetched mints first, then
+   * stale ones, each in row order. A target longer than one call is covered
+   * over successive calls instead of starving everything past the first batch.
+   */
   function due<T>(map: Map<string, Entry<T>>, mints: string[], t: number): string[] {
-    return mints.filter((m) => {
+    const fresh: string[] = [];
+    const stale: string[] = [];
+    for (const m of mints) {
       const entry = map.get(m);
-      return !entry || t - entry.at >= ttl;
-    });
+      if (!entry) fresh.push(m);
+      else if (t - entry.at >= ttl) stale.push(m);
+    }
+    return [...fresh, ...stale].slice(0, maxMints);
   }
 
   async function refresh(rows: readonly TokenRow[]): Promise<void> {
     const t = now();
     prune(t);
-    const scoped = rows.slice(0, maxMints);
-    const ultraDue = due(ultra, scoped.filter(needsUltra).map((r) => r.token.mint), t);
-    const dexDue = due(dex, scoped.filter(needsDex).map((r) => r.token.mint), t);
+    const ultraDue = due(ultra, rows.filter(needsUltra).map((r) => r.token.mint), t);
+    const dexDue = due(dex, rows.filter(needsDex).map((r) => r.token.mint), t);
     const tasks: Promise<void>[] = [];
 
     if (ultraDue.length && t - lastUltraCall >= ultraGap) {
@@ -828,6 +897,24 @@ export function errorLines(error: unknown): string[] {
 }
 
 const GECKO_IDS: ReadonlySet<ProviderId> = new Set<ProviderId>(['geckoterminal', 'coingecko']);
+const INDEXED_ROW_SOURCES: ReadonlySet<ProviderId> = new Set<ProviderId>(['geckoterminal', 'coingecko', 'dexscreener']);
+
+/**
+ * A Discover row as a token-page row result, used to seed the token page's
+ * cache on hover so its header paints instantly with the row already on
+ * screen (no request). It keeps the row's real fetch time and source, so the
+ * token page shows its true age and refetches it on mount once stale.
+ */
+export function rowToTokenResult(row: TokenRow): ChainResult<TokenRow> {
+  const source = row.market.source;
+  return {
+    data: row,
+    source,
+    fetchedAt: row.market.updatedAt,
+    freshness: INDEXED_ROW_SOURCES.has(source) ? 'indexed' : 'fast',
+    attempts: [{ provider: source, ok: true }],
+  };
+}
 
 /** GeckoTerminal's licence asks for attribution wherever its data is shown. */
 export function showsGeckoData(result: { source: ProviderId; contributors?: ProviderId[] } | undefined, rows?: readonly TokenRow[]): boolean {
@@ -925,27 +1012,29 @@ export const UNIVERSE_SOURCES: readonly UniverseSourceDef[] = [
   { id: 'jup-top', provider: 'jupiter', label: 'Jupiter top traded', refreshMs: 45_000, windowed: true },
   { id: 'jup-organic', provider: 'jupiter', label: 'Jupiter top organic', refreshMs: 60_000, windowed: true },
   { id: 'gt-trending', provider: 'geckoterminal', label: 'GeckoTerminal trending', refreshMs: 60_000, windowed: true },
-  { id: 'gt-vol-1', provider: 'geckoterminal', label: 'GeckoTerminal top volume p1', refreshMs: 120_000, windowed: false },
-  { id: 'gt-vol-2', provider: 'geckoterminal', label: 'GeckoTerminal top volume p2', refreshMs: 120_000, windowed: false },
-  { id: 'gt-vol-3', provider: 'geckoterminal', label: 'GeckoTerminal top volume p3', refreshMs: 120_000, windowed: false },
-  { id: 'gt-tx-1', provider: 'geckoterminal', label: 'GeckoTerminal top transactions p1', refreshMs: 120_000, windowed: false },
-  { id: 'gt-tx-2', provider: 'geckoterminal', label: 'GeckoTerminal top transactions p2', refreshMs: 120_000, windowed: false },
-  { id: 'gt-tx-3', provider: 'geckoterminal', label: 'GeckoTerminal top transactions p3', refreshMs: 120_000, windowed: false },
+  { id: 'gt-vol-1', provider: 'geckoterminal', label: 'GeckoTerminal top volume p1', refreshMs: 180_000, windowed: false },
+  { id: 'gt-vol-2', provider: 'geckoterminal', label: 'GeckoTerminal top volume p2', refreshMs: 180_000, windowed: false },
+  { id: 'gt-vol-3', provider: 'geckoterminal', label: 'GeckoTerminal top volume p3', refreshMs: 180_000, windowed: false },
+  { id: 'gt-tx-1', provider: 'geckoterminal', label: 'GeckoTerminal top transactions p1', refreshMs: 180_000, windowed: false },
+  { id: 'gt-tx-2', provider: 'geckoterminal', label: 'GeckoTerminal top transactions p2', refreshMs: 180_000, windowed: false },
+  { id: 'gt-tx-3', provider: 'geckoterminal', label: 'GeckoTerminal top transactions p3', refreshMs: 180_000, windowed: false },
   { id: 'ds-promoted', provider: 'dexscreener', label: 'DEX Screener promoted', refreshMs: 60_000, windowed: false },
   { id: 'jup-new', provider: 'jupiter', label: 'Jupiter recent', refreshMs: 30_000, windowed: false },
-  { id: 'gt-new-1', provider: 'geckoterminal', label: 'GeckoTerminal new pools p1', refreshMs: 60_000, windowed: false },
-  { id: 'gt-new-2', provider: 'geckoterminal', label: 'GeckoTerminal new pools p2', refreshMs: 60_000, windowed: false },
+  { id: 'gt-new-1', provider: 'geckoterminal', label: 'GeckoTerminal new pools p1', refreshMs: 120_000, windowed: false },
+  { id: 'gt-new-2', provider: 'geckoterminal', label: 'GeckoTerminal new pools p2', refreshMs: 120_000, windowed: false },
 ];
 
 /**
  * Minimum gap between two calls to the same provider from the universe
- * loader. GeckoTerminal keyless is ~8 calls/min per browser (10 s → ≤ 6/min,
- * leaving headroom for its cooldowns); Jupiter is 4 per 10 s shared with the
- * SOL price chip and Ultra enrichment (3.5 s → ≤ 3 per 10 s).
+ * loader. GeckoTerminal keyless is ~8 calls/min per browser: 15 s → ≤ 4/min,
+ * so the token page opened from Discover still finds half of its sliding
+ * one-minute budget free for candles, trades and token info (the GeckoTerminal
+ * cadences above add up to ~4 calls/min). Jupiter is 4 per 10 s shared with
+ * the SOL price chip and Ultra enrichment (3.5 s → ≤ 3 per 10 s).
  */
 export const UNIVERSE_SPACING_MS: Readonly<Record<UniverseProvider, number>> = {
   jupiter: 3_500,
-  geckoterminal: 10_000,
+  geckoterminal: 15_000,
   dexscreener: 1_500,
 };
 
@@ -1166,6 +1255,7 @@ export function mergeUniverse(entries: UniverseEntries, defs: readonly UniverseS
     if (entry.source) contributors.add(entry.source);
     for (const row of entry.rows) {
       const mint = row.token.mint;
+      if (isExcludedMint(mint)) continue;
       const list = inputs.get(mint);
       if (list) list.push(row);
       else {
@@ -1222,8 +1312,9 @@ export interface SchedulePick {
 /**
  * Next source to fetch: one call in flight per provider, provider spacing
  * respected, cooldowns waited out. A source that has never answered beats a
- * refresh so the first paint fills up before anything re-polls; otherwise
- * source order wins.
+ * refresh so the first paint fills up before anything re-polls; among
+ * refreshes the most overdue wins (source order breaks ties), so a provider
+ * running at its spacing limit never starves the sources listed last.
  */
 export function pickNext(
   defs: readonly UniverseSourceDef[],
@@ -1234,7 +1325,7 @@ export function pickNext(
   spacing: Readonly<Record<UniverseProvider, number>> = UNIVERSE_SPACING_MS,
   coolingDown?: (provider: UniverseProvider) => boolean,
 ): SchedulePick {
-  let firstDue: UniverseSourceDef | undefined;
+  let mostOverdue: { def: UniverseSourceDef; due: number } | undefined;
   let firstFresh: UniverseSourceDef | undefined;
   let wait: number | undefined;
   for (const def of defs) {
@@ -1245,7 +1336,7 @@ export function pickNext(
     let at = last === undefined ? due : Math.max(due, last + spacing[def.provider]);
     if (coolingDown?.(def.provider)) at = Math.max(at, now + COOLDOWN_RECHECK_MS);
     if (at <= now) {
-      firstDue ??= def;
+      if (!mostOverdue || due < mostOverdue.due) mostOverdue = { def, due };
       if (entry.fetchedAt === undefined) {
         firstFresh = def;
         break;
@@ -1254,7 +1345,7 @@ export function pickNext(
       wait = wait === undefined ? at - now : Math.min(wait, at - now);
     }
   }
-  const task = firstFresh ?? firstDue;
+  const task = firstFresh ?? mostOverdue?.def;
   if (task) return { task };
   return wait === undefined ? {} : { waitMs: wait };
 }
@@ -1369,8 +1460,9 @@ export function createUniverseLoader(opts: UniverseLoaderOptions): UniverseLoade
         finish(def);
         const prev = entries[def.id] ?? EMPTY_ENTRY;
         if (isAbortError(error) || signal.aborted) {
-          // Paused, not failed: becomes due again when the loader resumes.
-          patch(def.id, { status: prev.fetchedAt !== undefined ? 'ok' : 'idle' });
+          // Paused, not failed: becomes due again when the loader resumes. A source whose
+          // last completed attempt failed stays failing (failures reset only on success).
+          patch(def.id, { status: prev.failures > 0 ? 'error' : prev.fetchedAt !== undefined ? 'ok' : 'idle' });
         } else {
           const failures = prev.failures + 1;
           const retryAfter = isProviderError(error) && error.retryAfterMs ? error.retryAfterMs : 0;
@@ -1462,7 +1554,7 @@ export interface UniverseProviderStatus {
   stale: number;
   /** Sources still waiting for a first answer. */
   pending: number;
-  /** Sources that have never answered and failed. */
+  /** Sources that have never answered and failed (or are retrying after failing). */
   failed: number;
   /** First error line and the earliest retry among failing sources. */
   error?: string;
@@ -1502,14 +1594,18 @@ export function summarizeUniverse(
     p.total++;
     const hasData = e.fetchedAt !== undefined;
     if (hasData) sourcesWithData++;
-    if (e.status === 'error') {
+    // A source retrying after a failure is still failing until it answers
+    // (failures reset only on success), so error states do not flicker away
+    // for the duration of every retry.
+    const retrying = e.status === 'loading' && e.failures > 0;
+    if (e.status === 'error' || retrying) {
       failing++;
       if (hasData) p.stale++;
       else p.failed++;
       const line = `${def.label}: ${(e.error ?? 'failed').replace(/^[a-z][a-z-]*:\s*/i, '')}`;
       if (!errors.includes(line)) errors.push(line);
       p.error ??= line;
-      if (e.retryAt !== undefined && (p.retryAt === undefined || e.retryAt < p.retryAt)) p.retryAt = e.retryAt;
+      if (!retrying && e.retryAt !== undefined && (p.retryAt === undefined || e.retryAt < p.retryAt)) p.retryAt = e.retryAt;
     } else if (hasData) {
       p.ok++;
     } else {
@@ -1538,14 +1634,18 @@ export function mintSetKey(rows: readonly TokenRow[] | undefined): string {
 /** Rows rendered per chunk of the infinite-scroll table. */
 export const ROWS_PER_CHUNK = 60;
 
-/** Mints enriched per view: one Jupiter Ultra batch. */
-export const ENRICH_ROWS = 100;
+/**
+ * Mints kept enriched per view (five table chunks). The cache requests at
+ * most one Ultra batch (100 mints) per 30 s, new mints first, so a longer
+ * target costs no extra calls: it is covered over successive batches.
+ */
+export const ENRICH_ROWS = 300;
 
 /**
  * Which rows to enrich: what is on screen first (top of the sorted, filtered
  * list), then the top of the unfiltered list so a stage / flag filter can
  * still discover rows whose stage or flags only enrichment reveals. Capped at
- * `limit` so it always fits one Ultra call.
+ * `limit`.
  */
 export function enrichmentTarget(visible: readonly TokenRow[], all: readonly TokenRow[], limit = ENRICH_ROWS): TokenRow[] {
   const out: TokenRow[] = [];

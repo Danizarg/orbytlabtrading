@@ -2,21 +2,39 @@ import { describe, expect, it } from 'vitest';
 import { computePnl } from '@/lib/analytics/pnl';
 import { MINTS } from '@/lib/core/solana';
 import type { Portfolio, WalletActivity, WalletActivityPage } from '@/lib/core/types';
+import { ProviderError } from '@/lib/net/errors';
 import {
+  accountHintGapMs,
+  accumulateHead,
   activityCoverage,
   activityMints,
   assemblePnlInput,
+  displayUnrealized,
+  openPositionStats,
+  pricesAsOf,
+  tradeSplit,
   feedMints,
   filterTrackerEntries,
+  holdingPrices,
   identityMints,
   mergeActivityItems,
   mergeTrackerEntries,
+  missingPriceMints,
   nextPnlTarget,
   openPositionMints,
+  pickPrices,
   priceHoldings,
   pricesInSol,
+  countStreamMisses,
+  patchTrackerStatus,
   pruneTrackerEntries,
+  reconcileIntervalMs,
+  retryDelayMs,
   selectMintsToPrice,
+  streamReliable,
+  TRACKER_FAST_POLL_MS,
+  TRACKER_MEDIUM_POLL_MS,
+  TRACKER_POLL_MS,
   signedSol,
   solToUsd,
   staggerMs,
@@ -218,6 +236,39 @@ describe('mergeActivityItems / activityCoverage', () => {
   });
 });
 
+describe('accumulateHead', () => {
+  const at = (sig: string, offset: number) => activity(sig, 'buy', { timestamp: NOW + offset });
+
+  it('keeps items from earlier refreshes instead of replacing them', () => {
+    const page1 = [at('p2', 2), at('p1', 1)];
+    // First refresh: two new transactions on top of page 1.
+    const r1 = accumulateHead({ items: page1 }, { items: [at('n2', 20), at('n1', 10), at('p2', 2)], scanned: 3 }, page1, 3);
+    expect(r1.items.map((a) => a.signature)).toEqual(['n2', 'n1', 'p2', 'p1']);
+    expect(r1.gap).toBeUndefined();
+    // Second refresh only returns the newest 3; n1 and n2 must stay on screen.
+    const r2 = accumulateHead(r1, { items: [at('n4', 40), at('n3', 30), at('n2', 20)], scanned: 3, nextCursor: 'n2' }, page1, 3);
+    expect(r2.items.map((a) => a.signature)).toEqual(['n4', 'n3', 'n2', 'n1', 'p2', 'p1']);
+    expect(r2.gap).toBeUndefined();
+    expect(r2.scanned).toBe(3);
+    expect(r2.nextCursor).toBe('n2');
+  });
+
+  it('flags a possible gap when a full page is entirely newer than everything known, and keeps the flag', () => {
+    const page1 = [at('p1', 1)];
+    const r1 = accumulateHead({ items: page1 }, { items: [at('n9', 90), at('n8', 80), at('n7', 70)], scanned: 3, nextCursor: 'n7' }, page1, 3);
+    expect(r1.gap).toBe(true);
+    const r2 = accumulateHead(r1, { items: [at('n9', 90)], scanned: 1 }, page1, 3);
+    expect(r2.gap).toBe(true);
+    // A short page cannot hide anything in between.
+    expect(accumulateHead({ items: page1 }, { items: [at('n1', 10)], scanned: 1 }, page1, 3).gap).toBeUndefined();
+  });
+
+  it('caps the accumulated list at the newest items', () => {
+    const r = accumulateHead({ items: [at('a', 1), at('b', 2)] }, { items: [at('c', 3)], scanned: 1 }, [], 15, 2);
+    expect(r.items.map((a) => a.signature)).toEqual(['c', 'b']);
+  });
+});
+
 describe('assemblePnlInput', () => {
   it('converts USD prices to SOL, sums scanned signatures and flags incomplete history', () => {
     const pages: WalletActivityPage[] = [
@@ -335,7 +386,166 @@ describe('mergeTrackerEntries', () => {
     expect(walletLive(undefined, { open: true, confirmed: true })).toBe('subscribed');
     expect(walletLive({ streamEvents: 0 }, { open: false, confirmed: false })).toBe('polling');
     expect(walletLive({ streamEvents: 0, backfillError: 'HTTP 500' }, { open: true, confirmed: true })).toBe('error');
-    // A backfill that succeeded before a later poll failed is still live.
+    // A backfill that succeeded before a later poll failed is still live while the WS is.
     expect(walletLive({ streamEvents: 0, backfilledAt: NOW, lastPollAt: NOW, pollError: 'rate limited' }, { open: true, confirmed: true })).toBe('subscribed');
+    // ...but with the WS down and the poll failing nothing is feeding the wallet.
+    expect(walletLive({ streamEvents: 0, backfilledAt: NOW, pollError: 'rate limited' }, { open: false, confirmed: false })).toBe('error');
+    // A successful poll clears the backfill error (the hook reports backfillError: undefined).
+    expect(walletLive({ streamEvents: 0, lastPollAt: NOW }, { open: false, confirmed: false })).toBe('polling');
+    // An open socket whose subscriptions are not confirmed yet is not "subscribed".
+    expect(walletLive({ streamEvents: 0, backfilledAt: NOW }, { open: true, confirmed: false })).toBe('polling');
+    // A confirmed subscription that is missing this wallet's transactions is not trusted either.
+    expect(walletLive({ streamEvents: 0, backfilledAt: NOW, lastMissAt: NOW + 1 }, { open: true, confirmed: true })).toBe('polling');
+    expect(walletLive({ streamEvents: 1, backfilledAt: NOW, lastMissAt: NOW + 1, lastStreamAt: NOW + 2 }, { open: true, confirmed: true })).toBe('subscribed');
+  });
+});
+
+describe('stream reliability and reconciliation cadence', () => {
+  it('trusts the stream only while it is live and has delivered since the last miss', () => {
+    expect(streamReliable(undefined, true)).toBe(true);
+    expect(streamReliable(undefined, false)).toBe(false);
+    expect(streamReliable({ streamEvents: 0, lastMissAt: 10 }, true)).toBe(false);
+    expect(streamReliable({ streamEvents: 1, lastMissAt: 10, lastStreamAt: 5 }, true)).toBe(false);
+    expect(streamReliable({ streamEvents: 2, lastMissAt: 10, lastStreamAt: 11 }, true)).toBe(true);
+    // A balance-change notification after the miss is live evidence too (log notifications may never come).
+    expect(streamReliable({ streamEvents: 0, lastMissAt: 10, lastAccountAt: 12 }, true)).toBe(true);
+    expect(streamReliable({ streamEvents: 0, lastMissAt: 10, lastAccountAt: 9 }, true)).toBe(false);
+    expect(streamReliable({ streamEvents: 0, lastMissAt: 10, lastAccountAt: 12 }, false)).toBe(false);
+  });
+
+  it('coalesces balance-change reads more widely for longer lists', () => {
+    expect(accountHintGapMs(1)).toBe(10_000);
+    expect(accountHintGapMs(5)).toBe(10_000);
+    expect(accountHintGapMs(6)).toBe(15_000);
+    expect(accountHintGapMs(25)).toBe(30_000);
+  });
+
+  it('polls faster only for small lists while the stream is unreliable', () => {
+    expect(reconcileIntervalMs(1, true)).toBe(TRACKER_POLL_MS);
+    expect(reconcileIntervalMs(3, false)).toBe(TRACKER_FAST_POLL_MS);
+    expect(reconcileIntervalMs(5, false)).toBe(TRACKER_FAST_POLL_MS);
+    expect(reconcileIntervalMs(6, false)).toBe(TRACKER_MEDIUM_POLL_MS);
+    expect(reconcileIntervalMs(25, false)).toBe(TRACKER_POLL_MS);
+  });
+
+  it('counts only new, successful, post-subscription transactions as stream misses', () => {
+    const entries = toTrackerEntries(
+      [
+        activity('new', 'buy', { timestamp: NOW + 20_000 }),
+        activity('streamed', 'sell', { timestamp: NOW + 21_000 }),
+        activity('early', 'buy', { timestamp: NOW + 1_000 }),
+        activity('failed', 'buy', { timestamp: NOW + 22_000, success: false }),
+      ],
+      WALLET,
+      'poll',
+      NOW + 30_000,
+    );
+    const known = new Set([trackerKey(WALLET, 'streamed')]);
+    expect(countStreamMisses(entries, NOW + 10_000, (e) => known.has(e.key))).toBe(1);
+    expect(countStreamMisses([], NOW, () => false)).toBe(0);
+  });
+
+  it('patches status fields and clears the ones set to undefined', () => {
+    const base = { streamEvents: 3, backfillError: 'HTTP 503', lastPollAt: 1 };
+    const next = patchTrackerStatus(base, { backfillError: undefined, lastPollAt: 2, missedByStream: 4 });
+    expect(next).toEqual({ streamEvents: 3, lastPollAt: 2, missedByStream: 4 });
+    expect('backfillError' in next).toBe(false);
+    expect(base.backfillError).toBe('HTTP 503');
+    // streamEvents is a counter and never cleared by a patch.
+    expect(patchTrackerStatus(base, { streamEvents: undefined }).streamEvents).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Shared prices and retries
+// ---------------------------------------------------------------------------
+
+describe('price sharing between holdings and PnL', () => {
+  it('exposes only real holding prices and requests only what is missing', () => {
+    const priced = priceHoldings(
+      portfolio([
+        { mint: MINT_A, amount: 10, decimals: 6 },
+        { mint: MINT_B, amount: 5, decimals: 6 },
+      ]),
+      { [MINT_A]: 2 },
+      100,
+    );
+    const known = holdingPrices(priced);
+    expect(known).toEqual({ [MINT_A]: 2 });
+    expect(holdingPrices(undefined)).toEqual({});
+    expect(missingPriceMints([MINT_A, MINT_B, MINT_C], known)).toEqual([MINT_B, MINT_C]);
+    expect(missingPriceMints([MINT_A], { [MINT_A]: 0 })).toEqual([MINT_A]);
+    // MINT_B was already asked for by the holdings and came back unpriced: not requested again.
+    expect(missingPriceMints([MINT_A, MINT_B, MINT_C], known, new Set([MINT_A, MINT_B]))).toEqual([MINT_C]);
+  });
+
+  it('dates a picked price set by its oldest contributing source', () => {
+    const sources = [
+      { prices: { [MINT_A]: 2 }, at: NOW },
+      { prices: { [MINT_A]: 3, [MINT_B]: 4 }, at: NOW - 60_000 },
+    ];
+    expect(pricesAsOf([MINT_A], sources)).toBe(NOW);
+    expect(pricesAsOf([MINT_A, MINT_B], sources)).toBe(NOW - 60_000);
+    expect(pricesAsOf([MINT_C], sources)).toBeUndefined();
+    expect(pricesAsOf([MINT_A], [{ prices: undefined, at: NOW }])).toBeUndefined();
+  });
+
+  it('picks the first positive price per mint and omits unpriced mints', () => {
+    const picked = pickPrices([MINT_A, MINT_B, MINT_C], [{ [MINT_A]: 2, [MINT_B]: 0 }, { [MINT_A]: 3, [MINT_B]: 4 }, undefined]);
+    expect(picked).toEqual({ [MINT_A]: 2, [MINT_B]: 4 });
+    expect(pickPrices([], [{ [MINT_A]: 1 }])).toEqual({});
+  });
+
+  it('feeds shared prices into unrealized PnL without inventing the rest', () => {
+    const pages: WalletActivityPage[] = [{ items: [buy('s2', MINT_B, 10, 1, NOW + 1), buy('s1', MINT_A, 100, 2, NOW)], scanned: 2 }];
+    const open = openPositionMints(computePnl(assemblePnlInput({ wallet: WALLET, pages })));
+    expect(open.sort()).toEqual([MINT_A, MINT_B].sort());
+    const pricesUsd = pickPrices(open, [{ [MINT_A]: 0.05 }]);
+    const report = computePnl(assemblePnlInput({ wallet: WALLET, pages, pricesUsd, solPriceUsd: 100 }));
+    const a = report.tokens.find((t) => t.mint === MINT_A);
+    const b = report.tokens.find((t) => t.mint === MINT_B);
+    expect(a?.unrealizedSol).toBeCloseTo(100 * 0.0005 - 2, 9);
+    expect(b?.unrealizedSol).toBeUndefined();
+    expect(b?.currentPriceSol).toBeUndefined();
+    expect(openPositionStats(report)).toEqual({ open: 2, priced: 1, valued: 1 });
+    expect(displayUnrealized(report)).toBeCloseTo(100 * 0.0005 - 2, 9);
+  });
+
+  it('never shows 0 unrealized when open positions exist but none can be valued', () => {
+    // MINT_A: bought then fully sold (closed, exact 0). MINT_B: part received without a SOL cost, then bought:
+    // priced, but its remaining cost is unknown, so it cannot be valued.
+    const pages: WalletActivityPage[] = [
+      {
+        items: [
+          sell('s2', MINT_A, 10, 2, NOW + 3),
+          buy('s1', MINT_A, 10, 1, NOW + 2),
+          buy('b1', MINT_B, 5, 0.5, NOW + 1),
+          activity('t1', 'transfer_in', { tokenMint: MINT_B, tokenAmount: 5, timestamp: NOW, legs: [{ mint: MINT_B, delta: 5 }] }),
+        ],
+        scanned: 4,
+      },
+    ];
+    const report = computePnl(assemblePnlInput({ wallet: WALLET, pages, pricesUsd: { [MINT_B]: 1 }, solPriceUsd: 100 }));
+    expect(report.totals.unrealizedSol).toBe(0);
+    expect(openPositionStats(report)).toEqual({ open: 1, priced: 1, valued: 0 });
+    expect(displayUnrealized(report)).toBeUndefined();
+    expect(displayUnrealized(undefined)).toBeUndefined();
+    expect(tradeSplit(report)).toEqual({ buys: 2, sells: 1 });
+    // No open positions: the exact 0 of closed positions is shown.
+    const closed = computePnl(assemblePnlInput({ wallet: WALLET, pages: [{ items: [sell('s2', MINT_A, 10, 2, NOW + 2), buy('s1', MINT_A, 10, 1, NOW + 1)], scanned: 2 }] }));
+    expect(displayUnrealized(closed)).toBe(0);
+  });
+});
+
+describe('retryDelayMs', () => {
+  it('waits for the browser budget window on rate limits and backs off otherwise', () => {
+    const limited = new ProviderError('jupiter', 'rate_limited', 'jupiter: request budget exhausted');
+    expect(retryDelayMs(0, limited)).toBe(6_000);
+    expect(retryDelayMs(1, limited)).toBe(8_000);
+    expect(retryDelayMs(1, new ProviderError('jupiter', 'rate_limited', 'x', { retryAfterMs: 15_000 }))).toBe(15_000);
+    expect(retryDelayMs(9, limited)).toBe(20_000);
+    expect(retryDelayMs(0, new Error('boom'))).toBe(1_000);
+    expect(retryDelayMs(2, new ProviderError('orbyt', 'http', 'x', { status: 500 }))).toBe(4_000);
+    expect(retryDelayMs(10, new Error('boom'))).toBe(8_000);
   });
 });

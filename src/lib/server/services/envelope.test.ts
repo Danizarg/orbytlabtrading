@@ -4,7 +4,7 @@ import { ChainError } from '@/lib/core/chain';
 import type { Sourced } from '@/lib/core/types';
 import { ProviderError } from '@/lib/net/errors';
 import { CACHE } from '@/lib/server/respond';
-import { handle, leastFresh, safeErrorText, sendSourced, sourcesOf, STALE_NOTE, withCache } from './envelope';
+import { handle, leastFresh, NOT_SERVABLE_MESSAGE, safeErrorText, sendSourced, sourcesOf, STALE_NOTE, withCache } from './envelope';
 import { BadRequestError, NotConfiguredError } from './errors';
 
 const RESULT: Sourced<number[]> & { attempts: { provider: 'birdeye' | 'helius'; ok: boolean; error?: string }[] } = {
@@ -150,6 +150,32 @@ describe('handle', () => {
       throw new ProviderError('helius', 'not_configured', 'helius: API key rejected (HTTP 401)');
     });
     expect(unconfigured.status).toBe(501);
+  });
+
+  it('answers 501 (not an outage) when every provider declines the request as unsupported', async () => {
+    const res = await handle(async () => {
+      throw new ChainError('discover organic', [
+        { provider: 'coingecko', ok: false, error: "coingecko: 'organic' discovery is not available", code: 'unsupported' },
+        { provider: 'birdeye', ok: false, error: 'birdeye: not configured', code: 'not_configured' },
+      ]);
+    });
+    expect(res.status).toBe(501);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    const body = await errorOf(res);
+    expect(body.error).toEqual({ code: 'not_configured', message: NOT_SERVABLE_MESSAGE });
+    expect(body.meta.sources.map((s) => [s.provider, s.ok])).toEqual([
+      ['coingecko', false],
+      ['birdeye', false],
+    ]);
+
+    // One real outage among the declines keeps it an upstream failure.
+    const mixed = await handle(async () => {
+      throw new ChainError('candles', [
+        { provider: 'birdeye', ok: false, error: 'birdeye: HTTP 500', code: 'http' },
+        { provider: 'coingecko', ok: false, error: 'coingecko: not supported', code: 'unsupported' },
+      ]);
+    });
+    expect(mixed.status).toBe(502);
   });
 
   it('strips URLs and credentials from chain attempt errors echoed to clients', async () => {

@@ -95,9 +95,21 @@ function Segmented<T extends string>({
 
 const AGE_ITEMS = [{ value: 'any', label: 'Any' }, ...AGE_PRESETS.map((p) => ({ value: p.value, label: p.label }))];
 
+/** Panel width (w-72) and the minimum gap to the viewport edge (matches max-w-[calc(100vw-24px)]). */
+const PANEL_WIDTH = 288;
+const PANEL_GUTTER = 12;
+
+/** Left offset (≤ 0) from the button that keeps the whole panel on screen at phone widths. */
+function panelShift(buttonLeft: number, viewportWidth: number): number {
+  const width = Math.min(PANEL_WIDTH, viewportWidth - 2 * PANEL_GUTTER);
+  return Math.min(0, viewportWidth - PANEL_GUTTER - width - buttonLeft);
+}
+
 /** Filters button + popover (min liquidity, min MC, max age, launch stage, hide flagged). Emits partial patches. */
 export function FiltersPopover({ value, onChange }: { value: DiscoverFilters; onChange: (patch: Partial<DiscoverFilters>) => void }) {
   const [open, setOpen] = useState(false);
+  // Horizontal shift (px, ≤ 0) that keeps the panel inside a narrow viewport.
+  const [shift, setShift] = useState(0);
   const [resetCount, setResetCount] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -129,14 +141,18 @@ export function FiltersPopover({ value, onChange }: { value: DiscoverFilters; on
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          const rect = buttonRef.current?.getBoundingClientRect();
+          if (!open && rect) setShift(panelShift(rect.left, window.innerWidth));
+          setOpen((o) => !o);
+        }}
         className={cn(
           'flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs font-medium transition-colors',
           count ? 'border-brand/40 text-brand-strong' : 'border-line-strong text-muted hover:bg-hover hover:text-fg',
           open && 'bg-hover',
         )}
       >
-        <SlidersHorizontal aria-hidden className="size-3.5" />
+        <SlidersHorizontal aria-hidden className="size-3.5" strokeWidth={1.75} />
         Filters
         {count > 0 && (
           <span className="flex h-4 min-w-4 items-center justify-center rounded bg-brand-soft px-1 text-2xs tabular text-brand-strong">{count}</span>
@@ -147,7 +163,8 @@ export function FiltersPopover({ value, onChange }: { value: DiscoverFilters; on
           id={panelId}
           role="dialog"
           aria-label="Filters"
-          className="absolute top-full left-0 z-50 mt-1 flex w-72 flex-col gap-3 rounded-lg border border-line-strong bg-panel-2 p-3 shadow-lg"
+          style={{ left: shift }}
+          className="absolute top-full z-50 mt-1 flex w-72 max-w-[calc(100vw-24px)] flex-col gap-3 rounded-lg border border-line-strong bg-panel-2 p-3 shadow-lg"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-fg">Filters</span>

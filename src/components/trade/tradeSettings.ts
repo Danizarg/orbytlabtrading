@@ -3,13 +3,19 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { INTERVALS, type Interval } from '@/lib/core/types';
-import { DEFAULT_SLIPPAGE_BPS, MAX_SLIPPAGE_BPS, MIN_SLIPPAGE_BPS, type QuoteSide } from '@/lib/services/token';
+import { DEFAULT_SLIPPAGE_BPS, MAX_SLIPPAGE_BPS, MIN_SLIPPAGE_BPS, type ChartCurrency, type QuoteSide } from '@/lib/services/token';
 
 /**
- * Browser-local trade-panel and chart preferences. Purely presentational:
- * ORBYT never signs or submits anything, so slippage, priority fee and MEV
- * protection only describe what the user intends to set in their wallet /
- * Jupiter. Nothing here leaves the browser.
+ * Browser-local trade-panel and chart preferences. Slippage feeds the quote
+ * request; priority fee and MEV protection describe what the user intends to
+ * set in their wallet / Jupiter (the swap link cannot carry them). Nothing
+ * here leaves the browser.
+ *
+ * Hydration: the store starts with defaults on the server AND on the
+ * client's first render (skipHydration), so SSR markup matches; the token
+ * page calls `rehydrateTradeSettings()` after mount and `hydrated` flips to
+ * true once the saved values are applied (the chart waits for it, so it does
+ * not spend a GeckoTerminal call on a default interval it is about to leave).
  */
 
 export type ChartMode = 'price' | 'mc';
@@ -25,7 +31,10 @@ export interface TradeSettings {
   advancedOpen: boolean;
   interval: Interval;
   chartMode: ChartMode;
+  currency: ChartCurrency;
   logScale: boolean;
+  /** Saved preferences have been applied (never persisted). */
+  hydrated: boolean;
   setSide: (side: QuoteSide) => void;
   setOrderMode: (mode: OrderMode) => void;
   setSlippageBps: (bps: number) => void;
@@ -34,6 +43,7 @@ export interface TradeSettings {
   setAdvancedOpen: (open: boolean) => void;
   setInterval: (interval: Interval) => void;
   setChartMode: (mode: ChartMode) => void;
+  setCurrency: (currency: ChartCurrency) => void;
   setLogScale: (on: boolean) => void;
 }
 
@@ -75,7 +85,9 @@ export const useTradeSettings = create<TradeSettings>()(
       advancedOpen: false,
       interval: '1m',
       chartMode: 'price',
+      currency: 'usd',
       logScale: false,
+      hydrated: false,
       setSide: (side) => set({ side }),
       setOrderMode: (orderMode) => set({ orderMode }),
       setSlippageBps: (bps) => set({ slippageBps: Number.isFinite(bps) ? clampBps(bps) : DEFAULT_SLIPPAGE_BPS }),
@@ -84,12 +96,15 @@ export const useTradeSettings = create<TradeSettings>()(
       setAdvancedOpen: (advancedOpen) => set({ advancedOpen }),
       setInterval: (interval) => set({ interval }),
       setChartMode: (chartMode) => set({ chartMode }),
+      setCurrency: (currency) => set({ currency }),
       setLogScale: (logScale) => set({ logScale }),
     }),
     {
       name: 'orbyt-trade-settings-v1',
       version: 1,
       storage: createJSONStorage(() => safeStorage),
+      skipHydration: true,
+      onRehydrateStorage: () => () => useTradeSettings.setState({ hydrated: true }),
       partialize: (s) => ({
         side: s.side,
         slippageBps: s.slippageBps,
@@ -98,6 +113,7 @@ export const useTradeSettings = create<TradeSettings>()(
         advancedOpen: s.advancedOpen,
         interval: s.interval,
         chartMode: s.chartMode,
+        currency: s.currency,
         logScale: s.logScale,
       }),
       // Validate whatever comes back from storage.
@@ -112,9 +128,16 @@ export const useTradeSettings = create<TradeSettings>()(
           advancedOpen: p.advancedOpen === true,
           interval: INTERVALS.includes(p.interval as Interval) ? (p.interval as Interval) : current.interval,
           chartMode: p.chartMode === 'mc' ? 'mc' : 'price',
+          currency: p.currency === 'sol' ? 'sol' : 'usd',
           logScale: p.logScale === true,
         };
       },
     },
   ),
 );
+
+/** Apply the saved preferences once, after mount (see the hydration note above). */
+export function rehydrateTradeSettings(): void {
+  if (useTradeSettings.getState().hydrated) return;
+  void useTradeSettings.persist.rehydrate();
+}

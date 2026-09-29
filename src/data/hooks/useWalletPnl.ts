@@ -7,12 +7,19 @@ import type { PnlReport } from '@/lib/core/types';
 import {
   activityMints,
   assemblePnlInput,
+  IDENTITY_LOOKUP_MAX,
   mergeActivityItems,
+  missingPriceMints,
   nextPnlTarget,
   openPositionMints,
+  openPositionStats,
+  pickPrices,
   PNL_AUTO_PAGES,
   PNL_MAX_PAGES,
+  pricesAsOf,
+  retryDelayMs,
   type ActivityCoverage,
+  type OpenPositionStats,
 } from '@/lib/services/wallet';
 import { POLL } from '../query';
 import { jup } from '../sources';
@@ -21,6 +28,22 @@ import { useSolPrice } from './useSolPrice';
 import { useWalletActivity, type WalletActivityView } from './useWalletActivity';
 
 const EMPTY_MINTS: readonly string[] = [];
+const EMPTY_PRICES: Readonly<Record<string, number>> = {};
+
+export interface WalletPnlOptions {
+  /**
+   * Current USD prices the page already has (priced holdings). Open positions
+   * found here are not requested again, which keeps the wallet page inside
+   * Jupiter's 4 calls / 10 s browser budget.
+   */
+  knownPricesUsd?: Readonly<Record<string, number>>;
+  /** False while those prices are still loading: PnL waits rather than requesting the same mints twice. */
+  knownPricesSettled?: boolean;
+  /** When `knownPricesUsd` was fetched. */
+  knownPricesUpdatedAt?: number;
+  /** Mints the page already asked a price for (priced or not); PnL does not ask Jupiter again for those. */
+  attemptedMints?: ReadonlySet<string>;
+}
 
 export interface WalletPnlView {
   /** FIFO, SOL-denominated report over the loaded pages; undefined until the first page arrives. */
@@ -36,9 +59,13 @@ export interface WalletPnlView {
   /** More history exists and the cap (30 pages) is not reached. */
   canAnalyzeMore: boolean;
   analyzeMore: () => void;
-  /** Open positions priced for unrealized PnL / open positions in total. */
-  pricedOpen: number;
-  openPositions: number;
+  /** Loading an older page failed; retry that page (the analysis resumes towards `target`). */
+  moreFailed: boolean;
+  retryMore: () => void;
+  /** Open / priced / valued (current price and known cost) positions in the report. */
+  positions: OpenPositionStats;
+  /** Age of the OLDEST price behind unrealized PnL (undefined when no open position is priced). */
+  pricesUpdatedAt: number | undefined;
   pricesError: unknown;
   solPriceUsd: number | undefined;
 }
@@ -50,9 +77,13 @@ export interface WalletPnlView {
  * denominated like the rest of the report). Shares the activity page cache
  * with the Activity tab.
  */
-export function useWalletPnl(address: string): WalletPnlView {
+export function useWalletPnl(address: string, options: WalletPnlOptions = {}): WalletPnlView {
   const activity = useWalletActivity(address);
   const sol = useSolPrice();
+  const known = options.knownPricesUsd ?? EMPTY_PRICES;
+  const knownSettled = options.knownPricesSettled ?? true;
+  const knownAt = options.knownPricesUpdatedAt;
+  const attempted = options.attemptedMints;
   // The target is keyed by wallet so a different address starts over without an effect.
   const [goal, setGoal] = useState<{ address: string; target: number }>({ address, target: PNL_AUTO_PAGES });
   const target = goal.address === address ? goal.target : PNL_AUTO_PAGES;
@@ -60,15 +91,19 @@ export function useWalletPnl(address: string): WalletPnlView {
   const { infinite } = activity;
   const pages = infinite.data?.pages;
   const pagesLoaded = pages?.length ?? 0;
-  const { hasNextPage, isFetchingNextPage, isError, fetchNextPage } = infinite;
+  const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = infinite;
 
+  // Walk older pages one at a time towards the target; a failed page stops the walk until retried.
   useEffect(() => {
-    if (pagesLoaded === 0 || pagesLoaded >= target || !hasNextPage || isFetchingNextPage || isError) return;
+    if (pagesLoaded === 0 || pagesLoaded >= target || !hasNextPage || isFetchingNextPage || isFetchNextPageError) return;
     void fetchNextPage({ cancelRefetch: false });
-  }, [pagesLoaded, target, hasNextPage, isFetchingNextPage, isError, fetchNextPage]);
+  }, [pagesLoaded, target, hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
 
   const fetchedPages = useMemo(() => pages?.map((p) => p.data) ?? [], [pages]);
-  const mints = useMemo(() => (fetchedPages.length ? activityMints(mergeActivityItems(fetchedPages)) : EMPTY_MINTS), [fetchedPages]);
+  const mints = useMemo(
+    () => (fetchedPages.length ? activityMints(mergeActivityItems(fetchedPages), IDENTITY_LOOKUP_MAX) : EMPTY_MINTS),
+    [fetchedPages],
+  );
   const identities = useMintIdentities(mints);
   const symbols = useMemo(() => {
     const out: Record<string, string> = {};
@@ -76,26 +111,32 @@ export function useWalletPnl(address: string): WalletPnlView {
     return out;
   }, [identities.byMint]);
 
-  // First pass without prices decides which open positions need a current price.
-  const preliminary = useMemo(
-    () => (fetchedPages.length ? computePnl(assemblePnlInput({ wallet: address, pages: fetchedPages, symbols })) : undefined),
-    [address, fetchedPages, symbols],
+  // Open positions do not depend on prices, so a price-free pass decides which mints need one.
+  const openMints = useMemo(
+    () => (fetchedPages.length ? openPositionMints(computePnl(assemblePnlInput({ wallet: address, pages: fetchedPages }))) : EMPTY_MINTS),
+    [address, fetchedPages],
   );
-  const openMints = useMemo(() => (preliminary ? openPositionMints(preliminary) : EMPTY_MINTS), [preliminary]);
-  const priceKey = openMints.join(',');
+  const missing = useMemo(
+    () => (knownSettled ? missingPriceMints(openMints, known, attempted) : EMPTY_MINTS),
+    [knownSettled, openMints, known, attempted],
+  );
+  const priceKey = missing.join(',');
 
   const prices = useQuery({
     queryKey: walletKeys.pnlPrices(priceKey),
-    queryFn: ({ signal }) => jup.getPrices([...openMints], signal),
-    enabled: openMints.length > 0,
+    queryFn: ({ signal }) => jup.getPrices([...missing], signal),
+    enabled: missing.length > 0,
     refetchInterval: POLL.indexed,
     staleTime: 20_000,
     placeholderData: keepPreviousData,
-    retry: 1,
+    retry: 2,
+    retryDelay: retryDelayMs,
   });
 
+  const fetched = prices.data?.data;
+  const fetchedAt = prices.data?.fetchedAt;
+  const pricesUsd = useMemo(() => pickPrices(openMints, [known, fetched]), [openMints, known, fetched]);
   const solPriceUsd = sol.data?.data.priceUsd;
-  const pricesUsd = prices.data?.data;
   const report = useMemo(
     () =>
       fetchedPages.length
@@ -103,12 +144,21 @@ export function useWalletPnl(address: string): WalletPnlView {
         : undefined,
     [address, fetchedPages, pricesUsd, solPriceUsd, symbols],
   );
+  const positions = useMemo(() => openPositionStats(report), [report]);
+  const pricesUpdatedAt = useMemo(
+    () =>
+      pricesAsOf(openMints, [
+        { prices: known, at: knownAt },
+        { prices: fetched, at: fetchedAt },
+      ]),
+    [openMints, known, knownAt, fetched, fetchedAt],
+  );
 
   const analyzeMore = useCallback(
     () => setGoal((g) => ({ address, target: nextPnlTarget(Math.max(g.address === address ? g.target : PNL_AUTO_PAGES, pagesLoaded)) })),
     [address, pagesLoaded],
   );
-  const pricedOpen = useMemo(() => openMints.filter((m) => (pricesUsd?.[m] ?? 0) > 0 && (solPriceUsd ?? 0) > 0).length, [openMints, pricesUsd, solPriceUsd]);
+  const retryMore = useCallback(() => void fetchNextPage({ cancelRefetch: false }), [fetchNextPage]);
 
   return {
     report,
@@ -117,11 +167,13 @@ export function useWalletPnl(address: string): WalletPnlView {
     activity,
     pagesLoaded,
     target,
-    analyzing: pagesLoaded < target && !!hasNextPage && !isError,
-    canAnalyzeMore: !!hasNextPage && pagesLoaded < PNL_MAX_PAGES && !isError,
+    analyzing: pagesLoaded > 0 && pagesLoaded < target && !!hasNextPage && !isFetchNextPageError,
+    canAnalyzeMore: !!hasNextPage && pagesLoaded < PNL_MAX_PAGES && !isFetchNextPageError,
     analyzeMore,
-    pricedOpen,
-    openPositions: openMints.length,
+    moreFailed: isFetchNextPageError,
+    retryMore,
+    positions,
+    pricesUpdatedAt,
     pricesError: prices.error,
     solPriceUsd,
   };

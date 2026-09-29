@@ -8,13 +8,13 @@ import { cn } from '@/components/ui/cn';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useCandles } from '@/data/hooks/useCandles';
+import { useCandles, type PriceObservation } from '@/data/hooks/useCandles';
 import type { TradeFeed } from '@/data/hooks/useTrades';
 import type { LiveTick } from '@/lib/analytics/candles';
 import { formatTime } from '@/lib/core/format';
 import { shortAddress } from '@/lib/core/solana';
 import type { PoolInfo, Trade } from '@/lib/core/types';
-import { errorLines, INTERVAL_LABELS, isGecko, providerLabel } from '@/lib/services/token';
+import { errorLines, INTERVAL_LABELS, isLiveFreshness, isSolQuoted } from '@/lib/services/token';
 import { Chip, ErrorLines, Pane, SourceLine, UpdatedAgo } from './parts';
 import { useTradeSettings } from './tradeSettings';
 
@@ -40,11 +40,12 @@ function ToolButton({ label, active, onClick, children }: { label: string; activ
 const LIVE_TEXT = {
   trades: 'last bar ticks per trade',
   curve: 'last bar follows the on-chain curve price (3 s)',
-  price: 'last bar follows Jupiter price (10 s)',
+  price: 'last bar follows the token price (10 s poll)',
 } as const;
 
 /**
- * Chart panel: interval bar, Price / MC and USD / SOL toggles, log scale,
+ * Chart panel (lightweight-charts is loaded on demand inside PriceChart):
+ * interval bar, Price / MC and USD / SOL toggles, log scale,
  * fit / auto-scale / go-to-realtime, the Lightweight Charts canvas and a
  * provenance line. Candles come from useCandles (never synthetic).
  */
@@ -57,22 +58,40 @@ export function ChartPanel({
   feed,
   tradesEnabled,
   curveTick,
+  curveTickSol,
+  rowPrice,
+  aggregateTicks,
+  poolIndexed,
+  solUsd,
   className,
 }: {
   mint: string;
   pool?: PoolInfo;
+  /** The charted pool is listed by an aggregator (native candles exist upstream). */
+  poolIndexed: boolean;
   hasPool: boolean | undefined;
   supply?: number;
   trades: readonly Trade[];
   feed?: TradeFeed;
   tradesEnabled: boolean;
   curveTick?: LiveTick;
+  /** The bonding-curve read priced in SOL (SOL-quoted curves). */
+  curveTickSol?: LiveTick;
+  /** Token row price (Jupiter / ORBYT route) used as the live tick. */
+  rowPrice?: PriceObservation;
+  /** Token-level prices may move the last bar (false for a user-pinned pool). */
+  aggregateTicks: boolean;
+  solUsd?: number;
   className?: string;
 }) {
+  // Saved interval / currency apply after mount; wait for them before fetching candles.
+  const settingsReady = useTradeSettings((s) => s.hydrated);
   const interval = useTradeSettings((s) => s.interval);
   const setInterval = useTradeSettings((s) => s.setInterval);
   const chartMode = useTradeSettings((s) => s.chartMode);
   const setChartMode = useTradeSettings((s) => s.setChartMode);
+  const currencyPref = useTradeSettings((s) => s.currency);
+  const setCurrency = useTradeSettings((s) => s.setCurrency);
   const logScale = useTradeSettings((s) => s.logScale);
   const setLogScale = useTradeSettings((s) => s.setLogScale);
   const [fitSignal, setFitSignal] = useState(0);
@@ -81,22 +100,31 @@ export function ChartPanel({
 
   const c = useCandles({
     mint,
-    pool: pool?.address,
+    // GeckoTerminal is only asked for indexed pools; ORBYT's route resolves a pool itself.
+    pool: poolIndexed ? pool?.address : undefined,
     hasPool,
     interval,
+    currency: currencyPref,
+    quoteIsSol: isSolQuoted(pool),
+    solUsd,
     trades,
     tradesEnabled,
     tradesRealtime: feed?.realtime ?? false,
     tradesFreshness: feed?.freshness,
     tradesFetchedAt: feed?.fetchedAt,
     curveTick,
+    curveTickSol,
+    rowPrice,
+    aggregateTicks,
+    enabled: settingsReady,
   });
 
   const mcMode = chartMode === 'mc' && supply !== undefined;
   const candles = useMemo(() => (mcMode && supply !== undefined ? scaleCandles(c.candles, supply) : c.candles), [c.candles, mcMode, supply]);
   const seriesKey = `${mint}|${c.pool ?? ''}|${interval}|${c.kind ?? ''}`;
 
-  const derivedTooFew = c.kind === 'trades' && (c.derivation?.trades ?? 0) < 2;
+  const derivedTrades = c.derivation?.trades ?? 0;
+  const derivedTooFew = c.kind === 'trades' && derivedTrades < 2;
   const showChart = c.available && !derivedTooFew && candles.length > 0;
   const loading = c.isPending && !candles.length;
 
@@ -106,8 +134,8 @@ export function ChartPanel({
   } else if (derivedTooFew) {
     empty = (
       <EmptyState title="Waiting for trades">
-        {INTERVAL_LABELS[interval]} candles are built by ORBYT from real trades of this pool. {c.derivation?.trades ?? 0} trade{(c.derivation?.trades ?? 0) === 1 ? '' : 's'} so far; at least
-        two are needed. Nothing is simulated.
+        No native {INTERVAL_LABELS[interval]} source: these candles are built from this pool&apos;s trades. {derivedTrades} trade{derivedTrades === 1 ? '' : 's'}
+        {c.currency === 'sol' ? ' with a SOL leg' : ''} received so far; at least 2 are needed to draw a bar.
       </EmptyState>
     );
   } else if (hasPool === false && !c.kind) {
@@ -122,12 +150,13 @@ export function ChartPanel({
     empty = <EmptyState title="No candles for this range">The provider returned no candles for this pool yet.</EmptyState>;
   }
 
-  const live = c.liveSource === 'trades' || c.liveSource === 'curve';
+  // LIVE only for on-chain / realtime inputs: the curve read, or a realtime (not merely 'fast') trade feed.
+  const live = c.liveSource === 'curve' || (c.liveSource === 'trades' && isLiveFreshness(feed?.freshness));
 
   return (
     <Pane className={className}>
       <div className="flex h-8 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-line px-2 scrollbar-none">
-        <div role="tablist" aria-label="Interval" className="flex items-center gap-0.5">
+        <div role="group" aria-label="Interval" className="flex items-center gap-0.5">
           {c.options.map((o) => (
             <Chip
               key={o.interval}
@@ -158,10 +187,15 @@ export function ChartPanel({
         </div>
         <Divider />
         <div role="group" aria-label="Currency" className="flex items-center gap-0.5">
-          <Chip active title="Candles in USD">
+          <Chip active={c.currency === 'usd'} onClick={() => setCurrency('usd')} title="Prices and volume in USD">
             USD
           </Chip>
-          <Chip disabled title={pool?.quoteSymbol === 'SOL' ? 'Native SOL candles need the GeckoTerminal currency=token option (pending)' : 'Pool quote is not SOL'}>
+          <Chip
+            active={c.currency === 'sol'}
+            disabled={!c.currencyOption.available}
+            onClick={() => setCurrency('sol')}
+            title={c.currencyOption.reason}
+          >
             SOL
           </Chip>
         </div>
@@ -191,6 +225,7 @@ export function ChartPanel({
             intervalSec={c.intervalSec}
             seriesKey={seriesKey}
             mode={mcMode ? 'mc' : 'price'}
+            currency={c.currency}
             logScale={logScale}
             fitSignal={fitSignal}
             realtimeSignal={realtimeSignal}
@@ -203,7 +238,7 @@ export function ChartPanel({
           <div aria-busy="true" className="absolute inset-0 flex items-end gap-1 px-4 pb-8">
             <span className="sr-only">Loading chart</span>
             {Array.from({ length: 28 }, (_, i) => (
-              <Skeleton key={i} className="flex-1" style={{ height: `${25 + ((i * 37) % 55)}%` } as never} />
+              <Skeleton key={i} className="flex-1" style={{ height: `${25 + ((i * 37) % 55)}%` }} />
             ))}
           </div>
         )}
@@ -211,7 +246,8 @@ export function ChartPanel({
       </div>
 
       <SourceLine
-        source={c.source}
+        // Trade-built bars are attributed to the trade feed that supplied the trades.
+        source={c.kind === 'trades' ? feed?.source : c.source}
         fetchedAt={undefined}
         attempts={c.attempts}
         notes={c.notes}
@@ -223,7 +259,8 @@ export function ChartPanel({
                 Built from {c.derivation.trades} real trade{c.derivation.trades === 1 ? '' : 's'} since {formatTime(c.derivation.from)}
               </span>
             )}
-            {c.kind !== 'trades' && c.source && <span>{isGecko(c.source) ? 'GeckoTerminal OHLCV' : `${providerLabel(c.source)} candles`}</span>}
+            {c.kind !== 'trades' && c.source && <span>OHLCV</span>}
+            {c.currency === 'sol' && <span>in SOL</span>}
             {pool && (
               <span title={pool.address}>
                 {pool.dexLabel} pool {shortAddress(pool.address)}

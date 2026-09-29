@@ -5,7 +5,7 @@ import type { ProviderId } from '@/lib/core/providers';
 import { isSolanaAddress, PROGRAMS } from '@/lib/core/solana';
 import { isProviderError, ProviderError } from '@/lib/net/errors';
 import type { JsonFetcher, JsonRequest } from '@/lib/net/types';
-import { createHelius, HELIUS_ASSET_BATCH_LIMIT, isProgramDerivedOwner, pumpBondingCurvePda } from './index';
+import { createHelius, HELIUS_ASSET_BATCH_LIMIT, isProgramDerivedOwner, pumpBondingCurvePda, pumpSwapPoolPdaOf } from './index';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -222,6 +222,18 @@ describe('helius getHolders', () => {
     expect(lookup?.params).toEqual([[PUMPSWAP_POOL], { encoding: 'base64', dataSlice: { offset: 0, length: 0 }, commitment: 'confirmed' }]);
   });
 
+  it("labels the mint's canonical PumpSwap pool from its PDA, without the owner-program lookup", async () => {
+    const pool = await pumpSwapPoolPdaOf(MINT);
+    expect(pool && isProgramDerivedOwner(pool)).toBe(true);
+    const owners = withOwner(OWNERS, 2, pool ?? '');
+    const { fetcher, calls } = fakeRpc({ ...HOLDER_ROUTES, getMultipleAccounts: owners });
+    const res = await createHelius({ apiKey: API_KEY, fetcher }).getHolders(MINT);
+    expect(res.data.top[2]).toMatchObject({ owner: pool, label: 'PumpSwap pool', isProgramAccount: true });
+    expect(res.data.distribution?.top10Pct).toBeCloseTo(2, 10);
+    // Every PDA owner was known statically: no base64 owner-program lookup.
+    expect(calls.map((c) => c.method).sort()).toEqual(['getMultipleAccounts', 'getTokenLargestAccounts', 'getTokenSupply']);
+  });
+
   it('leaves PDA owners of unknown programs unlabelled and counted', async () => {
     const owners = withOwner(OWNERS, 2, PUMPSWAP_POOL);
     const { fetcher } = fakeRpc({
@@ -286,6 +298,19 @@ describe('helius getHolders', () => {
     expect('supply' in res.data).toBe(false);
     expect('distribution' in res.data).toBe(false);
     expect(res.notes?.[0]).toMatch(/supply unavailable/i);
+  });
+
+  it('treats an unreadable or zero supply like a failed supply call', async () => {
+    const zero = { jsonrpc: '2.0', id: 1, result: { context: { slot: 1 }, value: { amount: '0', decimals: 6, uiAmount: 0, uiAmountString: '0' } } };
+    for (const getTokenSupply of [zero, { jsonrpc: '2.0', id: 1, result: { context: { slot: 1 }, value: null } }]) {
+      const { fetcher } = fakeRpc({ ...HOLDER_ROUTES, getTokenSupply });
+      const res = await createHelius({ apiKey: API_KEY, fetcher }).getHolders(MINT);
+      expect(res.data.top).toHaveLength(3);
+      for (const entry of res.data.top) expect('pctOfSupply' in entry).toBe(false);
+      expect('supply' in res.data).toBe(false);
+      expect('distribution' in res.data).toBe(false);
+      expect(res.notes).toEqual(['Token supply unavailable; percentages omitted.']);
+    }
   });
 
   it('returns an honest empty list when the mint has no funded accounts', async () => {

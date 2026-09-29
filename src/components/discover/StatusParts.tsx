@@ -212,7 +212,7 @@ export function RefreshWarning({ error, lines, updatedAt }: { error?: unknown; l
   const text = lines ?? errorLines(error);
   return (
     <div role="status" className="flex h-7 shrink-0 items-center gap-2 overflow-x-auto border-b border-line bg-warn-soft px-3 text-2xs whitespace-nowrap text-warn scrollbar-none">
-      <TriangleAlert aria-hidden className="size-3 shrink-0" />
+      <TriangleAlert aria-hidden className="size-3.5 shrink-0" strokeWidth={1.75} />
       <span>Refresh failed · {text.join(' · ')}</span>
       <span className="text-warn/80">
         · showing data from <Ago at={updatedAt} /> · retrying automatically
@@ -251,7 +251,7 @@ export function LoadError({
         disabled={retrying}
         className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-line-strong px-2.5 py-1 text-2xs text-muted hover:bg-hover hover:text-fg"
       >
-        <RotateCw aria-hidden className={retrying ? 'size-3 motion-safe:animate-spin' : 'size-3'} /> Retry now
+        <RotateCw aria-hidden className={retrying ? 'size-3.5 motion-safe:animate-spin' : 'size-3.5'} strokeWidth={1.75} /> Retry now
       </button>
     </EmptyState>
   );

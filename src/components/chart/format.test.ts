@@ -50,6 +50,11 @@ describe('seriesDelta', () => {
     expect(seriesDelta([], [bar(1)])).toEqual({ kind: 'reset', prepended: 0, appended: 1 });
     expect(seriesDelta(prev, [bar(120), bar(180, 1.2)])).toEqual({ kind: 'reset', prepended: 0, appended: 0 });
   });
+
+  it('never asks series.update() to go back in time', () => {
+    // Last bar replaced by one that starts earlier (provider revised the live bucket).
+    expect(seriesDelta(prev, [bar(60), bar(120), bar(150)])).toEqual({ kind: 'reset', prepended: 0, appended: 0 });
+  });
 });
 
 describe('local time labels', () => {

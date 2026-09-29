@@ -73,6 +73,7 @@ export const PULSE_COLUMNS: readonly PulseColumnConfig[] = [
       PUMPPORTAL,
       { label: 'Jupiter', feeds: ['jupRows', 'jupTrending'], note: 'Jupiter Tokens V2: graduation pool and time; 1 h trending launches' },
       { label: 'GeckoTerminal', feeds: ['geckoNew'], href: GECKO_HREF, note: GECKO_NOTE },
+      { label: 'Solana RPC', feeds: ['poolDex'], note: 'Destination DEX read on-chain from the owner program of each migration pool' },
     ],
     serverFeed: 'serverMigrated',
     settle: { feeds: ['jupRows', 'jupTrending', 'serverMigrated'], stream: false },

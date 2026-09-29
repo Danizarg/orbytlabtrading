@@ -51,7 +51,9 @@ export function usePulseColumn(column: PulseColumn, solPriceUsd: number | undefi
   }, [column, mintsKey]);
   useEffect(() => () => setVisibleMints(column, []), [column]);
 
-  const pause = useCallback(() => setFrozen((prev) => prev ?? (mintsKey ? mintsKey.split(',') : [])), [mintsKey]);
+  // An empty column is never frozen: a pointer resting on it while the first
+  // tokens load would otherwise hide them behind "Paused" until it moves away.
+  const pause = useCallback(() => setFrozen((prev) => prev ?? (mintsKey ? mintsKey.split(',') : null)), [mintsKey]);
   const resume = useCallback(() => setFrozen(null), []);
 
   return { shown: view.shown, queued: view.queued, paused: frozen !== null, hiddenByFilter, filter, pause, resume };

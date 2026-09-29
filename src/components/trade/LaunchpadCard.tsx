@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { WalletLink } from '@/components/ui/AddressLink';
 import { cn } from '@/components/ui/cn';
 import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
-import { formatAmount, formatPct, formatSol, formatUsd } from '@/lib/core/format';
+import { formatAmount, formatPct, formatPrice, formatUsd } from '@/lib/core/format';
 import { explorer, shortAddress } from '@/lib/core/solana';
 import type { BondingCurveState, LaunchpadState, PoolInfo } from '@/lib/core/types';
 import { curveMarketCapUsd, curveQuoteSymbol, quoteToGraduation, tokenTradeHref } from '@/lib/services/token';
@@ -39,6 +39,7 @@ export function LaunchpadCard({
   const toGraduation = curve ? quoteToGraduation(curve) : undefined;
   const quoteSymbol = curve ? (curveQuoteSymbol(curve) ?? 'quote') : 'SOL';
   const migrated = pools.find((p) => !p.isBondingCurve && (launchpad.migratedPool ? p.address === launchpad.migratedPool : true));
+  const migratedKnown = migrated !== undefined && launchpad.migratedPool === migrated.address;
   const curveMc = curve ? curveMarketCapUsd(curve, solUsd) : undefined;
 
   return (
@@ -89,18 +90,19 @@ export function LaunchpadCard({
             </KV>
           )}
           {complete && migrated && (
-            <KV label="Migrated to">
+            // "Migrated to" only when the provider names the migration pool; otherwise it is just the most liquid AMM pool.
+            <KV label={migratedKnown ? 'Migrated to' : 'Main pool'} title={migratedKnown ? 'Migration pool reported by the provider' : 'Most liquid AMM pool (the provider does not report the migration pool)'}>
               <Link href={tokenTradeHref(mint, migrated.address)} className="text-fg-dim hover:text-brand-strong hover:underline" title={migrated.address}>
                 {migrated.dexLabel}
               </Link>
-              {launchpad.graduatedAt !== undefined && (
+              {migratedKnown && launchpad.graduatedAt !== undefined && (
                 <span className="ml-1 text-faint">
                   <Age from={launchpad.graduatedAt} /> ago
                 </span>
               )}
             </KV>
           )}
-          {complete && !migrated && launchpad.graduatedAt !== undefined && (
+          {complete && !migratedKnown && launchpad.graduatedAt !== undefined && (
             <KV label="Graduated">
               <Age from={launchpad.graduatedAt} /> ago
             </KV>
@@ -125,7 +127,7 @@ export function LaunchpadCard({
           )}
           {curve && curve.priceQuote !== undefined && (
             <p className="mt-1 text-2xs text-faint" title="Spot price from virtual reserves">
-              Curve price {formatSol(curve.priceQuote, { maxDecimals: 12 })}
+              Curve price {formatPrice(curve.priceQuote, { currency: false })} {quoteSymbol}
             </p>
           )}
         </div>

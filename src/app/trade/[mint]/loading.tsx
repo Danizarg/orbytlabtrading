@@ -29,7 +29,7 @@ export default function Loading() {
           </div>
           <div className="flex flex-1 items-end gap-1 px-4 pb-8">
             {Array.from({ length: 28 }, (_, i) => (
-              <Skeleton key={i} className="flex-1" style={{ height: `${25 + ((i * 37) % 55)}%` } as never} />
+              <Skeleton key={i} className="flex-1" style={{ height: `${25 + ((i * 37) % 55)}%` }} />
             ))}
           </div>
         </div>

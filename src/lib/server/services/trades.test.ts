@@ -170,6 +170,16 @@ describe('loadTrades', () => {
     expect(result.notes).toBeUndefined();
   });
 
+  it('returns the newest trades first before capping, whatever order the provider used', async () => {
+    const t = (signature: string, timestamp: number) => trade({ signature, timestamp, usdValue: 1, priceUsd: 1, marketCapUsd: 1 });
+    const oldestFirst = [t('a', 1_000), t('b', 2_000), t('c', 3_000), t('d', 4_000)];
+    const st = provider('solanatracker', async () => sourced(oldestFirst, 'solanatracker', 'fast'));
+    const result = await loadTrades({ mint: MINT, pool: POOL, limit: 2 }, deps({ solanaTracker: st }));
+    expect(result.data.map((x) => x.signature)).toEqual(['d', 'c']);
+    // The provider's array (possibly shared through a cache) is left untouched.
+    expect(oldestFirst.map((x) => x.signature)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
   it('omits enrichment honestly when the SOL price is unavailable', async () => {
     const d = deps({
       coingeckoPro: provider('coingecko', async () => sourced([trade({ signature: 'x', solAmount: 1, tokenAmount: 10 })], 'coingecko')),

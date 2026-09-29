@@ -60,10 +60,17 @@ export function applyUltraInfo(rows: readonly TokenRow[], info: Readonly<Record<
   return { rows: out, changed };
 }
 
+/** Lists the CoinGecko on-chain API ranks (it has no organic-score ranking). */
+export const COINGECKO_DISCOVER_LISTS: readonly DiscoverList[] = ['trending', 'top', 'new'];
+
 export async function loadDiscover(query: DiscoverQuery, deps: DiscoverDeps): Promise<ChainResult<TokenRow[]>> {
-  const providers = [deps.jupiter, deps.coingecko].filter((p): p is TokenDiscoveryProvider => p !== null);
-  if (!providers.length) {
+  if (!deps.jupiter && !deps.coingecko) {
     throw new NotConfiguredError('Server discovery needs JUPITER_API_KEY or COINGECKO_API_KEY. The browser uses public sources instead.');
+  }
+  const coingecko = deps.coingecko && COINGECKO_DISCOVER_LISTS.includes(query.list) ? deps.coingecko : null;
+  const providers = [deps.jupiter, coingecko].filter((p): p is TokenDiscoveryProvider => p !== null);
+  if (!providers.length) {
+    throw new NotConfiguredError(`Server discovery of the ${query.list} list needs JUPITER_API_KEY. The browser uses public sources instead.`);
   }
   const result = await runChain(
     `discover ${query.list}`,

@@ -144,9 +144,23 @@ export function ProgramCell({ program }: { program?: string }) {
 }
 
 /** Small stat tile used by the wallet summary strip. */
-export function StatTile({ label, value, sub, tone, title }: { label: string; value: ReactNode; sub?: ReactNode; tone?: 'up' | 'down' | 'neutral'; title?: string }) {
+export function StatTile({
+  label,
+  value,
+  sub,
+  tone,
+  title,
+  className,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  tone?: 'up' | 'down' | 'neutral';
+  title?: string;
+  className?: string;
+}) {
   return (
-    <div className="flex min-w-0 flex-col justify-center gap-0.5 bg-panel px-3 py-2" title={title}>
+    <div className={cn('flex min-w-0 flex-col justify-center gap-0.5 bg-panel px-3 py-2', className)} title={title}>
       <span className="text-2xs font-medium tracking-wide text-muted uppercase">{label}</span>
       <span className={cn('truncate font-display text-sm font-semibold tabular', tone === 'up' ? 'text-up' : tone === 'down' ? 'text-down' : 'text-fg')}>{value}</span>
       {sub !== undefined && <span className="truncate text-2xs tabular text-muted">{sub}</span>}

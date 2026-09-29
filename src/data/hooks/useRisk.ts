@@ -92,7 +92,8 @@ export function useRisk(mint: string, input: RiskInput) {
     freshness,
     notes,
     /** Nothing at all answered (not even GeckoTerminal). */
-    error: !sources.length && !mintInfo ? (query.error ?? input.geckoError) : undefined,
+    // React Query reports `null` when there is no error.
+    error: !sources.length && !mintInfo ? (query.error ?? input.geckoError ?? undefined) : undefined,
     isPending: query.isPending && !gecko,
   };
 }

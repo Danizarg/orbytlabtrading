@@ -122,7 +122,7 @@ export function LaunchpadChip({ launchpad }: { launchpad?: LaunchpadState }) {
 export function VerifiedMark() {
   return (
     <span title="Verified on Jupiter" className="inline-flex shrink-0 text-info">
-      <BadgeCheck aria-hidden className="size-3" />
+      <BadgeCheck aria-hidden className="size-3" strokeWidth={1.75} />
       <span className="sr-only">Verified</span>
     </span>
   );
@@ -134,7 +134,7 @@ export function FlagMark({ reasons }: { reasons: readonly string[] }) {
   const text = reasons.join(' · ');
   return (
     <span title={text} className="inline-flex shrink-0 text-warn">
-      <TriangleAlert aria-hidden className="size-3" />
+      <TriangleAlert aria-hidden className="size-3" strokeWidth={1.75} />
       <span className="sr-only">{text}</span>
     </span>
   );
@@ -164,7 +164,7 @@ export const WatchStar = memo(function WatchStar({ mint, symbol }: { mint: strin
         on ? 'text-warn' : 'text-faint hover:text-fg-dim',
       )}
     >
-      <Star aria-hidden className={cn('size-3.5', on && 'fill-current')} />
+      <Star aria-hidden className={cn('size-3.5', on && 'fill-current')} strokeWidth={1.75} />
     </button>
   );
 });
@@ -182,7 +182,7 @@ export const RemoveButton = memo(function RemoveButton({ mint, symbol }: { mint:
       }}
       className="inline-flex size-6 items-center justify-center rounded text-faint transition-colors hover:bg-panel-3 hover:text-down"
     >
-      <X aria-hidden className="size-3.5" />
+      <X aria-hidden className="size-3.5" strokeWidth={1.75} />
     </button>
   );
 });

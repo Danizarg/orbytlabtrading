@@ -13,8 +13,9 @@
  *   txns, holders, bonding progress, risk) take the NEWEST reading. Every
  *   group remembers when its reading was true and the tier that produced it
  *   (stream / on-chain 3 > fast REST 2 > indexed 1). A lower tier replaces a
- *   higher-tier reading only once that reading is READING_HOLD_MS old, so
- *   on-chain progress wins over provider-reported progress while it is fresh.
+ *   higher-tier reading only once that reading is READING_HOLD_MS old.
+ *   Decoded on-chain bonding progress ranks above every provider (tier 4), so
+ *   it wins over provider-reported progress while it is fresh.
  * - The launch stage only moves forward (unknown → amm → bonding → graduated):
  *   a graduated token never returns to bonding.
  *
@@ -24,7 +25,7 @@
 import { ChainError } from '@/lib/core/chain';
 import { normalizeDex } from '@/lib/core/dex';
 import { PROVIDER_LABELS, type ProviderId } from '@/lib/core/providers';
-import { MINTS, STABLE_MINTS } from '@/lib/core/solana';
+import { MINTS, PROGRAMS, STABLE_MINTS } from '@/lib/core/solana';
 import type {
   BondingCurveState,
   Freshness,
@@ -72,6 +73,8 @@ export const LIVE_WINDOW_MS = 10_000;
 /** How far behind the chain each freshness class typically is (ms). */
 export const FRESHNESS_LAG_MS: Readonly<Record<Freshness, number>> = { stream: 0, realtime: 0, fast: 5_000, indexed: 45_000 };
 export const FRESHNESS_TIER: Readonly<Record<Freshness, number>> = { stream: 3, realtime: 3, fast: 2, indexed: 1 };
+/** Decoded on-chain progress outranks provider-reported progress of any claimed freshness while it is fresh. */
+const ONCHAIN_PROGRESS_TIER = 4;
 
 const STAGE_RANK: Readonly<Record<LaunchStage, number>> = { unknown: 0, amm: 1, bonding: 2, graduated: 3 };
 
@@ -250,11 +253,11 @@ export function mergeItem(prev: PulseItem, p: PulsePatch): PulseItem {
   let readings = prev.readings;
   const reading: Reading = { at: p.at, source: p.source, tier: FRESHNESS_TIER[p.freshness] };
 
-  const bump = (group: LiveGroup) => {
+  const bump = (group: LiveGroup, r: Reading = reading) => {
     const current = readings[group];
-    if (current && current.at === reading.at && current.source === reading.source && current.tier === reading.tier) return;
+    if (current && current.at === r.at && current.source === r.source && current.tier === r.tier) return;
     if (readings === prev.readings) readings = { ...readings };
-    readings[group] = reading;
+    readings[group] = r;
   };
 
   // Static identity: first real value wins.
@@ -337,16 +340,17 @@ export function mergeItem(prev: PulseItem, p: PulsePatch): PulseItem {
     }
   }
 
-  // Bonding progress (on-chain readings are tier 3 and win while fresh).
-  if (isNum(p.progressPct) && acceptReading(readings.progress, reading)) {
+  // Bonding progress: decoded on-chain readings outrank every provider value while fresh.
+  const progressSource = p.progressSource ?? p.source;
+  const progressReading: Reading = progressSource === 'solana-rpc' ? { ...reading, tier: ONCHAIN_PROGRESS_TIER } : reading;
+  if (isNum(p.progressPct) && acceptReading(readings.progress, progressReading)) {
     const pct = clampPct(p.progressPct);
-    const source = p.progressSource ?? p.source;
-    if (lp.progressPct !== pct || lp.progressSource !== source) {
+    if (lp.progressPct !== pct || lp.progressSource !== progressSource) {
       editLp().progressPct = pct;
-      lp.progressSource = source;
+      lp.progressSource = progressSource;
       changed = true;
     }
-    bump('progress');
+    bump('progress', progressReading);
   }
 
   // Curve completion: open → complete only; a transition seen live is timestamped.
@@ -436,6 +440,17 @@ export function createItem(p: PulsePatch): PulseItem {
 }
 
 /**
+ * Merge one reading from `source` into `existing`, or start tracking the
+ * token. Returns `existing` itself when nothing changed, and `undefined` for
+ * an update-only reading about a token that is not tracked.
+ */
+export function upsert(existing: PulseItem | undefined, patch: Omit<PulsePatch, 'source'>, source: ProviderId): PulseItem | undefined {
+  const p: PulsePatch = { ...patch, source };
+  if (existing) return mergeItem(existing, p);
+  return p.updateOnly ? undefined : createItem(p);
+}
+
+/**
  * Apply readings in order. Copy-on-write: returns the same map (changed:false)
  * when no reading altered anything.
  */
@@ -446,16 +461,9 @@ export function applyPatches(
   let next: Map<string, PulseItem> | null = null;
   for (const p of patches) {
     if (typeof p.mint !== 'string' || p.mint.length < 32 || p.mint.length > 44) continue;
-    const current = next ?? items;
-    const prev = current.get(p.mint);
-    if (!prev) {
-      if (p.updateOnly) continue;
-      next ??= new Map(items);
-      next.set(p.mint, createItem(p));
-      continue;
-    }
-    const merged = mergeItem(prev, p);
-    if (merged !== prev) {
+    const prev = (next ?? items).get(p.mint);
+    const merged = upsert(prev, p, p.source);
+    if (merged && merged !== prev) {
       next ??= new Map(items);
       next.set(p.mint, merged);
     }
@@ -669,27 +677,32 @@ export function pruneItems(
 /**
  * Pick up to `cap` mints: priority tiers first (each tier least-recently
  * picked first, so every visible token gets its turn), then fill the rest
- * from `pool` in least-recently-picked order (rotation).
+ * from `pool` in least-recently-picked order (rotation). `tierCaps[i]` limits
+ * how many slots tier i may take per batch, so a full high-priority tier
+ * cannot starve the tiers after it; unused slots flow on to later tiers.
  */
 export function pickBatch(
   priority: ReadonlyArray<readonly string[]>,
   pool: Iterable<string>,
   lastPicked: ReadonlyMap<string, number>,
   cap: number,
+  tierCaps: ReadonlyArray<number | undefined> = [],
 ): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   const order = (list: Iterable<string>) =>
     [...list].filter((m) => !seen.has(m)).sort((a, b) => (lastPicked.get(a) ?? 0) - (lastPicked.get(b) ?? 0));
-  const take = (list: Iterable<string>) => {
+  const take = (list: Iterable<string>, max = Infinity) => {
+    let taken = 0;
     for (const mint of order(list)) {
-      if (out.length >= cap) return;
+      if (out.length >= cap || taken >= max) return;
       if (seen.has(mint)) continue;
       seen.add(mint);
       out.push(mint);
+      taken++;
     }
   };
-  for (const tier of priority) take(tier);
+  priority.forEach((tier, i) => take(tier, tierCaps[i]));
   take(pool);
   return out;
 }
@@ -809,6 +822,8 @@ export function patchFromTokenRow(row: TokenRow, meta: PatchMeta): PulsePatch {
     if (lp.stage === 'graduated') {
       if (isNum(lp.graduatedAt)) p.graduatedAt = lp.graduatedAt;
       if (lp.migratedPool) p.migratedPool = lp.migratedPool;
+      // The row's main pool names the destination DEX only when it IS the migration pool.
+      if (lp.migratedPool && row.pool?.address === lp.migratedPool && row.pool.dexLabel) p.migratedDex = row.pool.dexLabel;
     }
   }
   if (isNum(m.priceUsd)) p.priceUsd = m.priceUsd;
@@ -931,6 +946,88 @@ export function patchFromUltra(mint: string, info: JupiterUltraInfo, meta: Patch
   return p.progressPct === undefined && !p.risk ? null : p;
 }
 
+// ---------------------------------------------------------------------------
+// Destination DEX from the migration pool's owner program (on-chain)
+// ---------------------------------------------------------------------------
+
+/**
+ * AMM programs that own launchpad graduation pools → normalized DEX id.
+ * Verified 2026-09-29 against the owners of Jupiter `graduatedPool` accounts
+ * (PumpSwap, Raydium AMM v4 / CPMM, Meteora DAMM v2 / DLMM) and Meteora's
+ * DAMM v1 SDK. An owner outside this map stays unlabelled.
+ */
+export const POOL_PROGRAM_DEX: Readonly<Record<string, string>> = {
+  [PROGRAMS.PUMP_AMM]: 'pumpswap',
+  '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8': 'raydium',
+  CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C: 'raydium-cpmm',
+  CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK: 'raydium-clmm',
+  cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG: 'meteora-damm-v2',
+  Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB: 'meteora-damm',
+  LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo: 'meteora-dlmm',
+  whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc: 'orca',
+};
+
+/** DEX label for a pool owned by `owner`, when the program is a known AMM. */
+export function dexLabelForPoolOwner(owner: string | undefined): string | undefined {
+  const dex = owner ? POOL_PROGRAM_DEX[owner] : undefined;
+  return dex ? normalizeDex('orbyt', dex).label : undefined;
+}
+
+/** Graduated tokens with a known migration pool but no destination DEX yet (visible Migrated cards first). */
+export function poolDexTargets(
+  items: ReadonlyMap<string, PulseItem>,
+  visibleMigrated: readonly string[],
+  settled: ReadonlySet<string>,
+  cap: number,
+): Array<{ mint: string; pool: string }> {
+  const out: Array<{ mint: string; pool: string }> = [];
+  const seen = new Set<string>();
+  const consider = (item: PulseItem | undefined) => {
+    if (out.length >= cap || !item || seen.has(item.mint)) return;
+    seen.add(item.mint);
+    const pool = item.launchpad.migratedPool;
+    if (item.launchpad.stage !== 'graduated' || !pool || item.migratedDex || settled.has(pool)) return;
+    out.push({ mint: item.mint, pool });
+  };
+  for (const mint of visibleMigrated) consider(items.get(mint));
+  for (const item of items.values()) consider(item);
+  return out;
+}
+
+/**
+ * Owners from a `getMultipleAccounts` result (aligned with `pools`):
+ * a string for an existing account, null for a missing one. Malformed
+ * entries are left out so they can be retried.
+ */
+export function poolOwnersFromRpc(result: unknown, pools: readonly string[]): Record<string, string | null> {
+  const value = isPlainObject(result) ? result.value : undefined;
+  const out: Record<string, string | null> = {};
+  if (!Array.isArray(value) || value.length !== pools.length) return out;
+  pools.forEach((pool, i) => {
+    const account: unknown = value[i];
+    if (account === null) out[pool] = null;
+    else if (isPlainObject(account) && typeof account.owner === 'string') out[pool] = account.owner;
+  });
+  return out;
+}
+
+/** On-chain reading: the migration pool is owned by a known AMM program. */
+export function patchFromPoolOwner(mint: string, pool: string, owner: string, fetchedAt: number): PulsePatch | null {
+  const label = dexLabelForPoolOwner(owner);
+  if (!label) return null;
+  return {
+    mint,
+    source: 'solana-rpc',
+    freshness: 'realtime',
+    at: fetchedAt,
+    receivedAt: fetchedAt,
+    updateOnly: true,
+    stage: 'graduated',
+    migratedPool: pool,
+    migratedDex: label,
+  };
+}
+
 /** Keyed server list token (Solana Tracker / Birdeye via /api/v1/pulse). */
 export function patchFromServerToken(t: PulseToken, meta: PatchMeta): PulsePatch {
   const p = basePatch(t.mint, meta);
@@ -1015,6 +1112,7 @@ export type PulseFeedId =
   | 'geckoNew'
   | 'geckoPump'
   | 'curves'
+  | 'poolDex'
   | 'jupRows'
   | 'jupUltra'
   | 'serverNew'
@@ -1072,7 +1170,8 @@ export function columnFreshness(
     if (status.lastOkAt !== undefined && (backfillAt === undefined || status.lastOkAt > backfillAt)) backfillAt = status.lastOkAt;
     if (feedFailing(status) && status.error) errors.push(status.error);
   }
-  const updatedAt = backfillAt ?? liveAt;
+  // The newest successful reading of any kind (a curve read 11 s ago beats a 50 s old pool list).
+  const updatedAt = backfillAt === undefined ? liveAt : liveAt === undefined ? backfillAt : Math.max(backfillAt, liveAt);
   const liveDown = column === 'final' ? feedFailing(feeds.curves) : !input.streamOpen;
   const allFailing = enabled > 0 && errors.length === enabled && liveDown;
   return allFailing ? { updatedAt, live: false, error: errors.join(' · ') } : { updatedAt, live: false };
@@ -1137,10 +1236,12 @@ export function feedErrorText(error: unknown): string {
         return `${label} unavailable`;
     }
   }
-  if (error instanceof ChainError && error.attempts.length) {
-    return error.attempts
-      .map((a) => `${PROVIDER_LABELS[a.provider] ?? a.provider} ${a.code === 'rate_limited' ? 'rate limited' : 'unavailable'}`)
-      .join(' · ');
+  if (error instanceof ChainError) {
+    // A server route answering 501 (no keyed provider configured) is skipped silently.
+    const failed = error.attempts.filter((a) => a.code !== 'not_configured');
+    if (failed.length) {
+      return failed.map((a) => `${PROVIDER_LABELS[a.provider] ?? a.provider} ${a.code === 'rate_limited' ? 'rate limited' : 'unavailable'}`).join(' · ');
+    }
   }
   return 'Source unavailable';
 }

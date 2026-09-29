@@ -63,7 +63,6 @@ function Stat({ label, children, title }: { label: string; children: ReactNode; 
 export function WalletHeader({ address, view }: { address: string; view: PortfolioView }) {
   const { query, portfolio, prices, skippedPricing, pricingPending } = view;
   const result = query.data;
-  const placeholder = query.isPlaceholderData;
   const error = query.isError ? describeError(query.error) : prices.isError && !prices.data ? `prices: ${describeError(prices.error)}` : null;
   const unpriced = portfolio ? portfolio.unpricedCount : undefined;
 
@@ -105,7 +104,7 @@ export function WalletHeader({ address, view }: { address: string; view: Portfol
             </span>
           )}
         </Stat>
-        <FreshnessBadge updatedAt={placeholder ? undefined : result?.fetchedAt} error={error} staleAfterMs={90_000} />
+        <FreshnessBadge updatedAt={result?.fetchedAt} error={error} staleAfterMs={90_000} />
       </div>
     </div>
   );

@@ -84,10 +84,11 @@ function enrichmentCache(): EnrichmentCache {
 }
 
 /**
- * Fetch trigger: enrichment for the rows on screen, keyed on their mint set.
- * The cache fetches only new or stale mints (≥ 55 s), so re-running every
- * 30 s is cheap and a list whose membership shifts slightly costs one small
- * request. Rendering reads the cache through `useEnrichmentSnapshot`.
+ * Fetch trigger: enrichment for the target rows (on screen first), keyed on
+ * their mint set. The cache fetches only new or stale mints (≥ 55 s), at most
+ * one Ultra batch of 100 per 30 s (never-fetched mints first), so re-running
+ * every 30 s is cheap and a list whose membership shifts slightly costs one
+ * small request. Rendering reads the cache through `useEnrichmentSnapshot`.
  */
 export function useRowEnrichment(rows: readonly TokenRow[] | undefined) {
   const mintKey = useMemo(() => mintSetKey(rows), [rows]);

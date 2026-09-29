@@ -4,7 +4,6 @@ import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { CopyButton } from '@/components/ui/CopyButton';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/components/ui/cn';
 import type { DiscoverWindow } from '@/lib/core/providers';
 import { shortAddress } from '@/lib/core/solana';
@@ -13,6 +12,7 @@ import { ROWS_PER_CHUNK, type SortKey, type SortState } from '@/lib/services/dis
 import { RemoveButton } from './cells';
 import { COLUMNS, TABLE_MIN_WIDTH, type ColumnDef } from './columns';
 import { tradeHref } from './prefetch';
+import { SkeletonRow } from './TableSkeleton';
 import { ROW_H, TD, TD_ACTION, TD_RANK, TD_TOKEN, TH, TH_RANK, TH_TOKEN } from './tableStyles';
 import { TokenTableRow, type TableVariant } from './TokenTableRow';
 
@@ -24,7 +24,7 @@ export interface TokenTableProps {
   variant?: TableVariant;
   /** Initial load: render skeleton rows when there are no rows yet. */
   loading?: boolean;
-  /** Extra skeleton rows (watchlist tokens still loading). */
+  /** Skeleton rows: during the initial load (default 16), or extra rows (watchlist tokens still loading). */
   skeletonRows?: number;
   /** Rows belong to a previous list while the new one loads. */
   dimmed?: boolean;
@@ -32,8 +32,10 @@ export interface TokenTableProps {
   missing?: readonly string[];
   /** Shown under the header when there is nothing to list (empty, filtered out, error). */
   empty?: ReactNode;
-  /** Hover intent on a row (token page prefetch). */
-  onHover?: (mint: string) => void;
+  /** Hover / focus intent on a row (token page prefetch). */
+  onHover?: (row: TokenRow) => void;
+  /** Pointer left the table (cancels a pending hover intent). */
+  onHoverEnd?: () => void;
   /** When this changes the rendered chunk count resets (e.g. the list tab). */
   resetKey?: unknown;
   caption: string;
@@ -67,32 +69,10 @@ function HeaderCell({ col, win, sort, onSort, variant }: { col: ColumnDef; win: 
         )}
       >
         <span className="truncate">{variant === 'watchlist' && key === 'rank' ? '#' : label}</span>
-        {active === 'asc' && <ArrowUp aria-hidden className="size-3 shrink-0 text-brand" />}
-        {active === 'desc' && <ArrowDown aria-hidden className="size-3 shrink-0 text-brand" />}
+        {active === 'asc' && <ArrowUp aria-hidden className="size-3 shrink-0 text-brand" strokeWidth={1.75} />}
+        {active === 'desc' && <ArrowDown aria-hidden className="size-3 shrink-0 text-brand" strokeWidth={1.75} />}
       </button>
     </th>
-  );
-}
-
-function SkeletonRow() {
-  return (
-    <tr className={ROW_H} aria-hidden>
-      {COLUMNS.map((c) => (
-        <td key={c.id} className={c.id === 'rank' ? TD_RANK : c.id === 'token' ? TD_TOKEN : TD}>
-          {c.id === 'token' ? (
-            <div className="flex items-center gap-2">
-              <Skeleton className="size-[22px] shrink-0 rounded-full" />
-              <div className="flex flex-col gap-1.5">
-                <Skeleton className="h-2.5 w-20" />
-                <Skeleton className="h-2 w-14" />
-              </div>
-            </div>
-          ) : c.id === 'action' || c.id === 'rank' ? null : (
-            <Skeleton className={cn('h-2.5', c.align === 'right' ? 'ml-auto w-3/5' : 'w-3/4')} />
-          )}
-        </td>
-      ))}
-    </tr>
   );
 }
 
@@ -109,7 +89,7 @@ function MissingRow({ mint }: { mint: string }) {
         </span>
       </td>
       <td className={cn(TD, 'text-2xs text-muted')} colSpan={COLUMNS.length - 3}>
-        Not listed by Jupiter, GeckoTerminal or DEX Screener right now
+        No market data source lists this token right now
       </td>
       <td className={TD_ACTION}>
         <RemoveButton mint={mint} />
@@ -137,6 +117,7 @@ export function TokenTable({
   missing,
   empty,
   onHover,
+  onHoverEnd,
   resetKey,
   caption,
 }: TokenTableProps) {
@@ -172,11 +153,16 @@ export function TokenTable({
     // `limit` remounts the sentinel after each chunk so a still-visible sentinel re-triggers.
   }, [remaining, limit, grow]);
 
-  const skeletons = loading && !rows.length ? 16 : skeletonRows;
+  const skeletons = loading && !rows.length ? skeletonRows || 16 : skeletonRows;
   const showEmpty = !loading && !rows.length && !missing?.length && !skeletons && empty;
 
   return (
-    <div ref={containerRef} className="relative min-h-0 flex-1 overflow-auto bg-panel" aria-busy={loading || dimmed || undefined}>
+    <div
+      ref={containerRef}
+      className="relative min-h-0 flex-1 overflow-auto bg-panel"
+      aria-busy={loading || dimmed || undefined}
+      onMouseLeave={onHoverEnd}
+    >
       <table className={cn('w-full table-fixed border-separate border-spacing-0 text-xs', TABLE_MIN_WIDTH)}>
         <caption className="sr-only">{caption}</caption>
         <colgroup>
@@ -214,7 +200,7 @@ export function TokenTable({
           ))}
         </tbody>
       </table>
-      {/* Outside the table so it centres in the visible width, not the 1250 px table. */}
+      {/* Outside the table so it centres in the visible width, not across the full table width. */}
       {showEmpty && <div className="sticky left-0 w-full">{empty}</div>}
     </div>
   );

@@ -1,9 +1,10 @@
 'use client';
 
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { memo, useState, type ReactNode } from 'react';
+import { memo, useCallback, useState, type ReactNode } from 'react';
 import { TxLink } from '@/components/ui/AddressLink';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/components/ui/cn';
 import type { MintIdentities } from '@/data/hooks/usePortfolio';
@@ -178,15 +179,21 @@ function SkeletonRow() {
 
 /** PnL tab: per-token FIFO results with a basis badge and an expandable signature audit. */
 export function PnlTable({ pnl }: { pnl: WalletPnlView }) {
-  const { report, identities, solPriceUsd, activity, pricesError } = pnl;
+  const { report, identities, solPriceUsd, activity, pricesError, pricesUpdatedAt, positions } = pnl;
+  // The badge follows current prices only when some open position is actually priced; otherwise the history's age.
+  const pricedView = positions.priced > 0 && pricesUpdatedAt !== undefined;
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
-  const toggle = (mint: string) =>
-    setExpanded((s) => {
-      const next = new Set(s);
-      if (next.has(mint)) next.delete(mint);
-      else next.add(mint);
-      return next;
-    });
+  // Stable, so memoized rows do not all re-render when one row toggles.
+  const toggle = useCallback(
+    (mint: string) =>
+      setExpanded((s) => {
+        const next = new Set(s);
+        if (next.has(mint)) next.delete(mint);
+        else next.add(mint);
+        return next;
+      }),
+    [],
+  );
 
   const loading = activity.infinite.isPending;
   let empty: ReactNode = null;
@@ -273,7 +280,15 @@ export function PnlTable({ pnl }: { pnl: WalletPnlView }) {
             </span>
           </>
         )}
-        <span className="ml-auto pl-3 text-faint">≈USD at the current SOL price{solPriceUsd !== undefined ? ` (${formatUsd(solPriceUsd, { compact: false })})` : ''}</span>
+        <span className="ml-auto flex items-center gap-2 pl-3">
+          <span className="text-faint">≈USD at the current SOL price{solPriceUsd !== undefined ? ` (${formatUsd(solPriceUsd, { compact: false })})` : ''}</span>
+          {/* Realized PnL is immutable history; the age that matters is that of the prices behind unrealized PnL. */}
+          <FreshnessBadge
+            updatedAt={pricedView ? pricesUpdatedAt : activity.infinite.data?.pages[0]?.fetchedAt}
+            error={activity.infinite.isError && !report ? describeError(activity.infinite.error) : positions.open > 0 && pricesError ? describeError(pricesError) : null}
+            staleAfterMs={pricedView ? 120_000 : Number.POSITIVE_INFINITY}
+          />
+        </span>
       </footer>
     </div>
   );

@@ -62,8 +62,10 @@ export function seriesDelta(prev: readonly Candle[], next: readonly Candle[]): S
         break;
       }
     }
-    if (stable) {
-      const last = prev.length - 1;
+    const last = prev.length - 1;
+    // series.update() may never move back in time: a replaced last bar that starts earlier needs setData.
+    const monotonic = (next[last]?.time ?? -Infinity) >= (prev[last]?.time ?? Infinity);
+    if (stable && monotonic) {
       if (next.length === prev.length && sameBar(prev[last], next[last])) return { kind: 'same' };
       return { kind: 'tail', from: last };
     }

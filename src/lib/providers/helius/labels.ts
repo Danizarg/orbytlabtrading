@@ -13,7 +13,8 @@ import 'server-only';
  * matches none of these stays unlabelled.
  */
 
-import { PROGRAMS } from '@/lib/core/solana';
+import { address, getAddressEncoder, getProgramDerivedAddress } from '@solana/kit';
+import { isSolanaAddress, MINTS, PROGRAMS } from '@/lib/core/solana';
 import type { HolderEntry, HolderSnapshot } from '@/lib/core/types';
 import { derivePumpCurveAddress } from '@/lib/providers/solana/pump';
 
@@ -58,12 +59,57 @@ export async function bondingCurvePdaOf(mint: string): Promise<string | undefine
   }
 }
 
+const addressEncoder = getAddressEncoder();
+/** Canonical PumpSwap pools use index 0 (u16 little-endian). */
+const CANONICAL_POOL_INDEX = new Uint8Array([0, 0]);
+
+/**
+ * The mint's canonical PumpSwap pool, where pump.fun migrates a completed
+ * curve (seeds from the pump IDL `migrate` instruction, the same derivation
+ * the holders route verified against live pools):
+ * pool_authority = PDA(['pool-authority', mint], pump);
+ * pool = PDA(['pool', u16le(0), pool_authority, mint, WSOL], pump AMM).
+ * The pool account owns its vaults, so it is the owner a holder list shows.
+ */
+export async function pumpSwapPoolPdaOf(mint: string): Promise<string | undefined> {
+  if (!isSolanaAddress(mint)) return undefined;
+  try {
+    const [poolAuthority] = await getProgramDerivedAddress({
+      programAddress: address(PROGRAMS.PUMP),
+      seeds: ['pool-authority', addressEncoder.encode(address(mint))],
+    });
+    const [pool] = await getProgramDerivedAddress({
+      programAddress: address(PROGRAMS.PUMP_AMM),
+      seeds: ['pool', CANONICAL_POOL_INDEX, addressEncoder.encode(poolAuthority), addressEncoder.encode(address(mint)), addressEncoder.encode(address(MINTS.SOL))],
+    });
+    return pool;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Launchpad accounts that can hold a pump.fun coin's supply (both undefined for an invalid mint). */
+export interface LaunchpadPdas {
+  curve?: string;
+  pumpSwapPool?: string;
+}
+
+export async function launchpadPdasOf(mint: string): Promise<LaunchpadPdas> {
+  const [curve, pumpSwapPool] = await Promise.all([bondingCurvePdaOf(mint), pumpSwapPoolPdaOf(mint)]);
+  const pdas: LaunchpadPdas = {};
+  if (curve) pdas.curve = curve;
+  if (pumpSwapPool) pdas.pumpSwapPool = pumpSwapPool;
+  return pdas;
+}
+
 /**
  * Label for an owner known without any network call: the mint's pump.fun
- * bonding-curve PDA or a program-wide vault authority.
+ * bonding-curve PDA, its canonical PumpSwap pool, or a program-wide vault
+ * authority.
  */
-export function staticLiquidityLabel(owner: string, curvePda: string | undefined): string | undefined {
+export function staticLiquidityLabel(owner: string, curvePda: string | undefined, pumpSwapPool?: string): string | undefined {
   if (curvePda && owner === curvePda) return BONDING_CURVE_LABEL;
+  if (pumpSwapPool && owner === pumpSwapPool) return PUMPSWAP_POOL_LABEL;
   return AMM_AUTHORITY_LABELS[owner];
 }
 

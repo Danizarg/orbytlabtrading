@@ -28,10 +28,14 @@ import type { RpcParsedInstruction, RpcParsedTransaction } from './tx-types';
  * delta (it really paid them). The pump.fun TradeEvent amount (curve SOL,
  * excluding protocol/creator fees) is exposed separately as `venueSolAmount`.
  *
- * Known limit: rent of NON-token program accounts (e.g. pump's per-user
- * volume accumulator, ~0.00135 SOL) stays in the SOL delta both when it is
- * deposited and when a later close refunds it — a close cannot be attributed
- * from balances alone, so excluding only the deposit would bias PnL.
+ * Wallet view (walletBalanceChanges / classifyWalletActivity, used by PnL):
+ * rent of NON-token accounts (e.g. pump's per-user volume accumulator,
+ * ~0.00135 SOL; a new coin's mint and bonding curve on a create + dev buy)
+ * stays in the SOL delta both when it is deposited and when a later close
+ * refunds it — a close cannot be attributed from balances alone, so excluding
+ * only the deposit would bias PnL. Trade view (deriveTradeForMint, the trade
+ * feed): rent the trader locked into accounts created in the tx is not trade
+ * value and is excluded from the quote (see `createdAccountRent`).
  */
 
 export interface BalanceChanges {
@@ -62,7 +66,13 @@ export interface DerivedTrade {
   /** Trader wallet (the owner whose balance of `mint` changed; not necessarily the fee payer). */
   wallet: string;
   tokenAmount: number;
-  /** SOL exchanged by the trader (native + WSOL, fee/rent excluded) when the quote is SOL. */
+  /**
+   * SOL exchanged by the trader (native + WSOL) when the quote is SOL. Excludes
+   * the network fee, rent of the trader's own token accounts opened/closed in
+   * the tx and rent it locked into any other account created in the tx (a new
+   * coin's mint / bonding curve / curve vault on a create + dev buy, pump's
+   * volume accumulators, someone else's ATA).
+   */
   solAmount?: number;
   /** Quote mint when not SOL (e.g. USDC). */
   quoteMint?: string;
@@ -70,7 +80,7 @@ export interface DerivedTrade {
   /**
    * Execution price per token in quote units (quote / tokenAmount). When the
    * trader's own quote leg is unknown it falls back to the pump.fun curve
-   * price (`venueSolAmount / tokenAmount`), then to the pool side.
+   * price (TradeEvent `sol_amount / token_amount`), then to the pool side.
    */
   priceQuote?: number;
   /**
@@ -215,9 +225,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function lamportsOf(value: unknown): bigint | undefined {
   // Digit strings are parsed exactly (JSON numbers above 2^53 are already lossy; nothing to recover there).
+  // Anything else (booleans, '1e3', negatives, fractions) is malformed, never coerced.
   if (typeof value === 'string' && /^\d+$/.test(value)) return BigInt(value);
-  const n = num(value);
-  return n !== undefined && Number.isInteger(n) && n >= 0 ? BigInt(n) : undefined;
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? BigInt(value) : undefined;
 }
 
 function rawAmountOf(value: unknown): bigint | undefined {
@@ -368,33 +378,89 @@ function parsedInfo(ix: RpcParsedInstruction): { type: string; info: Record<stri
   return { type: parsed.type, info: parsed.info };
 }
 
-/** Who paid for each account created in the tx, and where each closed token account's lamports went. */
-function accountLifecycle(view: TxView): { funders: Map<string, string>; closedTo: Map<string, string> } {
+interface AccountLifecycle {
+  /** Who paid for each account created in the tx (system create* or ATA create). */
+  funders: Map<string, string>;
+  /** Lamports each system create* instruction put into the new account, by account and funder. */
+  created: Map<string, { funder: string; lamports: bigint }>;
+  /** System transfers, in execution order. */
+  transfers: Array<{ source: string; destination: string; lamports: bigint }>;
+  /** Where each closed token account's lamports went. */
+  closedTo: Map<string, string>;
+}
+
+function accountLifecycle(view: TxView): AccountLifecycle {
   const funders = new Map<string, string>();
+  const created = new Map<string, { funder: string; lamports: bigint }>();
+  const transfers: AccountLifecycle['transfers'] = [];
   const closedTo = new Map<string, string>();
   for (const ix of view.instructions) {
     const p = parsedInfo(ix);
     if (!p) continue;
     const { type, info } = p;
     if (ix.programId === SYSTEM_PROGRAM && (type === 'createAccount' || type === 'createAccountWithSeed')) {
-      if (typeof info.newAccount === 'string' && typeof info.source === 'string' && !funders.has(info.newAccount)) funders.set(info.newAccount, info.source);
+      if (typeof info.newAccount !== 'string' || typeof info.source !== 'string') continue;
+      if (!funders.has(info.newAccount)) funders.set(info.newAccount, info.source);
+      const lamports = lamportsOf(info.lamports);
+      if (lamports !== undefined && !created.has(info.newAccount)) created.set(info.newAccount, { funder: info.source, lamports });
+    } else if (ix.programId === SYSTEM_PROGRAM && (type === 'transfer' || type === 'transferWithSeed')) {
+      const lamports = lamportsOf(info.lamports);
+      if (typeof info.source === 'string' && typeof info.destination === 'string' && lamports !== undefined) {
+        transfers.push({ source: info.source, destination: info.destination, lamports });
+      }
     } else if (ix.programId === ATA_PROGRAM && (type === 'create' || type === 'createIdempotent')) {
       if (typeof info.account === 'string' && typeof info.source === 'string' && !funders.has(info.account)) funders.set(info.account, info.source);
     } else if (TOKEN_PROGRAMS.has(ix.programId) && type === 'closeAccount') {
       if (typeof info.account === 'string' && typeof info.destination === 'string') closedTo.set(info.account, info.destination);
     }
   }
-  return { funders, closedTo };
+  return { funders, created, transfers, closedTo };
 }
 
-function walletLamports(view: TxView, wallet: string, deltas: OwnerDeltas): WalletLamports {
+/**
+ * Lamports `payer` locked into accounts it created in this tx, other than its
+ * own new token accounts (whose rent walletLamports already excludes): a new
+ * coin's mint (plus its Token-2022 metadata top-up), bonding curve and curve
+ * vault on a create + dev buy, pump's volume accumulators, someone else's ATA.
+ * None of it is paid to the venue, so none of it is trade value.
+ * - Only what is still in the account at the end counts (temporary accounts
+ *   closed in the tx cost nothing), and WSOL held by a new token account is
+ *   not rent.
+ * - At most the lamports of the create instruction itself, so SOL paid later
+ *   into a new account (a bonding curve receiving the dev buy) is never
+ *   mistaken for rent — except for a mint account, which holds nothing but
+ *   rent: transfers `payer` made into it (the metadata realloc top-up) count.
+ */
+function createdAccountRent(view: TxView, payer: string, lifecycle = accountLifecycle(view)): bigint {
+  let mints: Set<string> | undefined;
+  let rent = 0n;
+  for (const [account, { funder, lamports }] of lifecycle.created) {
+    if (funder !== payer) continue;
+    const index = view.keys.indexOf(account);
+    if (index < 0 || view.pre[index] !== 0n) continue;
+    const before = view.preTokens.get(index);
+    const after = view.postTokens.get(index);
+    if (!before && after?.owner === payer) continue;
+    let held = (view.post[index] as bigint) - (after?.mint === WSOL ? after.raw : 0n);
+    if (held <= 0n) continue;
+    let paid = lamports;
+    mints ??= new Set([...view.preTokens.values(), ...view.postTokens.values()].map((t) => t.mint));
+    if (mints.has(account)) {
+      for (const t of lifecycle.transfers) if (t.source === payer && t.destination === account) paid += t.lamports;
+    }
+    if (held > paid) held = paid;
+    rent += held;
+  }
+  return rent;
+}
+
+function walletLamports(view: TxView, wallet: string, deltas: OwnerDeltas, lifecycle = accountLifecycle(view)): WalletLamports {
   const index = view.keys.indexOf(wallet);
   const native = index >= 0 ? (view.post[index] as bigint) - (view.pre[index] as bigint) : 0n;
   const fee = view.feePayer === wallet ? view.fee : 0n;
   const wsol = deltas.get(wallet)?.get(WSOL)?.raw ?? 0n;
 
   let rent = 0n;
-  const lifecycle = accountLifecycle(view);
   for (const i of tokenIndices(view)) {
     const before = view.preTokens.get(i);
     const after = view.postTokens.get(i);
@@ -415,11 +481,21 @@ function walletLamports(view: TxView, wallet: string, deltas: OwnerDeltas): Wall
   return { native, fee, rent, wsol, sol: native + fee + rent + wsol };
 }
 
+/**
+ * Raw integer → decimal-adjusted number, correctly rounded: the exact decimal
+ * string is handed to the JS number parser. (Adding the integer and fraction
+ * parts as doubles is off by one ulp for ~1 in 9,000 amounts, e.g. 1,412,654,698
+ * lamports → 1.4126546979999999.)
+ */
 function toUi(raw: bigint, decimals: number): number {
   const negative = raw < 0n;
-  const abs = negative ? -raw : raw;
-  const base = 10n ** BigInt(decimals);
-  const value = Number(abs / base) + Number(abs % base) / Number(base);
+  const digits = (negative ? -raw : raw).toString();
+  let value: number;
+  if (decimals === 0) value = Number(digits);
+  else {
+    const padded = digits.padStart(decimals + 1, '0');
+    value = Number(`${padded.slice(0, -decimals)}.${padded.slice(-decimals)}`);
+  }
   return negative ? -value : value;
 }
 
@@ -598,10 +674,13 @@ function solCounterparty(view: TxView, wallet: string, sol: bigint): string | un
  * balances; else the signer whose balance of `mint` changed; else (no signer
  * moved it) the non-PDA owner with the largest |delta|. Owners equal to
  * `opts.pool` are never the trader. Side always comes from the trader's
- * balance delta (never from instruction names).
+ * balance delta (never from instruction names). One trade per transaction:
+ * in a bundle (several users trading the mint) it is the largest signer's,
+ * still carrying its own TradeEvent leg.
  *
  * Quote: the trader's own leg moving against `mint` — its SOL delta (native +
- * WSOL, fee/rent excluded, ≥ 0.000001 SOL) or a token leg (a unique USDC/USDT
+ * WSOL; network fee, own-ATA rent and rent locked into accounts created in the
+ * tx excluded; ≥ 0.000001 SOL) or a token leg (a unique USDC/USDT
  * leg, else a unique leg). When both a SOL and a token leg qualify (e.g. a
  * USDC-quoted buy that also paid a SOL tip) the one the other side of the
  * trade (the pool / curve) moved by a comparable amount wins; if that cannot
@@ -616,6 +695,8 @@ function solCounterparty(view: TxView, wallet: string, sol: bigint): string | un
  * trade moves it — a bot or relayer paid for the receiver). Otherwise null —
  * a transfer is not a trade.
  * Timestamp: blockTime, else the TradeEvent timestamp; null without either.
+ * The TradeEvent identifies the trader and dates the trade whatever the
+ * curve's quote asset; only a SOL-quoted curve's event yields `venueSolAmount`.
  */
 export function deriveTradeForMint(tx: RpcParsedTransaction, mint: string, opts: { pool?: string } = {}): DerivedTrade | null {
   const view = readTx(tx, 'solana-rpc');
@@ -629,12 +710,18 @@ export function deriveTradeForMint(tx: RpcParsedTransaction, mint: string, opts:
   }
   if (candidates.length === 0) return null;
 
-  const event = consistentTradeEvent(decodePumpTradeEvents(tx).filter((e) => e.mint === mint));
-  const fromEvent = event ? candidates.find((c) => c.owner === event.user && (c.raw > 0n) === event.isBuy) : undefined;
+  const events = decodePumpTradeEvents(tx).filter((e) => e.mint === mint);
+  const consistent = consistentTradeEvent(events);
+  const fromEvent = consistent ? candidates.find((c) => c.owner === consistent.user && (c.raw > 0n) === consistent.isBuy) : undefined;
   const trader = fromEvent ?? pickTrader(candidates, view.signers);
   if (!trader) return null;
+  // Several users traded the mint (a bundle): the chosen trader's own events still describe its curve leg.
+  const own = fromEvent ? consistent : consistentTradeEvent(events.filter((e) => e.user === trader.owner));
+  const event = own && own.user === trader.owner && own.isBuy === (trader.raw > 0n) ? own : undefined;
 
-  const timestamp = blockTimeMs(tx) ?? (event?.timestamp ? event.timestamp * 1000 : undefined);
+  // All events of a tx carry the same on-chain clock.
+  const eventSeconds = events.find((e) => e.timestamp !== undefined)?.timestamp;
+  const timestamp = blockTimeMs(tx) ?? (eventSeconds !== undefined ? eventSeconds * 1000 : undefined);
   if (timestamp === undefined) return null;
 
   const side = trader.raw > 0n ? 'buy' : 'sell';
@@ -644,8 +731,9 @@ export function deriveTradeForMint(tx: RpcParsedTransaction, mint: string, opts:
   const program = programs.aggregator ?? programs.venue;
   if (program) trade.program = program;
   if (programs.venue) trade.venue = programs.venue;
-  const venueSol = fromEvent && event ? toUi(event.solAmount, LAMPORTS_DECIMALS) : undefined;
+  const venueSol = event?.solAmount !== undefined ? toUi(event.solAmount, LAMPORTS_DECIMALS) : undefined;
   if (venueSol !== undefined) trade.venueSolAmount = venueSol;
+  const lifecycle = accountLifecycle(view);
 
   const applyQuote = (quote: QuoteLeg, side: 'trader' | 'pool') => {
     const amount = toUi(abs(quote.raw), quote.decimals);
@@ -658,12 +746,13 @@ export function deriveTradeForMint(tx: RpcParsedTransaction, mint: string, opts:
     trade.quoteSide = side;
     return trade;
   };
-  const quote = resolveQuote(view, deltas, trader, mint);
+  const quote = resolveQuote(view, deltas, trader, mint, lifecycle);
   if (quote === 'ambiguous') return trade;
   if (quote) return applyQuote(quote, 'trader');
-  if (venueSol !== undefined && venueSol > 0) {
+  if (venueSol !== undefined && venueSol > 0 && event !== undefined && event.tokenAmount > 0n) {
     // The curve event proves the trade even when the trader's own SOL leg is not visible (e.g. paid by a router).
-    trade.priceQuote = venueSol / tokenAmount;
+    // Price = the curve's own SOL / tokens (the trader's net token delta may include unrelated moves).
+    trade.priceQuote = venueSol / toUi(event.tokenAmount, trader.decimals);
     trade.quoteSide = 'event';
     return trade;
   }
@@ -678,11 +767,18 @@ interface QuoteLeg {
   decimals: number;
 }
 
-function resolveQuote(view: TxView, deltas: OwnerDeltas, trader: { owner: string } & MintDelta, mint: string): QuoteLeg | 'ambiguous' | undefined {
+function resolveQuote(
+  view: TxView,
+  deltas: OwnerDeltas,
+  trader: { owner: string } & MintDelta,
+  mint: string,
+  lifecycle: AccountLifecycle,
+): QuoteLeg | 'ambiguous' | undefined {
   const traderUp = trader.raw > 0n;
   const others = tokenLegsOf(deltas, trader.owner).filter((t) => t.mint !== mint);
   const counter = others.filter((t) => (t.raw > 0n) !== traderUp);
-  const sol = walletLamports(view, trader.owner, deltas).sol;
+  // Trade value: rent the trader locked into accounts created in the tx is added back (not paid to the venue).
+  const sol = walletLamports(view, trader.owner, deltas, lifecycle).sol + createdAccountRent(view, trader.owner, lifecycle);
   const solLeg: QuoteLeg | undefined = abs(sol) >= DUST_LAMPORTS && (sol > 0n) !== traderUp ? { mint: WSOL, raw: sol, decimals: LAMPORTS_DECIMALS } : undefined;
   const legs: QuoteLeg[] = solLeg ? [solLeg, ...counter] : counter;
   if (legs.length === 0) return undefined;
@@ -721,8 +817,10 @@ function otherSideMoved(view: TxView, deltas: OwnerDeltas, trader: { owner: stri
  * Quote read from the other side of the trade when the trader shows no quote
  * leg of its own (a bot or relayer paid for the receiver; a sniper program
  * holds tokens in one PDA and pays from another). The counterpart is `pool`
- * when given (it must have moved `mint` against the trader), else the unique
- * off-curve owner that did — an on-curve wallet on the other side is a plain
+ * when given and it holds token accounts in the tx (it must have moved `mint`
+ * against the trader), else the unique off-curve owner that did — e.g. the
+ * vault authority of an AMM whose pool id is not its vault owner (Raydium AMM
+ * v4 / CPMM); an on-curve wallet on the other side is a plain
  * transfer, never a pool. It qualifies only when it moved exactly one quote
  * asset — SOL (native + WSOL, above dust) or one other token — the way a pool
  * does (it receives quote on a buy, pays it on a sell) and no other token
@@ -737,7 +835,9 @@ function poolSideQuote(view: TxView, deltas: OwnerDeltas, trader: { owner: strin
     const d = byMint.get(mint)?.raw ?? 0n;
     if (owner !== trader.owner && d !== 0n && (d > 0n) !== traderUp) opposing.push(owner);
   }
-  const other = pool !== undefined ? opposing.find((o) => o === pool) : opposing.length === 1 && isOffCurve(opposing[0] as string) ? opposing[0] : undefined;
+  let other: string | undefined;
+  if (pool !== undefined && deltas.has(pool)) other = opposing.find((o) => o === pool);
+  else if (opposing.length === 1 && isOffCurve(opposing[0] as string)) other = opposing[0];
   if (other === undefined) return undefined;
 
   const legs: QuoteLeg[] = [];
@@ -772,21 +872,27 @@ function pickTrader<T extends { owner: string; raw: bigint }>(candidates: T[], s
 interface ConsistentEvent {
   user: string;
   isBuy: boolean;
-  solAmount: bigint;
+  /** Summed raw token amount moved against the curve. */
+  tokenAmount: bigint;
+  /** Summed curve lamports; absent when any event is quoted in another asset (e.g. a PUMP-paired curve). */
+  solAmount?: bigint;
   timestamp?: number;
 }
 
-/** One trader, one direction, SOL-quoted — otherwise the event is not used. */
+/** One trader, one direction — otherwise the event is not used. Summed over the trader's events of the mint. */
 function consistentTradeEvent(events: PumpTradeEvent[]): ConsistentEvent | undefined {
   const first = events[0];
   if (!first) return undefined;
-  let solAmount = 0n;
+  let solAmount: bigint | undefined = 0n;
+  let tokenAmount = 0n;
   for (const e of events) {
     if (e.user !== first.user || e.isBuy !== first.isBuy) return undefined;
-    if (e.quoteMint !== undefined && e.quoteMint !== SYSTEM_PROGRAM && e.quoteMint !== WSOL) return undefined;
-    solAmount += e.solAmount;
+    tokenAmount += e.tokenAmount;
+    const solQuoted = e.quoteMint === undefined || e.quoteMint === SYSTEM_PROGRAM || e.quoteMint === WSOL;
+    solAmount = solQuoted && solAmount !== undefined ? solAmount + e.solAmount : undefined;
   }
-  const out: ConsistentEvent = { user: first.user, isBuy: first.isBuy, solAmount };
+  const out: ConsistentEvent = { user: first.user, isBuy: first.isBuy, tokenAmount };
+  if (solAmount !== undefined) out.solAmount = solAmount;
   if (first.timestamp !== undefined) out.timestamp = first.timestamp;
   return out;
 }

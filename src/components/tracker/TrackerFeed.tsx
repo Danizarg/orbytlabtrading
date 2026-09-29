@@ -16,7 +16,16 @@ import type { MintIdentities } from '@/data/hooks/usePortfolio';
 import type { TrackerFeedView } from '@/data/hooks/useTrackerFeed';
 import { formatAge } from '@/lib/core/format';
 import { shortAddress } from '@/lib/core/solana';
-import { filterTrackerEntries, signedSol, TRACKER_KIND_FILTERS, TRACKER_POLL_MS, usdEstimate, type TrackerEntry, type TrackerKindFilter } from '@/lib/services/wallet';
+import {
+  filterTrackerEntries,
+  signedSol,
+  TRACKER_BACKFILL_LIMIT,
+  TRACKER_KIND_FILTERS,
+  TRACKER_POLL_MS,
+  usdEstimate,
+  type TrackerEntry,
+  type TrackerKindFilter,
+} from '@/lib/services/wallet';
 
 const COLS: ReadonlyArray<{ id: string; label: string; width: string; align: 'left' | 'right' }> = [
   { id: 'time', label: 'Time', width: 'w-20', align: 'left' },
@@ -30,7 +39,15 @@ const COLS: ReadonlyArray<{ id: string; label: string; width: string; align: 'le
   { id: 'tx', label: 'Tx', width: 'w-20', align: 'right' },
 ];
 
-const VIA_TITLE = { backfill: 'Loaded from history', stream: 'Received live from the Solana log subscription', poll: 'Found by the reconciliation poll' } as const;
+const VIA_TITLE = {
+  backfill: 'Loaded from history',
+  stream: 'Received live from the Solana log subscription',
+  account: 'Read right after the wallet balance changed (Solana account subscription)',
+  poll: 'Found by the reconciliation poll',
+} as const;
+
+/** Rows slide in only while new; a row re-mounted later (filter change) must not animate again. */
+const FRESH_MS = 3_000;
 
 const TrackerRow = memo(function TrackerRow({
   entry,
@@ -166,15 +183,17 @@ export function TrackerFeed({ wallets, feed, hydrated }: { wallets: readonly Tra
     return [...out];
   }, [wallets, status]);
 
-  const streamEvents = wallets.reduce((sum, w) => sum + (status[w.address]?.streamEvents ?? 0), 0);
+  // Transactions delivered live: log notifications plus reads triggered by a balance change.
+  const liveFound = wallets.reduce((sum, w) => sum + (status[w.address]?.streamEvents ?? 0) + (status[w.address]?.hintedFound ?? 0), 0);
+  const missed = wallets.reduce((sum, w) => sum + (status[w.address]?.missedByStream ?? 0), 0);
   const lastEvent = wallets.reduce((max, w) => Math.max(max, status[w.address]?.lastStreamAt ?? 0, status[w.address]?.lastPollAt ?? 0), 0);
   const wsView = wsLabel(ws);
 
   let empty: ReactNode = null;
   if (hydrated && wallets.length === 0) {
     empty = (
-      <EmptyState title="Track a wallet to see its activity here">
-        Add a wallet on the left. ORBYT loads its latest transactions right away, then follows it live through a Solana log subscription and re-checks every {TRACKER_POLL_MS / 1000} s.
+      <EmptyState title="No wallets tracked">
+        Add an address in the wallet panel, or press Track on any wallet page. Its latest {TRACKER_BACKFILL_LIMIT} transactions load immediately; new ones stream in as they confirm.
       </EmptyState>
     );
   } else if (hydrated && backfilled && shown.length === 0) {
@@ -259,7 +278,7 @@ export function TrackerFeed({ wallets, feed, hydrated }: { wallets: readonly Tra
                 label={labels[entry.wallet] ?? shortAddress(entry.wallet)}
                 identities={identities}
                 solPriceUsd={solPriceUsd}
-                fresh={mountedAt > 0 && entry.seenAt > mountedAt && entry.via !== 'backfill'}
+                fresh={mountedAt > 0 && entry.seenAt > mountedAt && entry.via !== 'backfill' && now - entry.seenAt < FRESH_MS}
               />
             ))}
             {(loading || !hydrated) && Array.from({ length: 8 }, (_, i) => <SkeletonRow key={i} />)}
@@ -272,15 +291,30 @@ export function TrackerFeed({ wallets, feed, hydrated }: { wallets: readonly Tra
         <span aria-hidden className="text-faint">
           ·
         </span>
-        <span className={wsView.tone} title="publicnode delivers only part of the notifications, so polling stays the source of truth">
+        <span
+          className={wsView.tone}
+          title="Wallet log notifications are best effort (the public endpoint confirms them but may deliver none). Balance-change notifications trigger an immediate read, and reconciliation stays the source of truth."
+        >
           {wsView.text}
         </span>
-        {streamEvents > 0 && (
+        {liveFound > 0 && (
           <>
             <span aria-hidden className="text-faint">
               ·
             </span>
-            <span className="tabular">{streamEvents} live event{streamEvents === 1 ? '' : 's'}</span>
+            <span className="tabular" title="Transactions surfaced by a log notification or read right after a balance change">
+              {liveFound} live
+            </span>
+          </>
+        )}
+        {missed > 0 && (
+          <>
+            <span aria-hidden className="text-faint">
+              ·
+            </span>
+            <span className="tabular text-warn" title="Transactions neither live path surfaced, found by reconciliation. Affected wallets are re-checked more often (30 s up to 5 wallets, 60 s up to 12) until a live path delivers again.">
+              {missed} caught by polling
+            </span>
           </>
         )}
         {lastEvent > 0 && now > 0 && (
@@ -301,7 +335,7 @@ export function TrackerFeed({ wallets, feed, hydrated }: { wallets: readonly Tra
             </span>
           </>
         )}
-        <span className="ml-auto pl-3 text-faint">USD ≈ at the current SOL price</span>
+        <span className="ml-auto pl-3 text-faint">USD ≈ now (SOL × current SOL price)</span>
       </footer>
     </section>
   );

@@ -1,11 +1,12 @@
 'use client';
 
-import type { CandlestickData, HistogramData, IChartApi, ISeriesApi, MouseEventParams, UTCTimestamp } from 'lightweight-charts';
+import type { CandlestickData, HistogramData, IChartApi, ISeriesApi, MouseEventParams, UTCTimestamp, WhitespaceData } from 'lightweight-charts';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/components/ui/cn';
 import { DASH, formatCompact, formatPct } from '@/lib/core/format';
 import type { Candle } from '@/lib/core/types';
 import { describeError } from '@/lib/net/errors';
+import type { ChartCurrency } from '@/lib/services/token';
 import { formatAxisMc, formatAxisPrice, localTickLabel, localTimeLabel, priceScaleBase, seriesDelta } from './format';
 
 /**
@@ -32,6 +33,8 @@ export interface PriceChartProps {
   /** Identity of the series (mint · pool · interval): a change refits the view. */
   seriesKey: string;
   mode: ChartMode;
+  /** Unit of prices and volume ('sol': bars and volume are in SOL). */
+  currency: ChartCurrency;
   logScale: boolean;
   /** Counters: bump to fit all bars, scroll to the newest bar or restore auto-scale. */
   fitSignal: number;
@@ -101,22 +104,28 @@ function withAlpha(color: string, alpha: number): string {
 
 const toBar = (c: Candle): CandlestickData<UTCTimestamp> => ({ time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close });
 
-function toVolume(c: Candle, up: string, down: string): HistogramData<UTCTimestamp> {
-  return { time: c.time as UTCTimestamp, value: c.volume ?? 0, color: c.close >= c.open ? up : down };
+/** Unknown volume is a whitespace point (no bar, legend "—"), never a zero bar. */
+function toVolume(c: Candle, up: string, down: string): HistogramData<UTCTimestamp> | WhitespaceData<UTCTimestamp> {
+  if (c.volume === undefined || !Number.isFinite(c.volume)) return { time: c.time as UTCTimestamp };
+  return { time: c.time as UTCTimestamp, value: c.volume, color: c.close >= c.open ? up : down };
 }
 
 /** Bars from the left edge at which older history is requested. */
 const HISTORY_EDGE_BARS = 12;
 
-export function PriceChart({ candles, intervalSec, seriesKey, mode, logScale, fitSignal, realtimeSignal, autoscaleSignal, onNeedHistory, className }: PriceChartProps) {
+/** Pointer / wheel / touch input on the chart: only a user's own pan or zoom pages in older history. */
+const INTERACTION_EVENTS = ['pointerdown', 'wheel', 'touchstart'] as const;
+
+export function PriceChart({ candles, intervalSec, seriesKey, mode, currency, logScale, fitSignal, realtimeSignal, autoscaleSignal, onNeedHistory, className }: PriceChartProps) {
   const container = useRef<HTMLDivElement>(null);
   const handles = useRef<ChartHandles | null>(null);
   const theme = useRef<Theme | null>(null);
-  const applied = useRef<{ key: string; candles: readonly Candle[]; base: number; mode: ChartMode }>({ key: '', candles: [], base: 0, mode: 'price' });
+  const applied = useRef<{ key: string; candles: readonly Candle[]; base: number; unit: string }>({ key: '', candles: [], base: 0, unit: '' });
   const intervalRef = useRef(intervalSec);
   const historyRef = useRef(onNeedHistory);
   const legendNext = useRef<Legend | null>(null);
-  const legendFrame = useRef(0);
+  // Programmatic fits also move the visible range to the first bar; history loads only after the user pans / zooms.
+  const interacted = useRef(false);
   const [ready, setReady] = useState(0);
   const [legend, setLegend] = useState<Legend | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -133,6 +142,10 @@ export function PriceChart({ candles, intervalSec, seriesKey, mode, logScale, fi
     let disposed = false;
     let chart: IChartApi | undefined;
     let raf = 0;
+    const markInteraction = () => {
+      interacted.current = true;
+    };
+    for (const type of INTERACTION_EVENTS) el.addEventListener(type, markInteraction, { passive: true, capture: true });
 
     import('lightweight-charts')
       .then((lib) => {
@@ -187,9 +200,10 @@ export function PriceChart({ candles, intervalSec, seriesKey, mode, logScale, fi
 
         const onMove = (param: MouseEventParams) => {
           const bar = param.time !== undefined ? (param.seriesData.get(candleSeries) as CandlestickData<UTCTimestamp> | undefined) : undefined;
-          const vol = param.time !== undefined ? (param.seriesData.get(volumeSeries) as HistogramData<UTCTimestamp> | undefined) : undefined;
+          const vol = param.time !== undefined ? (param.seriesData.get(volumeSeries) as Partial<HistogramData<UTCTimestamp>> | undefined) : undefined;
+          const volume = typeof vol?.value === 'number' && Number.isFinite(vol.value) ? vol.value : undefined;
           legendNext.current = bar
-            ? { time: Number(bar.time), open: bar.open, high: bar.high, low: bar.low, close: bar.close, ...(vol ? { volume: vol.value } : {}) }
+            ? { time: Number(bar.time), open: bar.open, high: bar.high, low: bar.low, close: bar.close, ...(volume !== undefined ? { volume } : {}) }
             : null;
           if (!raf) {
             raf = requestAnimationFrame(() => {
@@ -200,7 +214,7 @@ export function PriceChart({ candles, intervalSec, seriesKey, mode, logScale, fi
         };
         chart.subscribeCrosshairMove(onMove);
         chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-          if (range && range.from < HISTORY_EDGE_BARS) historyRef.current?.();
+          if (range && interacted.current && range.from < HISTORY_EDGE_BARS) historyRef.current?.();
         });
 
         handles.current = {
@@ -218,10 +232,11 @@ export function PriceChart({ candles, intervalSec, seriesKey, mode, logScale, fi
 
     return () => {
       disposed = true;
+      for (const type of INTERACTION_EVENTS) el.removeEventListener(type, markInteraction, { capture: true });
       if (raf) cancelAnimationFrame(raf);
       chart?.remove();
       handles.current = null;
-      applied.current = { key: '', candles: [], base: 0, mode: 'price' };
+      applied.current = { key: '', candles: [], base: 0, unit: '' };
     };
   }, []);
 
@@ -234,11 +249,16 @@ export function PriceChart({ candles, intervalSec, seriesKey, mode, logScale, fi
     const last = candles.at(-1);
 
     if (last) {
+      const unit = `${mode}:${currency}`;
       const base = mode === 'mc' ? 100 : priceScaleBase(last.close);
-      if (base !== prev.base || mode !== prev.mode) {
+      if (base !== prev.base || unit !== prev.unit) {
         h.candles.applyOptions({ priceFormat: { type: 'custom', formatter: mode === 'mc' ? formatAxisMc : formatAxisPrice, base } });
         prev.base = base;
-        prev.mode = mode;
+      }
+      if (unit !== prev.unit) {
+        // Price ↔ MC or USD ↔ SOL rescales every value: re-fit the price axis, keep the time range.
+        if (prev.unit) h.chart.priceScale('right').applyOptions({ autoScale: true });
+        prev.unit = unit;
       }
     }
 
@@ -261,13 +281,15 @@ export function PriceChart({ candles, intervalSec, seriesKey, mode, logScale, fi
       h.candles.setData(candles.map(toBar));
       h.volume.setData(candles.map((c) => toVolume(c, upVol, downVol)));
       if (!range) {
+        // A new series starts fitted; it pages in older history only once the user scrolls it.
+        interacted.current = false;
         if (candles.length) timeScale.fitContent();
       } else if (delta.prepended > 0) {
         timeScale.setVisibleLogicalRange({ from: range.from + delta.prepended, to: range.to + delta.prepended });
       }
     }
     applied.current = { ...prev, key: seriesKey, candles };
-  }, [candles, seriesKey, mode, ready]);
+  }, [candles, seriesKey, mode, currency, ready]);
 
   useEffect(() => {
     const h = handles.current;
@@ -276,7 +298,10 @@ export function PriceChart({ candles, intervalSec, seriesKey, mode, logScale, fi
   }, [logScale, ready]);
 
   useEffect(() => {
-    if (fitSignal > 0) handles.current?.chart.timeScale().fitContent();
+    if (fitSignal <= 0) return;
+    // "Fit all bars" shows what is loaded; it is not a request for more history.
+    interacted.current = false;
+    handles.current?.chart.timeScale().fitContent();
   }, [fitSignal]);
 
   useEffect(() => {
@@ -290,6 +315,7 @@ export function PriceChart({ candles, intervalSec, seriesKey, mode, logScale, fi
   const lastBar = candles.at(-1);
   const shown: Legend | undefined = legend ?? (lastBar ? { time: lastBar.time, open: lastBar.open, high: lastBar.high, low: lastBar.low, close: lastBar.close, ...(lastBar.volume !== undefined ? { volume: lastBar.volume } : {}) } : undefined);
   const fmt = mode === 'mc' ? formatAxisMc : formatAxisPrice;
+  const unitLabel = `${mode === 'mc' ? 'MC' : 'Price'} · ${currency === 'sol' ? 'SOL' : 'USD'}`;
 
   return (
     <div className={cn('relative min-h-0 min-w-0', className)}>
@@ -299,6 +325,7 @@ export function PriceChart({ candles, intervalSec, seriesKey, mode, logScale, fi
           aria-live="off"
           className="pointer-events-none absolute top-1.5 left-2 z-10 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs tabular text-muted"
         >
+          <span className="text-faint">{unitLabel}</span>
           <span className="text-fg-dim">{localTimeLabel(shown.time, intervalSec)}</span>
           <LegendValue label="O" value={fmt(shown.open)} />
           <LegendValue label="H" value={fmt(shown.high)} />
@@ -307,7 +334,7 @@ export function PriceChart({ candles, intervalSec, seriesKey, mode, logScale, fi
           <span className={shown.close >= shown.open ? 'text-up' : 'text-down'}>
             {shown.open > 0 ? formatPct(((shown.close - shown.open) / shown.open) * 100) : DASH}
           </span>
-          <LegendValue label="V" value={shown.volume === undefined ? DASH : `$${formatCompact(shown.volume, 2)}`} />
+          <LegendValue label="V" value={formatVolume(shown.volume, currency)} />
         </div>
       )}
       {loadError && (
@@ -317,6 +344,12 @@ export function PriceChart({ candles, intervalSec, seriesKey, mode, logScale, fi
       )}
     </div>
   );
+}
+
+/** Volume in the series unit: USD bars carry USD volume, SOL bars SOL volume. */
+function formatVolume(volume: number | undefined, currency: ChartCurrency): string {
+  if (volume === undefined) return DASH;
+  return currency === 'sol' ? `${formatCompact(volume, 2)} SOL` : `$${formatCompact(volume, 2)}`;
 }
 
 function LegendValue({ label, value, tone }: { label: string; value: string; tone?: 'up' | 'down' }) {

@@ -16,11 +16,15 @@ import 'server-only';
  * - `volumeSol` on trades is a SOL-denominated valuation, not necessarily the
  *   SOL leg of the swap (USDC pools report it too), so it is not mapped.
  * - Pool `txns.volume` is lifetime volume; only `txns.volume24h` is mapped.
+ *   Pool `txns.buys` / `sells` are lifetime counters too (TRUMP doc example:
+ *   2.9M trades beside 51M USD of 24h volume), so they are mapped as the 24h
+ *   counts ORBYT shows only while the pool is younger than 24 hours.
  * - Holder `identity` (enrich=identity) labels pools, developers, bots and KOLs;
  *   pool / curve rows are left out of top-holder concentration, as Solana
  *   Tracker's own `risk.top10` does.
  */
 
+import { isValidCandle } from '@/lib/analytics/candles';
 import { num, toMs } from '@/lib/core/chain';
 import { normalizeDex, normalizeLaunchpadName } from '@/lib/core/dex';
 import { isSolanaAddress, MINTS } from '@/lib/core/solana';
@@ -138,7 +142,11 @@ function launchpadName(pool: Rec | undefined): string | undefined {
 // Chart
 // ---------------------------------------------------------------------------
 
-/** `{ oclhv: [...] }` or a bare array → ascending, time-unique candles (UNIX seconds). */
+/**
+ * `{ oclhv: [...] }` or a bare array → ascending, time-unique candles (UNIX
+ * seconds). Rows that cannot be charted as reported (non-positive prices,
+ * high/low not bracketing open/close) are dropped, never repaired.
+ */
 export function parseCandles(body: unknown): Candle[] | undefined {
   const r = rec(body);
   const list: unknown = Array.isArray(body) ? body : (r?.oclhv ?? r?.ohlcv);
@@ -154,6 +162,7 @@ export function parseCandles(body: unknown): Candle[] | undefined {
     const close = num(c.close);
     if (ms === undefined || open === undefined || high === undefined || low === undefined || close === undefined) continue;
     const candle: Candle = { time: Math.floor(ms / 1000), open, high, low, close };
+    if (!isValidCandle(candle)) continue;
     const volume = nonNegative(c.volume);
     if (volume !== undefined) candle.volume = volume;
     byTime.set(candle.time, candle);
@@ -399,6 +408,22 @@ function launchStateOf(poolList: Rec[], column: PulseColumn): LaunchpadState {
   });
 }
 
+const DAY_MS = 86_400_000;
+
+/**
+ * A pool's lifetime buy / sell counters, as 24h counts: exact only while the
+ * pool (`createdAt`, ms) is younger than 24 hours at `fetchedAt`; otherwise
+ * the 24h split is unknown.
+ */
+function dayTxns(pool: Rec | undefined, fetchedAt: number): PulseToken['txns'] {
+  const createdAt = toMs(pool?.createdAt);
+  if (createdAt === undefined || fetchedAt - createdAt > DAY_MS) return undefined;
+  const txns = rec(pool?.txns);
+  const buys = count(txns?.buys);
+  const sells = count(txns?.sells);
+  return buys !== undefined || sells !== undefined ? defined({ buys, sells }) : undefined;
+}
+
 export function parsePulseToken(item: unknown, column: PulseColumn, fetchedAt: number): PulseToken | undefined {
   const info = rec(item);
   const token = rec(info?.token);
@@ -409,8 +434,6 @@ export function parsePulseToken(item: unknown, column: PulseColumn, fetchedAt: n
   const curve = poolList.find(isCurvePool);
   const creation = rec(token.creation);
   const txns = rec(primary?.txns);
-  const buys = count(txns?.buys);
-  const sells = count(txns?.sells);
   const risk = defined(parseRiskFields(rec(info.risk), rec(primary?.security)));
 
   return defined<PulseToken>({
@@ -430,7 +453,7 @@ export function parsePulseToken(item: unknown, column: PulseColumn, fetchedAt: n
     liquidityUsd: nonNegative(rec(primary?.liquidity)?.usd),
     // 24h only: `txns.volume` is the pool's lifetime volume (TRUMP doc example: 15.8B vs 51M in 24h).
     volumeUsd: nonNegative(txns?.volume24h),
-    txns: buys !== undefined || sells !== undefined ? defined({ buys, sells }) : undefined,
+    txns: dayTxns(primary, fetchedAt),
     holders: count(info.holders),
     socials: socialsOf(token),
     risk: Object.keys(risk).length ? risk : undefined,

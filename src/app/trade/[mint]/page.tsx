@@ -9,7 +9,7 @@ export async function generateMetadata({ params }: PageProps<'/trade/[mint]'>): 
   const label = isSolanaAddress(mint) ? shortAddress(mint) : 'token';
   return {
     title: `Trade ${label}`,
-    description: 'Live chart, trades, holders, pools, audit and read-only Jupiter quotes for a Solana token.',
+    description: 'Live chart, trades, holders, pools, audit and Jupiter swap quotes for a Solana token.',
   };
 }
 

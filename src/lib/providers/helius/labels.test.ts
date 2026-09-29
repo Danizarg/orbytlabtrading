@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { address, getProgramDerivedAddress } from '@solana/kit';
 import { describe, expect, it } from 'vitest';
 import { PROGRAMS } from '@/lib/core/solana';
@@ -7,11 +9,23 @@ import {
   AMM_PROGRAM_LABELS,
   BONDING_CURVE_LABEL,
   holderDistribution,
+  launchpadPdasOf,
   PUMPSWAP_POOL_LABEL,
+  pumpSwapPoolPdaOf,
   staticLiquidityLabel,
 } from './labels';
 
 const OWNER = 'DHpRzLRuACd8i1BVGZh8rGQWaQsP7b4spBZFWbzW5WSb';
+/** pump.fun mint and its bonding-curve PDA (live RPC fixtures). */
+const PUMP_MINT = '7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump';
+const PUMP_CURVE = '9ZZuz4cVoYhbAFomLMHJjpPijY7EXryqHRjY79f9VC7A';
+
+/** Real mainnet PumpSwap pools, decoded from chain on 2026-09-28. */
+const CANONICAL_POOLS = (
+  JSON.parse(readFileSync(path.join(process.cwd(), 'tests/fixtures/pump/pumpswap_canonical_pool_decoded_rpc_2026-09-28.json'), 'utf8')) as {
+    pools: Array<{ mint: string; derived_pool: string; pool_owner: string; decoded_pool: { base_mint: string; index: number } }>;
+  }
+).pools;
 
 async function pda(program: string, seed: string): Promise<string> {
   const [derived] = await getProgramDerivedAddress({ programAddress: address(program), seeds: [seed] });
@@ -40,10 +54,33 @@ describe('liquidity labels', () => {
     expect(PUMPSWAP_POOL_LABEL).toBe('PumpSwap pool');
   });
 
-  it('labels the curve PDA and known authorities, nothing else', () => {
+  it('labels the curve PDA, the canonical PumpSwap pool and known authorities, nothing else', () => {
     expect(staticLiquidityLabel(OWNER, OWNER)).toBe(BONDING_CURVE_LABEL);
+    expect(staticLiquidityLabel(OWNER, undefined, OWNER)).toBe(PUMPSWAP_POOL_LABEL);
     expect(staticLiquidityLabel('5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1', undefined)).toBe('Raydium pool');
     expect(staticLiquidityLabel(OWNER, undefined)).toBeUndefined();
+    expect(staticLiquidityLabel(OWNER, PUMP_CURVE, PUMP_CURVE)).toBeUndefined();
+  });
+});
+
+describe('launchpad PDAs', () => {
+  it('derives the canonical PumpSwap pool of every live-verified graduated coin', async () => {
+    expect(CANONICAL_POOLS.length).toBeGreaterThanOrEqual(2);
+    for (const pool of CANONICAL_POOLS) {
+      // The vectors are canonical (index 0) SOL pools owned by the PumpSwap program.
+      expect(pool.pool_owner).toBe(PROGRAMS.PUMP_AMM);
+      expect(pool.decoded_pool).toMatchObject({ base_mint: pool.mint, index: 0 });
+      expect(await pumpSwapPoolPdaOf(pool.mint)).toBe(pool.derived_pool);
+    }
+  });
+
+  it('derives both launchpad accounts for a mint, and none for an invalid one', async () => {
+    const pdas = await launchpadPdasOf(PUMP_MINT);
+    expect(pdas.curve).toBe(PUMP_CURVE);
+    expect(pdas.pumpSwapPool).toBe(await pumpSwapPoolPdaOf(PUMP_MINT));
+    expect(pdas.pumpSwapPool).not.toBe(PUMP_CURVE);
+    expect(await launchpadPdasOf('not-a-mint')).toEqual({});
+    expect(await pumpSwapPoolPdaOf('')).toBeUndefined();
   });
 });
 

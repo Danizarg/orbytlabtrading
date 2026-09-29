@@ -43,9 +43,10 @@ function ColumnFreshness({ column }: { column: PulseColumn }) {
   const stream = usePumpPortalStatus();
   const feeds = usePulseStore((s) => s.feeds);
   const now = useNow();
-  if (!now) return <FreshnessBadge updatedAt={null} />;
+  // min-w-0: on a 360 px column the badge yields space to the Paused chip and the filter button.
+  if (!now) return <FreshnessBadge updatedAt={null} className="min-w-0 overflow-hidden" />;
   const f = columnFreshness(column, { streamOpen: stream.status === 'open', streamLastAt: stream.lastMessageAt, feeds, now });
-  return <FreshnessBadge updatedAt={f.updatedAt} live={f.live} error={f.error} liveWindowMs={LIVE_WINDOW_MS} />;
+  return <FreshnessBadge updatedAt={f.updatedAt} live={f.live} error={f.error} liveWindowMs={LIVE_WINDOW_MS} className="min-w-0 overflow-hidden" />;
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +232,12 @@ export function PulseColumnPanel({ config, className }: { config: PulseColumnCon
 
   const sync = () => (hovering.current || focused.current || scrolled.current ? pause() : resume());
 
+  // An empty column is not frozen (usePulseColumn); once the first tokens land
+  // under a pointer that is already resting on the column, pause then.
+  useEffect(() => {
+    if (hasItems && (hovering.current || focused.current || scrolled.current)) pause();
+  }, [hasItems, pause]);
+
   const onPointerEnter = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse') return;
     hovering.current = true;
@@ -273,11 +280,12 @@ export function PulseColumnPanel({ config, className }: { config: PulseColumnCon
 
   return (
     <section aria-labelledby={headingId} className={cn('min-h-0 min-w-0 flex-col bg-panel', className)}>
-      <header className="flex h-10 shrink-0 items-center gap-2 border-b border-line px-3">
-        <h2 id={headingId} className="font-display text-[13px] font-semibold tracking-tight text-fg">
+      {/* No overflow clipping here: the filter popover hangs below the header. The freshness badge shrinks instead. */}
+      <header className="flex h-10 min-w-0 shrink-0 items-center gap-2 border-b border-line px-3">
+        <h2 id={headingId} className="shrink-0 font-display text-[13px] font-semibold tracking-tight text-fg">
           {config.title}
         </h2>
-        <span className="rounded bg-panel-3 px-1.5 text-2xs leading-5 font-semibold text-muted tabular" title={`${view.shown.length} tokens shown`}>
+        <span className="shrink-0 rounded bg-panel-3 px-1.5 text-2xs leading-5 font-semibold text-muted tabular" title={`${view.shown.length} tokens shown`}>
           {view.shown.length}
         </span>
         <ColumnFreshness column={config.id} />
@@ -288,12 +296,12 @@ export function PulseColumnPanel({ config, className }: { config: PulseColumnCon
             title="Insertion paused while you hover, focus or scroll this column. Click to resume."
             className="inline-flex h-5 shrink-0 items-center gap-1 rounded bg-brand-soft px-1.5 text-2xs font-semibold text-brand-strong hover:bg-brand/25"
           >
-            <Pause aria-hidden className="size-3" />
+            <Pause aria-hidden className="size-3" strokeWidth={1.75} />
             Paused
             {view.queued > 0 && <span className="font-medium tabular">· {view.queued} new</span>}
           </button>
         )}
-        <div className="ml-auto flex items-center">
+        <div className="ml-auto flex shrink-0 items-center">
           <PulseFilterMenu column={config.id} title={config.title} />
         </div>
       </header>

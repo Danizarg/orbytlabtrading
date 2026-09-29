@@ -30,6 +30,8 @@ export function PoolsPanel({
   query: UseQueryResult<ChainResult<PoolInfo[]>>;
 }) {
   const result = query.data;
+  // React Query reports `null` when there is no error.
+  const error = query.error ?? undefined;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-8 shrink-0 items-center gap-3 border-b border-line px-3 text-xs">
@@ -42,17 +44,17 @@ export function PoolsPanel({
           </Link>
         )}
         <span className="ml-auto">
-          <FreshnessBadge updatedAt={result?.fetchedAt} error={query.error && !result ? 'Pools unavailable' : undefined} />
+          <FreshnessBadge updatedAt={result?.fetchedAt} error={error && !result ? 'Pools unavailable' : undefined} />
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
         {query.isPending && !pools.length && <SkeletonRows rows={4} cols={6} />}
-        {!query.isPending && !pools.length && query.error !== undefined && (
+        {!query.isPending && !pools.length && error !== undefined && (
           <EmptyState title="Pools unavailable" tone="error">
-            <ErrorLines lines={errorLines(query.error)} className="text-left" />
+            <ErrorLines lines={errorLines(error)} className="text-left" />
           </EmptyState>
         )}
-        {!query.isPending && !pools.length && query.error === undefined && <EmptyState title="No pool indexed">DEX Screener and GeckoTerminal list no pool for this token yet.</EmptyState>}
+        {!query.isPending && !pools.length && error === undefined && <EmptyState title="No pool indexed">DEX Screener and GeckoTerminal list no pool for this token yet.</EmptyState>}
         {pools.length > 0 && (
           <table className="w-full min-w-[720px] table-fixed border-separate border-spacing-0">
             <caption className="sr-only">Liquidity pools for this token</caption>

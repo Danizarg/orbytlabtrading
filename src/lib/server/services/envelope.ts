@@ -95,6 +95,18 @@ export async function withCache<T>(key: string, ttlMs: number, staleMs: number, 
   return { value: hit.value, stale: hit.stale };
 }
 
+export const NOT_SERVABLE_MESSAGE = 'No configured server-side provider serves this request. The browser uses public sources instead.';
+
+/**
+ * Every provider declined the request as outside what it can serve
+ * ('unsupported', e.g. a list or interval its plan lacks) or not configured.
+ * That is a capability gap, not an outage: answering 502 "retrying shortly"
+ * would be false, so it maps to 501 and clients fall back silently.
+ */
+export function noProviderCanServe(attempts: readonly ChainAttempt[]): boolean {
+  return attempts.length > 0 && attempts.every((a) => a.code === 'unsupported' || a.code === 'not_configured');
+}
+
 /** Run a route body; map thrown errors to 400 / 501 / upstream failures without leaking internals. */
 export async function handle(run: () => Promise<Response>): Promise<Response> {
   try {
@@ -107,7 +119,14 @@ export async function handle(run: () => Promise<Response>): Promise<Response> {
       return fail(404, 'no_route', error.message, [{ provider: error.provider, ok: false, error: `${error.provider}: no route` }]);
     }
     // Chain attempts are echoed in the error body's sources: sanitize them first.
-    if (error instanceof ChainError) return upstreamFailure(new ChainError(error.name, safeAttempts(error.attempts)));
+    if (error instanceof ChainError) {
+      const attempts = safeAttempts(error.attempts);
+      if (noProviderCanServe(attempts)) {
+        const sources = attempts.map((a) => ({ provider: a.provider, ok: a.ok, ...(a.error ? { error: a.error } : {}) }));
+        return fail(501, 'not_configured', NOT_SERVABLE_MESSAGE, sources);
+      }
+      return upstreamFailure(new ChainError(error.name, attempts));
+    }
     if (!isProviderError(error)) {
       // Unexpected (programming) errors: log a bounded, key-free summary for the deployment logs.
       console.error(`[orbyt api] ${safeErrorText(describeError(error))}`);

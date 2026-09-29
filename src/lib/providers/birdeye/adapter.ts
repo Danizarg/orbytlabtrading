@@ -15,14 +15,15 @@ import 'server-only';
  *   base in its quote currency (SOL for most memecoin pools) with no USD option, and the
  *   base is not necessarily the requested token, so its candles cannot be labelled USD.
  * - GET /defi/v3/token/txs — ≤100 per call, block_unix_time in seconds.
- * - GET /defi/v3/token/holder — ≤100 per call (token-account rows), total holder count.
+ * - GET /defi/v3/token/holder — ≤100 per call (token-account rows by default), total holder
+ *   count; `top10HoldPercent` sums the top token accounts, liquidity vaults included.
  * - GET /defi/token_security (Lite+) + GET /token/v1/holder-profile (Standard+).
  * - GET /defi/v3/token/meme/list — launchpad lists with progress_percent / graduated.
  */
 
 import { address, isOffCurveAddress } from '@solana/kit';
 import { fillMissing } from '@/lib/core/chain';
-import { bondingCurvePdaOf, staticLiquidityLabel } from '@/lib/providers/helius/labels';
+import { launchpadPdasOf, staticLiquidityLabel } from '@/lib/providers/helius/labels';
 import type {
   CandlesQuery,
   ChartDataProvider,
@@ -48,8 +49,8 @@ import {
 import { describeError, isAbortError, isProviderError, ProviderError } from '@/lib/net/errors';
 import type { JsonFetcher } from '@/lib/net/types';
 import {
+  parseHolderPage,
   parseHolderProfile,
-  parseHolderSnapshot,
   parseMemeItem,
   parseOhlcvItems,
   parseSecurity,
@@ -83,6 +84,10 @@ export const BIRDEYE_MAX_HOLDERS = 100;
 export const BIRDEYE_PULSE_LIMIT = 50;
 /** Caveat on Birdeye's token-account-level top-10 share (ORBYT's own distributions exclude liquidity accounts). */
 export const BIRDEYE_TOP10_NOTE = 'Top-10 share from Birdeye; it may include bonding-curve or pool accounts.';
+/** Birdeye's top-10 share is withheld when a known curve / pool account is among the accounts it sums. */
+export const BIRDEYE_TOP10_OMITTED_NOTE = "Birdeye's top-10 share counts bonding-curve or pool accounts as holders; omitted.";
+/** Rows behind Birdeye's top-10 share: always requested so each one can be checked. */
+const TOP10_ROWS = 10;
 
 const PROVIDER = 'birdeye' as const;
 const DEFAULT_CANDLES = 300;
@@ -232,8 +237,8 @@ export function createBirdeye(opts: BirdeyeOptions): BirdeyeAdapter {
     let candles = before !== undefined ? parsed.candles.filter((c) => c.time < before) : parsed.candles;
     if (candles.length > limit) candles = candles.slice(-limit);
     const series: CandleSeries = { interval, candles };
-    // In count mode a short page means history is exhausted before `time_to`.
-    if (countMode) series.hasMore = parsed.candles.length >= limit;
+    // In count mode a short page means history is exhausted before `time_to` (dropped rows still count as received).
+    if (countMode) series.hasMore = parsed.received >= limit;
 
     // USD was requested: candles priced in anything else must not reach a USD chart.
     if (parsed.currencies.some((c) => c !== 'usd')) throw malformed('ohlcv currency');
@@ -272,19 +277,31 @@ export function createBirdeye(opts: BirdeyeOptions): BirdeyeAdapter {
   async function getHolders(mint: string, limit = DEFAULT_HOLDERS, signal?: AbortSignal): Promise<Sourced<HolderSnapshot>> {
     assertMint(mint);
     const max = clampInt(limit, DEFAULT_HOLDERS, 1, BIRDEYE_MAX_HOLDERS);
-    const [data, curvePda] = await Promise.all([
-      get('/defi/v3/token/holder', { address: mint, offset: 0, limit: max }, signal),
-      bondingCurvePdaOf(mint),
+    // Same 30 CU for any page size up to 100: fetch at least the ten accounts behind Birdeye's top-10 share.
+    const [data, pdas] = await Promise.all([
+      get('/defi/v3/token/holder', { address: mint, offset: 0, limit: Math.max(max, TOP10_ROWS) }, signal),
+      launchpadPdasOf(mint),
     ]);
     const fetchedAt = Date.now();
-    const snapshot = parseHolderSnapshot(data, mint, max, fetchedAt, isProgramOwner, (owner) => staticLiquidityLabel(owner, curvePda));
-    if (!snapshot) throw malformed('holders');
-    // Birdeye's own top-10 share is over token accounts: say so when a curve / pool vault is among
-    // them, or an unlabelled program-derived owner that may be one (only wallets are known not to be).
-    const notes =
-      snapshot.distribution && snapshot.top.slice(0, 10).some((h) => h.label || h.isProgramAccount)
-        ? [BIRDEYE_TOP10_NOTE]
-        : [];
+    const page = parseHolderPage(data, isProgramOwner, (owner) => staticLiquidityLabel(owner, pdas.curve, pdas.pumpSwapPool));
+    if (!page) throw malformed('holders');
+    const snapshot: HolderSnapshot = { mint, top: page.entries.slice(0, max), updatedAt: fetchedAt };
+    if (page.totalHolders !== undefined) snapshot.totalHolders = page.totalHolders;
+
+    // Birdeye's top-10 share sums token accounts, liquidity vaults included, while ORBYT's
+    // concentration excludes them. A known curve / pool vault among those accounts makes the
+    // figure wrong for that definition, so it is withheld; an unlabelled program-derived owner
+    // only might be one, so the figure stays with a caveat. Plain wallets need no caveat.
+    const notes: string[] = [];
+    if (page.top10Pct !== undefined) {
+      const top10 = page.entries.slice(0, TOP10_ROWS);
+      if (top10.some((h) => h.label !== undefined)) {
+        notes.push(BIRDEYE_TOP10_OMITTED_NOTE);
+      } else {
+        snapshot.distribution = { top10Pct: page.top10Pct };
+        if (top10.some((h) => h.isProgramAccount)) notes.push(BIRDEYE_TOP10_NOTE);
+      }
+    }
     return sourced(snapshot, fetchedAt, 'indexed', notes);
   }
 

@@ -13,9 +13,10 @@ import 'server-only';
  * wallets). Owners are resolved with getMultipleAccounts (jsonParsed) and
  * percentages use getTokenSupply. The largest accounts are usually
  * bonding-curve / pool vaults, so they are labelled — the mint's pump.fun
- * curve PDA and program-wide vault authorities without a call, other
- * off-curve owners by their owning program (one more getMultipleAccounts,
- * zero-length data slice) — and left out of top-holder concentration.
+ * curve PDA, its canonical PumpSwap pool and program-wide vault authorities
+ * without a call, other off-curve owners by their owning program (one more
+ * getMultipleAccounts, zero-length data slice) — and left out of top-holder
+ * concentration.
  * Data is read from chain state (Helius standard RPC is uncached) →
  * freshness `realtime`. The total holder count is not available cheaply and
  * is omitted.
@@ -28,7 +29,7 @@ import { isSolanaAddress } from '@/lib/core/solana';
 import type { HolderEntry, HolderSnapshot, Sourced, TokenMeta } from '@/lib/core/types';
 import { isAbortError, isProviderError, ProviderError, type ProviderErrorCode } from '@/lib/net/errors';
 import type { JsonFetcher } from '@/lib/net/types';
-import { AMM_PROGRAM_LABELS, bondingCurvePdaOf, DISTRIBUTION_NOTE, holderDistribution, staticLiquidityLabel } from './labels';
+import { AMM_PROGRAM_LABELS, bondingCurvePdaOf, DISTRIBUTION_NOTE, holderDistribution, launchpadPdasOf, staticLiquidityLabel } from './labels';
 import {
   assetToTokenMeta,
   parseAccountPrograms,
@@ -46,6 +47,7 @@ export const HELIUS_MAX_HOLDERS = 20;
 export const HELIUS_ASSET_BATCH_LIMIT = 1_000;
 
 const PROVIDER = 'helius' as const;
+const SUPPLY_UNAVAILABLE_NOTE = 'Token supply unavailable; percentages omitted.';
 
 export interface HeliusOptions {
   apiKey: string;
@@ -202,10 +204,13 @@ export function createHelius(opts: HeliusOptions): HeliusAdapter {
     const max = Math.max(1, Math.min(Math.floor(limit) || HELIUS_MAX_HOLDERS, HELIUS_MAX_HOLDERS));
     const config = { commitment: 'confirmed' };
 
+    // Launchpad PDAs (CPU only) are derived while the RPC calls run.
+    const pdasPromise = launchpadPdasOf(mint);
     const [largestResult, supplyResult] = await Promise.allSettled([
       rpc('getTokenLargestAccounts', [mint, config], signal, true),
       rpc('getTokenSupply', [mint, config], signal, true),
     ]);
+    const pdas = await pdasPromise;
     if (largestResult.status === 'rejected') throw largestResult.reason;
     const accounts = parseLargestAccounts(largestResult.value);
     if (!accounts) throw new ProviderError(PROVIDER, 'malformed', `${PROVIDER}: getTokenLargestAccounts returned an unexpected payload`);
@@ -217,10 +222,11 @@ export function createHelius(opts: HeliusOptions): HeliusAdapter {
     let supply: number | undefined;
     if (supplyResult.status === 'fulfilled') {
       supply = parseTokenSupply(supplyResult.value);
-    } else {
-      if (isAbortError(supplyResult.reason)) throw supplyResult.reason;
-      notes.push('Token supply unavailable; percentages omitted.');
+    } else if (isAbortError(supplyResult.reason)) {
+      throw supplyResult.reason;
     }
+    // A failed call and an unreadable (or zero) supply both leave the percentages unknown.
+    if (supply === undefined) notes.push(SUPPLY_UNAVAILABLE_NOTE);
 
     let owners = new Map<string, string>();
     if (accounts.length) {
@@ -229,8 +235,6 @@ export function createHelius(opts: HeliusOptions): HeliusAdapter {
       if (!parsed) throw new ProviderError(PROVIDER, 'malformed', `${PROVIDER}: getMultipleAccounts returned an unexpected payload`);
       owners = parsed;
     }
-    const curvePda = accounts.length ? await pumpBondingCurvePda(mint) : undefined;
-
     const entries: HolderEntry[] = [];
     const liquidity = new Set<HolderEntry>();
     const unlabelledPdas = new Set<string>();
@@ -240,7 +244,7 @@ export function createHelius(opts: HeliusOptions): HeliusAdapter {
       if (!owner) continue;
       const entry: HolderEntry = { owner, tokenAccount: account.tokenAccount, amount: account.amount };
       if (supply) entry.pctOfSupply = (account.amount / supply) * 100;
-      const label = knownPools[owner] ?? knownPools[account.tokenAccount] ?? staticLiquidityLabel(owner, curvePda);
+      const label = knownPools[owner] ?? knownPools[account.tokenAccount] ?? staticLiquidityLabel(owner, pdas.curve, pdas.pumpSwapPool);
       if (label) {
         entry.label = label;
         liquidity.add(entry);

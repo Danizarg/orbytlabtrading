@@ -39,7 +39,8 @@ export function useBondingCurve(mint: string, enabled: boolean) {
     queryKey: bondingCurveKey(mint),
     queryFn: ({ signal }) => loadBondingCurve(mint, signal),
     enabled,
-    refetchInterval: (query) => curvePollInterval(query.state.data?.data),
+    // Both RPC reads failing is transient: back off to 10 s instead of hammering both every 3 s.
+    refetchInterval: (query) => (query.state.status === 'error' || query.state.fetchFailureCount > 0 ? POLL.fast : curvePollInterval(query.state.data?.data)),
     staleTime: 2_000,
     placeholderData: keepPreviousData,
     retry: 1,

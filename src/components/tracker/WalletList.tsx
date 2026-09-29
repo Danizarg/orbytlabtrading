@@ -2,11 +2,10 @@
 
 import { Check, ExternalLink, Pencil, Plus, X } from 'lucide-react';
 import Link from 'next/link';
-import { memo, useId, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { memo, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useNow } from '@/client/hooks/useNow';
 import { MAX_TRACKED_WALLETS, usePreferences, type TrackedWallet } from '@/client/store/preferences';
 import { CopyButton } from '@/components/ui/CopyButton';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/components/ui/cn';
 import type { TrackerFeedView } from '@/data/hooks/useTrackerFeed';
@@ -17,15 +16,18 @@ import { LIVE_LABEL, TRACKER_POLL_MS, type TrackerLive, type TrackerWalletStatus
 
 const DOT: Record<TrackerLive, string> = { subscribed: 'bg-up', polling: 'bg-warn', error: 'bg-down' };
 
-function statusText(status: TrackerWalletStatus | undefined, live: TrackerLive, now: number): string {
+function statusText(status: TrackerWalletStatus | undefined, live: TrackerLive, pollMs: number, now: number): string {
   if (!status) return 'Starting';
   if (live === 'error') return status.backfillError ?? status.pollError ?? 'Error';
   const parts: string[] = [LIVE_LABEL[live]];
-  if (status.streamEvents > 0) parts.push(`${status.streamEvents} live event${status.streamEvents === 1 ? '' : 's'}`);
+  const liveFound = status.streamEvents + (status.hintedFound ?? 0);
+  if (liveFound > 0) parts.push(`${liveFound} live`);
+  if (status.missedByStream) parts.push(`${status.missedByStream} via poll`);
+  if (pollMs < TRACKER_POLL_MS) parts.push(`every ${pollMs / 1000} s`);
   const last = Math.max(status.lastPollAt ?? 0, status.backfilledAt ?? 0);
   if (last > 0 && now) parts.push(`checked ${formatAge(last, now)} ago`);
   else if (status.backfilledAt === undefined && !status.backfillError) parts.push('loading recent activity');
-  if (status.pollError) parts.push(`last poll failed`);
+  if (status.pollError) parts.push('last poll failed');
   return parts.join(' · ');
 }
 
@@ -79,32 +81,47 @@ function AddWalletForm() {
         </p>
       ) : (
         <p className="text-2xs text-faint">
-          {count}/{MAX_TRACKED_WALLETS} wallets · stored in this browser only
+          {count}/{MAX_TRACKED_WALLETS} wallets · saved in this browser
         </p>
       )}
     </form>
   );
 }
 
-const WalletRow = memo(function WalletRow({ wallet, status, live }: { wallet: TrackedWallet; status: TrackerWalletStatus | undefined; live: TrackerLive }) {
+const WalletRow = memo(function WalletRow({
+  wallet,
+  status,
+  live,
+  pollMs,
+}: {
+  wallet: TrackedWallet;
+  status: TrackerWalletStatus | undefined;
+  live: TrackerLive;
+  pollMs: number;
+}) {
   const now = useNow();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(wallet.label);
   const [confirming, setConfirming] = useState(false);
+  // Escape cancels; some browsers fire blur while the input unmounts, which must not commit the draft.
+  const cancelled = useRef(false);
 
   function commit() {
+    if (cancelled.current) return;
+    cancelled.current = true;
     usePreferences.getState().renameWallet(wallet.address, draft);
     setEditing(false);
   }
   function onKey(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') commit();
     if (e.key === 'Escape') {
+      cancelled.current = true;
       setDraft(wallet.label);
       setEditing(false);
     }
   }
 
-  const text = statusText(status, live, now);
+  const text = statusText(status, live, pollMs, now);
   return (
     <li className="group flex items-center gap-2 border-b border-line px-3 py-1.5 transition-colors hover:bg-hover">
       <span aria-hidden className={cn('size-1.5 shrink-0 rounded-full', DOT[live], live === 'subscribed' && 'animate-pulse-dot')} title={LIVE_LABEL[live]} />
@@ -129,6 +146,7 @@ const WalletRow = memo(function WalletRow({ wallet, status, live }: { wallet: Tr
               <button
                 type="button"
                 onClick={() => {
+                  cancelled.current = false;
                   setDraft(wallet.label);
                   setEditing(true);
                 }}
@@ -214,13 +232,11 @@ export function WalletList({ wallets, feed, hydrated }: { wallets: readonly Trac
             ))}
           </div>
         ) : wallets.length === 0 ? (
-          <EmptyState title="No wallets tracked" className="py-8">
-            Paste a wallet address above, or open any wallet page and press Track.
-          </EmptyState>
+          <p className="px-3 py-4 text-2xs text-muted">No wallets yet. Paste an address above.</p>
         ) : (
           <ul>
             {wallets.map((w) => (
-              <WalletRow key={w.address} wallet={w} status={feed.status[w.address]} live={feed.live[w.address] ?? 'polling'} />
+              <WalletRow key={w.address} wallet={w} status={feed.status[w.address]} live={feed.live[w.address] ?? 'polling'} pollMs={feed.pollMs[w.address] ?? TRACKER_POLL_MS} />
             ))}
           </ul>
         )}

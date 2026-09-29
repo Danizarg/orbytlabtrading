@@ -55,9 +55,18 @@ export function HoldersPanel({ holders }: { holders: HoldersState }) {
           </EmptyState>
         )}
         {!holders.isPending && !snapshot && holders.error === undefined && <EmptyState title="No holder data">No provider reported holder data for this token.</EmptyState>}
-        {snapshot && !hasList && (
+        {snapshot && !hasList && !holders.listConfigured && (
           <EmptyState title="Holder summary only">
             {HOLDER_LIST_NOTE}. The count and concentration above come from {holders.source === 'geckoterminal' ? 'GeckoTerminal' : 'the configured provider'}.
+          </EmptyState>
+        )}
+        {snapshot && !hasList && holders.listConfigured && (
+          <EmptyState title={holders.listError !== undefined ? 'Holder list unavailable' : 'No holder list'} tone={holders.listError !== undefined ? 'error' : 'neutral'}>
+            {holders.listError !== undefined ? (
+              <ErrorLines lines={errorLines(holders.listError)} className="text-left" />
+            ) : (
+              'The holder list provider returned no holders for this token.'
+            )}
           </EmptyState>
         )}
         {snapshot && hasList && (

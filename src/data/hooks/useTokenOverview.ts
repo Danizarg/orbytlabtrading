@@ -9,7 +9,7 @@ import type { ProviderId } from '@/lib/core/providers';
 import type { BondingCurveState, Freshness, LaunchpadState, MintInfo, PoolInfo, TokenMarket, TokenMeta, TokenRow } from '@/lib/core/types';
 import { isProviderError } from '@/lib/net/errors';
 import type { GeckoTokenInfo } from '@/lib/providers/geckoterminal';
-import { chainWinner, isPumpCandidate, mergeLaunchpad, mergeOverview, pollForWinner } from '@/lib/services/token';
+import { chainWinner, isDefinitelyAbsent, isPumpCandidate, mergeLaunchpad, mergeOverview, pollForWinner } from '@/lib/services/token';
 import { POLL } from '../query';
 import { dex, gecko, jup, server } from '../sources';
 import { useBondingCurve } from './useBondingCurve';
@@ -24,10 +24,11 @@ import { useSolPrice } from './useSolPrice';
  * the on-chain mint account, the decoded pump.fun curve and the pool list.
  * Every request starts in parallel; nothing waits for another response.
  *
- * Keyless budget on this page: the row polls Jupiter every 15 s (30 s when a
- * browser-indexed source answered), token info costs one GeckoTerminal call
- * per two minutes (cached 5 min by the transport), pools one DEX Screener
- * call per minute.
+ * Keyless budget on this page: the row polls Jupiter (or the keyed server
+ * route) every 10 s, 30 s when a browser-indexed source answered or no source
+ * lists the token yet; token info
+ * costs one GeckoTerminal call per two minutes (cached 5 min by the
+ * transport), pools one DEX Screener call per minute.
  */
 
 export const tokenRowKey = (mint: string, serverDiscover: boolean) => ['token-row', mint, serverDiscover] as const;
@@ -53,7 +54,7 @@ export function tokenRowOptions(mint: string, serverDiscover: boolean) {
     queryKey: tokenRowKey(mint, serverDiscover),
     queryFn: ({ signal }) => loadTokenRow(mint, serverDiscover, signal),
     staleTime: 5_000,
-    refetchInterval: (query) => pollForWinner(chainWinner(query.state.data), 15_000, POLL.indexed),
+    refetchInterval: (query) => pollForWinner(chainWinner(query.state.data), POLL.fast, POLL.indexed),
     placeholderData: keepPreviousData,
     retry: 1,
   });
@@ -158,8 +159,9 @@ export function useTokenOverview(mint: string, opts: { pool?: string } = {}): To
 
   const launchpad = view.meta.launchpad;
   const isBonding = curve ? !curve.complete : launchpad?.stage === 'bonding';
-  const listed = row.data ? rowData !== undefined : row.isError ? false : undefined;
-  const isMint = mintInfo.data ? true : mintInfo.isError ? false : undefined;
+  // Only a definitive "not found" from every source counts as absent; a timeout or rate limit stays unknown.
+  const listed = row.data ? rowData !== undefined : isDefinitelyAbsent(row.error) ? false : undefined;
+  const isMint = mintInfo.data ? true : isDefinitelyAbsent(mintInfo.error) ? false : undefined;
 
   return {
     mint,

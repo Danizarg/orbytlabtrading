@@ -2,9 +2,10 @@
 
 import { ArrowUpRight, RotateCw } from 'lucide-react';
 import Link from 'next/link';
-import { memo } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import { useNow } from '@/client/hooks/useNow';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/components/ui/cn';
 import type { PortfolioView } from '@/data/hooks/usePortfolio';
@@ -24,6 +25,9 @@ const COLS: ReadonlyArray<{ id: string; label: string; width: string; align: 'le
   { id: 'trade', label: '', width: 'w-16', align: 'right' },
 ];
 
+/** Rows rendered before "Show more" (priced holdings sort first, so these carry the value). */
+const HOLDINGS_SHOWN = 150;
+
 function ShareBar({ pct }: { pct?: number }) {
   if (pct === undefined) return <Dash />;
   return (
@@ -36,6 +40,13 @@ function ShareBar({ pct }: { pct?: number }) {
   );
 }
 
+const HOLDING_FIELDS = ['mint', 'amount', 'decimals', 'priceUsd', 'valueUsd', 'sharePct', 'symbol', 'name', 'image'] as const;
+
+/** Holdings are re-priced every 30 s into new objects; re-render a row only when one of its cells changes. */
+function sameHolding(a: { holding: Holding }, b: { holding: Holding }): boolean {
+  return HOLDING_FIELDS.every((k) => a.holding[k] === b.holding[k]);
+}
+
 const HoldingRow = memo(function HoldingRow({ holding }: { holding: Holding }) {
   const { mint, amount, priceUsd, valueUsd, sharePct, symbol, name, image, decimals } = holding;
   return (
@@ -44,7 +55,8 @@ const HoldingRow = memo(function HoldingRow({ holding }: { holding: Holding }) {
         <TokenCell mint={mint} identity={{ mint, symbol, name, image, decimals }} />
       </td>
       <td className={cn(TD, 'text-right')}>
-        <span className="tabular text-fg" title={`${amount.toLocaleString('en-US', { maximumFractionDigits: decimals })}${symbol ? ` ${symbol}` : ''}`}>
+        {/* SPL decimals are a u8; Intl rejects more than 100 fraction digits. */}
+        <span className="tabular text-fg" title={`${amount.toLocaleString('en-US', { maximumFractionDigits: Math.min(20, Math.max(0, Math.floor(decimals) || 0)) })}${symbol ? ` ${symbol}` : ''}`}>
           {formatAmount(amount)}
         </span>
       </td>
@@ -68,7 +80,7 @@ const HoldingRow = memo(function HoldingRow({ holding }: { holding: Holding }) {
       </td>
     </tr>
   );
-});
+}, sameHolding);
 
 function SolRow({ sol, price, value, share }: { sol: number; price?: number; value?: number; share?: number }) {
   return (
@@ -127,9 +139,13 @@ export function HoldingsTable({ view }: { view: PortfolioView }) {
   const result = query.data;
   const loading = query.isPending;
   const tokens = portfolio?.tokens ?? [];
+  // Airdrop-heavy wallets hold thousands of dust tokens; render the valued top first and the rest on request.
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? tokens : tokens.slice(0, HOLDINGS_SHOWN);
+  const hidden = tokens.length - visible.length;
   const solShare = portfolio?.totalUsd && portfolio.solValueUsd !== undefined && portfolio.totalUsd > 0 ? (portfolio.solValueUsd / portfolio.totalUsd) * 100 : undefined;
 
-  let empty: React.ReactNode = null;
+  let empty: ReactNode = null;
   if (query.isError && !result) {
     empty = (
       <EmptyState tone="error" title="Holdings unavailable">
@@ -144,7 +160,7 @@ export function HoldingsTable({ view }: { view: PortfolioView }) {
   }
 
   const sourceLabel = result ? (result.source === 'orbyt' ? 'Solana RPC via ORBYT API' : PROVIDER_LABELS[result.source]) : undefined;
-  const priceSource = prices.data ? PROVIDER_LABELS[prices.data.source] : result?.contributors?.length ? PROVIDER_LABELS[result.contributors[0]!] : undefined;
+  const priceSource = prices.source ? PROVIDER_LABELS[prices.source] : result?.contributors?.length ? PROVIDER_LABELS[result.contributors[0]!] : undefined;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -165,14 +181,21 @@ export function HoldingsTable({ view }: { view: PortfolioView }) {
               ))}
             </tr>
           </thead>
-          <tbody className={cn('transition-opacity duration-150', query.isPlaceholderData && 'opacity-60')}>
+          <tbody>
             {portfolio && <SolRow sol={portfolio.sol} price={portfolio.solPriceUsd} value={portfolio.solValueUsd} share={solShare} />}
-            {tokens.map((h) => (
+            {visible.map((h) => (
               <HoldingRow key={h.mint} holding={h} />
             ))}
             {loading && !portfolio && Array.from({ length: 8 }, (_, i) => <SkeletonRow key={i} />)}
           </tbody>
         </table>
+        {hidden > 0 && (
+          <div className="sticky left-0 flex w-full justify-center border-b border-line py-2">
+            <button type="button" onClick={() => setShowAll(true)} className={BTN}>
+              Show {hidden} more
+            </button>
+          </div>
+        )}
         {empty && <div className="sticky left-0 w-full">{empty}</div>}
       </div>
       <footer className={FOOTER}>
@@ -201,10 +224,10 @@ export function HoldingsTable({ view }: { view: PortfolioView }) {
             </span>
             <span>
               Prices: <span className="text-fg-dim">{priceSource ?? 'Jupiter'}</span>
-              {prices.data && (
+              {prices.fetchedAt !== undefined && (
                 <>
                   {' '}
-                  · <Ago at={prices.data.fetchedAt} />
+                  · <Ago at={prices.fetchedAt} />
                 </>
               )}
               {pricingPending && ' · loading'}
@@ -217,7 +240,8 @@ export function HoldingsTable({ view }: { view: PortfolioView }) {
               ·
             </span>
             <span className="text-warn" title={describeError(prices.error)}>
-              Price refresh failed{prices.data ? ' · showing last quotes' : ''}
+              {prices.batches > 1 ? `${prices.failedBatches}/${prices.batches} price batches failed` : 'Price refresh failed'}
+              {prices.data ? ' · showing last quotes' : ''}
             </span>
           </>
         )}
@@ -249,6 +273,9 @@ export function HoldingsTable({ view }: { view: PortfolioView }) {
             <span title={result.notes.join('\n')}>{result.notes[result.notes.length - 1]}</span>
           </>
         ) : null}
+        <span className="ml-auto pl-3">
+          <FreshnessBadge updatedAt={result?.fetchedAt} error={query.isError ? describeError(query.error) : null} staleAfterMs={90_000} />
+        </span>
       </footer>
     </div>
   );

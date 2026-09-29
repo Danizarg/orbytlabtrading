@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { cn } from '@/components/ui/cn';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
@@ -13,7 +13,7 @@ import { useTrades } from '@/data/hooks/useTrades';
 import type { LiveTick } from '@/lib/analytics/candles';
 import { formatCompact } from '@/lib/core/format';
 import type { HolderSnapshot, RiskReport, Sourced } from '@/lib/core/types';
-import { curvePriceUsd, errorLines, parsePoolParam } from '@/lib/services/token';
+import { chainWinner, curvePriceUsd, curveQuoteSymbol, errorLines, isIndexedPool, parsePoolParam } from '@/lib/services/token';
 import { ChartPanel } from './ChartPanel';
 import { HoldersPanel } from './HoldersPanel';
 import { InfoPanel } from './InfoPanel';
@@ -25,6 +25,7 @@ import { StatsGrid } from './StatsGrid';
 import { TokenHeader } from './TokenHeader';
 import { TradePanel } from './TradePanel';
 import { TradesTable } from './TradesTable';
+import { rehydrateTradeSettings } from './tradeSettings';
 
 type Tab = 'trades' | 'holders' | 'pools' | 'info';
 
@@ -39,8 +40,12 @@ export function TradePage({ mint }: { mint: string }) {
   const poolParam = parsePoolParam(searchParams.get('pool'));
   const t = useTokenOverview(mint, { pool: poolParam });
   const pool = t.primaryPool;
-  const tradesState = useTrades(mint, pool?.address);
+  const poolIndexed = isIndexedPool(pool);
+  const tradesState = useTrades(mint, pool?.address, { indexed: poolIndexed });
   const [tab, setTab] = useState<Tab>('trades');
+
+  // Saved trade-panel / chart preferences apply after mount so SSR and hydration markup match.
+  useEffect(() => rehydrateTradeSettings(), []);
 
   const geckoInfo = t.queries.info.data;
   const geckoRisk = useMemo<Sourced<RiskReport> | undefined>(() => (geckoInfo ? { ...geckoInfo, data: geckoInfo.data.risk } : undefined), [geckoInfo]);
@@ -48,14 +53,31 @@ export function TradePage({ mint }: { mint: string }) {
   const risk = useRisk(mint, { gecko: geckoRisk, geckoError: t.queries.info.error, mintInfo: t.mintInfo });
   const holders = useHolders(mint, { summary: geckoHolders, summaryError: t.queries.info.error });
 
-  const curvePrice = t.curve && !t.curve.complete ? curvePriceUsd(t.curve, t.solUsd) : undefined;
+  const liveCurve = t.curve && !t.curve.complete ? t.curve : undefined;
+  const curvePrice = liveCurve ? curvePriceUsd(liveCurve, t.solUsd) : undefined;
+  const curvePriceSol = liveCurve && curveQuoteSymbol(liveCurve) === 'SOL' ? liveCurve.priceQuote : undefined;
   const curveAt = t.curveFetchedAt;
   const curveTick = useMemo<LiveTick | undefined>(
     () => (curvePrice !== undefined && curveAt !== undefined ? { timeSec: Math.floor(curveAt / 1000), price: curvePrice } : undefined),
     [curvePrice, curveAt],
   );
+  const curveTickSol = useMemo<LiveTick | undefined>(
+    () => (curvePriceSol !== undefined && curvePriceSol > 0 && curveAt !== undefined ? { timeSec: Math.floor(curveAt / 1000), price: curvePriceSol } : undefined),
+    [curvePriceSol, curveAt],
+  );
   const priceUsd = t.market?.priceUsd ?? curvePrice;
-  const hasPool = t.queries.pools.data ? t.pools.length > 0 || !!t.curve : t.queries.pools.isError ? t.pools.length > 0 : undefined;
+  // Native candles need the charted pool to be indexed upstream (a curve decoded only on-chain has no OHLCV yet).
+  const poolsAnswered = t.queries.pools.data !== undefined || t.queries.pools.isError;
+  const hasPool = poolsAnswered ? poolIndexed : undefined;
+  // The token row's price doubles as the chart's live tick when Jupiter or ORBYT's route answered it (10 s poll),
+  // so the chart does not spend a second Jupiter request on the same price.
+  const rowWinner = chainWinner(t.queries.row.data);
+  const rowPriceUsd = t.market?.priceUsd;
+  const rowFetchedAt = t.fetchedAt;
+  const rowPrice = useMemo(
+    () => ((rowWinner === 'jupiter' || rowWinner === 'orbyt') && rowPriceUsd !== undefined && rowPriceUsd > 0 && rowFetchedAt !== undefined ? { price: rowPriceUsd, at: rowFetchedAt } : undefined),
+    [rowWinner, rowPriceUsd, rowFetchedAt],
+  );
 
   if (t.isMint === false && t.listed === false) {
     return (
@@ -63,7 +85,7 @@ export function TradePage({ mint }: { mint: string }) {
         <EmptyState title="Not a token mint" tone="warn">
           <p>{mint}</p>
           <p className="mt-1">The address is not a token mint on Solana mainnet, and no market data source lists it.</p>
-          <ErrorLines lines={[...errorLines(t.queries.mintInfo.error), ...errorLines(t.error)]} className="mt-2 text-left" />
+          <ErrorLines lines={[t.queries.mintInfo.error, t.error].filter((e) => e != null).flatMap(errorLines)} className="mt-2 text-left" />
         </EmptyState>
       </div>
     );
@@ -92,12 +114,17 @@ export function TradePage({ mint }: { mint: string }) {
           <ChartPanel
             mint={mint}
             pool={pool}
+            poolIndexed={poolIndexed}
             hasPool={hasPool}
             supply={t.supply}
             trades={tradesState.trades}
             feed={tradesState.feed}
             tradesEnabled={tradesState.enabled}
             curveTick={curveTick}
+            curveTickSol={curveTickSol}
+            rowPrice={rowPrice}
+            aggregateTicks={!t.poolOverridden}
+            solUsd={t.solUsd}
             className="order-1 min-h-[380px] lg:col-start-1 lg:row-start-1 lg:min-h-0"
           />
         </ErrorBoundary>
@@ -117,6 +144,7 @@ export function TradePage({ mint }: { mint: string }) {
                 error={tradesState.error}
                 isPending={tradesState.isPending}
                 enabled={tradesState.enabled}
+                poolsPending={!poolsAnswered}
                 quoteSymbol={pool?.quoteSymbol}
               />
             )}
@@ -131,7 +159,7 @@ export function TradePage({ mint }: { mint: string }) {
             <TradePanel mint={mint} symbol={t.meta.symbol} decimals={t.meta.decimals} priceUsd={priceUsd} className="order-2 lg:order-none" />
           </ErrorBoundary>
           <ErrorBoundary label="Stats" resetKeys={[mint]} className="order-4 flex min-h-24 items-center justify-center bg-panel lg:order-none">
-            <StatsGrid market={t.market} className="order-4 shrink-0 lg:order-none" />
+            <StatsGrid market={t.market} loading={t.queries.row.isPending} className="order-4 shrink-0 lg:order-none" />
           </ErrorBoundary>
           <ErrorBoundary label="Audit" resetKeys={[mint]} className="order-5 flex min-h-24 items-center justify-center bg-panel lg:order-none">
             <RiskCard

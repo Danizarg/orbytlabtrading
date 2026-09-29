@@ -52,7 +52,12 @@ export function useHolders(mint: string, input: { summary?: Sourced<HolderSnapsh
     freshness: primary?.freshness,
     fetchedAt: primary?.fetchedAt,
     notes: [...new Set([...(list?.notes ?? []), ...(!list ? (summary?.notes ?? []) : [])])],
-    error: serverHolders ? (query.error ?? (!summary ? input.summaryError : undefined)) : !summary ? input.summaryError : undefined,
+    /** A keyed holder-list provider is configured (so a missing list is a failure, not a missing key). */
+    listConfigured: serverHolders,
+    /** The keyed list request failed (shown next to the summary fallback). */
+    listError: serverHolders && !list ? (query.error ?? undefined) : undefined,
+    // Nothing to show at all. React Query reports `null` when there is no error.
+    error: snapshot ? undefined : ((serverHolders ? query.error : null) ?? input.summaryError ?? undefined),
     isPending: serverHolders ? query.isPending && !summary : !summary && !input.summaryError,
     query,
   };

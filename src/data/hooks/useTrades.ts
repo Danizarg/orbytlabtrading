@@ -1,11 +1,12 @@
 'use client';
 
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useCapabilities } from '@/client/capabilities';
 import { mergeTrades, newTradesSince } from '@/lib/analytics/trades';
 import { runChain, type ChainAttempt } from '@/lib/core/chain';
 import type { ProviderId } from '@/lib/core/providers';
 import type { Freshness, Trade } from '@/lib/core/types';
+import { chainWinner, pollForWinner } from '@/lib/services/token';
 import { POLL } from '../query';
 import { gecko, server } from '../sources';
 
@@ -16,6 +17,7 @@ import { gecko, server } from '../sources';
  * 'indexed', ~30 s delayed). Each poll merges into the list already in the
  * query cache (deduplicated by signature, newest first, capped), so the feed
  * only grows while the page is open and never blanks when a refresh fails.
+ * GeckoTerminal is only asked for pools an aggregator has indexed.
  */
 
 export const TRADES_CAP = 300;
@@ -32,6 +34,7 @@ export interface TradeFeed {
   fetchedAt: number;
   /** Trades newer than this were not in the provider snapshot (volume-dedupe cursor for live candle ticks). */
   snapshotAt: number;
+  /** The feed moves the chart tick by tick (stream / realtime / fast). LIVE labels use `isLiveFreshness`. */
   realtime: boolean;
   notes?: string[];
   attempts: ChainAttempt[];
@@ -44,15 +47,15 @@ export function isRealtimeFeed(freshness: Freshness): boolean {
 }
 
 export async function loadTradeFeed(
-  input: { mint: string; pool: string | undefined; serverTrades: boolean; previous: TradeFeed | undefined },
+  input: { mint: string; pool: string | undefined; indexed: boolean; serverTrades: boolean; previous: TradeFeed | undefined },
   signal?: AbortSignal,
 ): Promise<TradeFeed> {
-  const { mint, pool, serverTrades, previous } = input;
+  const { mint, pool, indexed, serverTrades, previous } = input;
   const result = await runChain<Trade[]>(
     'trades',
     [
       serverTrades && { id: 'orbyt', run: () => server.trades.getTrades({ mint, pool, limit: 100 }, signal) },
-      !!pool && { id: 'geckoterminal', run: () => gecko.getTrades({ mint, pool, limit: TRADES_CAP }, signal) },
+      !!pool && indexed && { id: 'geckoterminal', run: () => gecko.getTrades({ mint, pool, limit: TRADES_CAP }, signal) },
     ],
     { signal },
   );
@@ -72,33 +75,46 @@ export async function loadTradeFeed(
   };
 }
 
-/** Poll at the winning source's cadence; while nothing has answered, retry at the fastest configured cadence. */
+/**
+ * Poll at the winning chain step's cadence: ORBYT's route every 3 s, the
+ * GeckoTerminal fallback every 30 s. `feed.source` names the upstream
+ * provider behind the server route (e.g. 'helius'), so the winner comes from
+ * the chain attempts. Before anything answered, retry at 5 s when the server
+ * route exists, else at GeckoTerminal's cache age.
+ */
 export function tradesPollInterval(feed: TradeFeed | undefined, serverTrades: boolean): number {
   if (!feed) return serverTrades ? 5_000 : POLL.indexed;
-  return feed.source === 'orbyt' && feed.realtime ? POLL.realtime : POLL.indexed;
+  return pollForWinner(chainWinner(feed), POLL.realtime, POLL.indexed);
 }
 
-export function useTrades(mint: string, pool: string | undefined) {
+export function useTrades(mint: string, pool: string | undefined, opts: { indexed?: boolean } = {}) {
   const { serverTrades } = useCapabilities();
+  const indexed = opts.indexed ?? true;
   const key = tradesKey(mint, pool, serverTrades);
+  const enabled = (!!pool && indexed) || serverTrades;
   const query = useQuery({
     queryKey: key,
-    queryFn: ({ signal, client }) => loadTradeFeed({ mint, pool, serverTrades, previous: client.getQueryData<TradeFeed>(key) }, signal),
-    enabled: !!pool || serverTrades,
+    queryFn: ({ signal, client }) => loadTradeFeed({ mint, pool, indexed, serverTrades, previous: client.getQueryData<TradeFeed>(key) }, signal),
+    enabled,
     refetchInterval: (q) => tradesPollInterval(q.state.data, serverTrades),
     staleTime: 2_000,
-    placeholderData: keepPreviousData,
+    // No placeholderData: a new key is a different pool, whose trades must never be shown as this one's.
+    // Refresh failures keep the accumulated list (React Query keeps `data` on error).
     retry: 1,
   });
   return {
     feed: query.data,
     trades: query.data?.trades ?? EMPTY,
-    error: query.error,
+    /** Signatures new in the latest poll (row flash). */
+    newSignatures: query.data?.fresh ?? NO_SIGNATURES,
+    // React Query reports `null` when there is no error.
+    error: query.error ?? undefined,
     isPending: query.isPending,
     isFetching: query.isFetching,
-    enabled: !!pool || serverTrades,
+    enabled,
     query,
   };
 }
 
 const EMPTY: Trade[] = [];
+const NO_SIGNATURES: ReadonlySet<string> = new Set();

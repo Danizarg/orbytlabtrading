@@ -10,7 +10,7 @@ import type { TradeFeed } from '@/data/hooks/useTrades';
 import { tradeUsdValue } from '@/lib/analytics/trades';
 import { formatAmount, formatDateTime, formatPrice, formatUsd } from '@/lib/core/format';
 import type { Trade } from '@/lib/core/types';
-import { errorLines, filterTrades, marketCapAtTrade, parseMinUsd, type TradeSideFilter } from '@/lib/services/token';
+import { errorLines, filterTrades, isLiveFreshness, marketCapAtTrade, parseMinUsd, type TradeSideFilter } from '@/lib/services/token';
 import { Age, Dash, ErrorLines, SkeletonRows, SourceLine } from './parts';
 import { ROW, TD, TD_NUM, TH, TH_NUM } from './tableStyles';
 
@@ -24,17 +24,20 @@ const TradeRow = memo(function TradeRow({ trade, fresh, supply }: { trade: Trade
   const usd = tradeUsdValue(trade);
   const mc = marketCapAtTrade(trade, supply);
   const buy = trade.side === 'buy';
-  const quote = trade.solAmount !== undefined ? `${formatAmount(trade.solAmount, { maxDecimals: trade.solAmount < 1 ? 4 : 2 })}` : trade.quoteAmount !== undefined ? `${formatAmount(trade.quoteAmount)} ${trade.quoteSymbol ?? ''}`.trim() : undefined;
+  // Adaptive decimals: a 0.00004 SOL trade must not round to "0".
+  const quote = trade.solAmount !== undefined ? formatAmount(trade.solAmount) : trade.quoteAmount !== undefined ? `${formatAmount(trade.quoteAmount)} ${trade.quoteSymbol ?? ''}`.trim() : undefined;
+  // New rows slide in (row) and flash their value cells in the trade's direction.
+  const flash = fresh ? (buy ? 'motion-safe:animate-flash-up' : 'motion-safe:animate-flash-down') : undefined;
   return (
     <tr className={cn(ROW, fresh && 'motion-safe:animate-slide-in')}>
       <td className={TD}>
         <Age from={trade.timestamp} title={formatDateTime(trade.timestamp)} className="text-muted" />
       </td>
       <td className={cn(TD, 'font-medium', buy ? 'text-up' : 'text-down')}>{buy ? 'Buy' : 'Sell'}</td>
-      <td className={cn(TD_NUM, buy ? 'text-up' : 'text-down')}>{trade.priceUsd === undefined ? <Dash /> : formatPrice(trade.priceUsd)}</td>
+      <td className={cn(TD_NUM, buy ? 'text-up' : 'text-down', flash)}>{trade.priceUsd === undefined ? <Dash /> : formatPrice(trade.priceUsd)}</td>
       <td className={TD_NUM}>{trade.tokenAmount === undefined ? <Dash /> : formatAmount(trade.tokenAmount, { maxDecimals: 2 })}</td>
       <td className={TD_NUM}>{quote ?? <Dash />}</td>
-      <td className={cn(TD_NUM, 'text-fg')}>{usd === undefined ? <Dash /> : formatUsd(usd)}</td>
+      <td className={cn(TD_NUM, 'text-fg', flash)}>{usd === undefined ? <Dash /> : formatUsd(usd)}</td>
       <td className={TD_NUM}>{mc === undefined ? <Dash /> : formatUsd(mc)}</td>
       <td className={TD}>{trade.wallet ? <WalletLink address={trade.wallet} /> : <Dash />}</td>
       <td className={cn(TD, 'text-right')}>
@@ -51,6 +54,7 @@ export function TradesTable({
   error,
   isPending,
   enabled,
+  poolsPending = false,
   quoteSymbol,
 }: {
   trades: readonly Trade[];
@@ -59,6 +63,8 @@ export function TradesTable({
   error: unknown;
   isPending: boolean;
   enabled: boolean;
+  /** The pool list is still loading (the feed cannot start yet). */
+  poolsPending?: boolean;
   quoteSymbol?: string;
 }) {
   const [side, setSide] = useState<TradeSideFilter>('all');
@@ -87,11 +93,12 @@ export function TradesTable({
           {filtered.length !== trades.length ? ` / ${trades.length}` : ''}
         </span>
         <span className="ml-auto">
-          <FreshnessBadge updatedAt={feed?.fetchedAt} live={feed?.realtime ?? false} liveWindowMs={8_000} error={error && !feed ? 'Trade feed unavailable' : undefined} />
+          <FreshnessBadge updatedAt={feed?.fetchedAt} live={isLiveFreshness(feed?.freshness)} liveWindowMs={8_000} error={error && !feed ? 'Trade feed unavailable' : undefined} />
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
-        {!enabled && <EmptyState title="Waiting for a pool">Trades load once a pool for this token is known.</EmptyState>}
+        {!enabled && poolsPending && <SkeletonRows rows={12} cols={7} />}
+        {!enabled && !poolsPending && <EmptyState title="Waiting for an indexed pool">Trades load once DEX Screener or GeckoTerminal lists a pool for this token.</EmptyState>}
         {enabled && isPending && !trades.length && <SkeletonRows rows={12} cols={7} />}
         {enabled && !isPending && !trades.length && error !== undefined && (
           <EmptyState title="Trade feed unavailable" tone="error">

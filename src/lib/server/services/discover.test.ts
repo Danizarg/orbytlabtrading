@@ -109,6 +109,31 @@ describe('loadDiscover', () => {
     expect(result.data).toEqual([]);
     expect(jup.getUltraInfo).not.toHaveBeenCalled();
   });
+
+  it('never asks CoinGecko for the organic list it cannot rank', async () => {
+    const gecko = { id: 'coingecko' as const, discover: vi.fn(async () => sourced([row(B, 'coingecko')], 'coingecko', 'indexed')) };
+    const organic: DiscoverQuery = { ...QUERY, list: 'organic' };
+    // CoinGecko alone: a capability gap (501), not a failed upstream call.
+    await expect(loadDiscover(organic, { jupiter: null, coingecko: gecko })).rejects.toBeInstanceOf(NotConfiguredError);
+    expect(gecko.discover).not.toHaveBeenCalled();
+
+    // With Jupiter failing, the chain ends at Jupiter instead of recording a pointless CoinGecko attempt.
+    const failing: NonNullable<DiscoverDeps['jupiter']> = {
+      id: 'jupiter',
+      discover: async () => {
+        throw new ProviderError('jupiter', 'http', 'jupiter: HTTP 500', { status: 500 });
+      },
+      getUltraInfo: async () => sourced({}, 'jupiter'),
+    };
+    const error = await loadDiscover(organic, { jupiter: failing, coingecko: gecko }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ChainError);
+    expect((error as ChainError).attempts.map((a) => a.provider)).toEqual(['jupiter']);
+    expect(gecko.discover).not.toHaveBeenCalled();
+
+    // Lists CoinGecko does rank still fall back to it.
+    const top = await loadDiscover({ ...QUERY, list: 'top' }, { jupiter: failing, coingecko: gecko });
+    expect(top.source).toBe('coingecko');
+  });
 });
 
 function rowsProvider(id: ProviderId, known: string[], freshness: Freshness, calls: string[][]): TokenRowsProvider {

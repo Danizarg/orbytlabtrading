@@ -13,6 +13,7 @@ import { isSolanaAddress, MINTS } from '@/lib/core/solana';
 import type {
   BondingCurveState,
   Candle,
+  Freshness,
   Interval,
   LaunchpadState,
   LaunchStage,
@@ -336,7 +337,7 @@ export function parseMinUsd(value: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// Read-only quotes
+// Swap quotes
 // ---------------------------------------------------------------------------
 
 export const SOL_DECIMALS = 9;
@@ -388,6 +389,17 @@ export function buildQuoteRequest(input: {
 }
 
 /**
+ * A quote may stand in (dimmed) while a new amount is quoted only for the
+ * same pair direction: a buy quote never stands in for a sell.
+ */
+export function quoteMatchesRequest(
+  quote: Pick<SwapQuote, 'inputMint' | 'outputMint'> | undefined,
+  request: Pick<QuoteRequest, 'inputMint' | 'outputMint'> | undefined,
+): boolean {
+  return !!quote && !!request && quote.inputMint === request.inputMint && quote.outputMint === request.outputMint;
+}
+
+/**
  * jup.ag swap link with the pair preselected. Verified in a browser on
  * 2026-09-29: `/swap?sell=<mint>&buy=<mint>` preloads both sides; an `amount`
  * parameter is ignored, and slippage / priority fee are set inside Jupiter.
@@ -403,7 +415,7 @@ export function jupiterTokenUrl(mint: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Trade panel (read-only preview; ORBYT never signs)
+// Trade panel (quotes are previews; execution happens on Jupiter)
 // ---------------------------------------------------------------------------
 
 export const SOL_PRESETS: readonly number[] = [0.1, 0.5, 1, 5];
@@ -552,6 +564,16 @@ export function curveMarketCapUsd(curve: BondingCurveState, solUsd: number | und
 }
 
 /**
+ * Listed by an aggregator (DEX Screener / GeckoTerminal / keyed provider).
+ * A curve decoded on-chain but not yet indexed has no OHLCV or trade history
+ * upstream, so GeckoTerminal is not asked for it (it would only 404 and spend
+ * the 8 calls/min budget).
+ */
+export function isIndexedPool(pool: Pick<PoolInfo, 'source'> | undefined): boolean {
+  return pool !== undefined && pool.source !== 'solana-rpc';
+}
+
+/**
  * The pump.fun curve account as a pool for tokens no aggregator has indexed
  * yet (the curve IS the venue; DEX Screener and GeckoTerminal use the same
  * address once they list it). Every figure is decoded on-chain: liquidity is
@@ -634,6 +656,96 @@ export function intervalOptions(input: {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Chart currency (USD / SOL)
+// ---------------------------------------------------------------------------
+
+export type ChartCurrency = 'usd' | 'sol';
+
+/** The pool is quoted in SOL (WSOL), so SOL-denominated candles are native to it. */
+export function isSolQuoted(pool: Pick<PoolInfo, 'quoteMint' | 'quoteSymbol'> | undefined): boolean {
+  if (!pool) return false;
+  if (pool.quoteMint) return pool.quoteMint === MINTS.SOL;
+  const symbol = pool.quoteSymbol?.toUpperCase();
+  return symbol === 'SOL' || symbol === 'WSOL';
+}
+
+export interface CurrencyOption {
+  available: boolean;
+  /** Tooltip text. */
+  reason: string;
+}
+
+/**
+ * Whether the chart can show SOL candles for the active source. SOL prices
+ * are never converted from USD bars with today's SOL price (that would
+ * misstate history): they come from GeckoTerminal's quote-token OHLCV of the
+ * SOL pool, or from each trade's own SOL and token amounts.
+ */
+export function chartCurrencyOption(input: {
+  quoteIsSol: boolean;
+  kind: CandleSourceKind | undefined;
+  interval: Interval;
+  geckoIntervals: readonly Interval[];
+}): CurrencyOption {
+  if (!input.quoteIsSol) return { available: false, reason: 'The charted pool is not quoted in SOL' };
+  if (input.kind === 'trades') return { available: true, reason: 'Price per token in SOL from each trade’s SOL and token amounts' };
+  if ((input.kind === 'gecko' || input.kind === 'server') && input.geckoIntervals.includes(input.interval)) {
+    return { available: true, reason: 'GeckoTerminal OHLCV in the pool’s quote token (SOL)' };
+  }
+  return { available: false, reason: `SOL candles are not available for ${INTERVAL_LABELS[input.interval]}` };
+}
+
+/**
+ * Trades re-priced in SOL for SOL charts: price = SOL exchanged / tokens
+ * exchanged (exact per trade). `usdValue` carries the SOL amount so that
+ * aggregated volume is in SOL, like GeckoTerminal's quote-token OHLCV. Trades
+ * without both legs are dropped rather than estimated.
+ */
+export function solPricedTrades(trades: readonly Trade[]): Trade[] {
+  const out: Trade[] = [];
+  for (const t of trades) {
+    if (!isPos(t.solAmount) || !isPos(t.tokenAmount)) continue;
+    const price = t.solAmount / t.tokenAmount;
+    if (!Number.isFinite(price) || price <= 0) continue;
+    // Market cap is a USD figure; it has no meaning on a SOL-priced copy.
+    const { marketCapUsd: _mc, ...rest } = t;
+    out.push({ ...rest, priceUsd: price, usdValue: t.solAmount });
+  }
+  return out;
+}
+
+/** GeckoTerminal OHLCV parameters for the keyless intervals. */
+export const GECKO_OHLCV: Partial<Record<Interval, { timeframe: 'minute' | 'hour' | 'day'; aggregate: number }>> = {
+  '1m': { timeframe: 'minute', aggregate: 1 },
+  '5m': { timeframe: 'minute', aggregate: 5 },
+  '15m': { timeframe: 'minute', aggregate: 15 },
+  '1h': { timeframe: 'hour', aggregate: 1 },
+  '4h': { timeframe: 'hour', aggregate: 4 },
+  '1d': { timeframe: 'day', aggregate: 1 },
+};
+
+/**
+ * Pool OHLCV path priced in the pool's quote token for `mint`. Verified live
+ * on 2026-09-29 (Bonk/SOL): `currency=token&token=<mint>` returns OHLC in SOL
+ * per token and volume in SOL (volume × SOL/USD matched the USD series).
+ */
+export function geckoQuoteOhlcvPath(input: { pool: string; mint: string; interval: Interval; limit: number; before?: number }): string | undefined {
+  const params = GECKO_OHLCV[input.interval];
+  if (!params || !isSolanaAddress(input.pool) || !isSolanaAddress(input.mint)) return undefined;
+  const limit = Math.max(1, Math.min(1_000, Math.floor(input.limit)));
+  let path = `/networks/solana/pools/${input.pool}/ohlcv/${params.timeframe}?aggregate=${params.aggregate}&limit=${limit}&currency=token&token=${input.mint}`;
+  if (input.before !== undefined && Number.isFinite(input.before) && input.before > 0) path += `&before_timestamp=${Math.floor(input.before)}`;
+  return path;
+}
+
+/** A current USD price observation expressed in SOL with the current SOL/USD price (both live). */
+export function usdToSol(priceUsd: number | undefined, solUsd: number | undefined): number | undefined {
+  if (!isPos(priceUsd) || !isPos(solUsd)) return undefined;
+  const v = priceUsd / solUsd;
+  return Number.isFinite(v) && v > 0 ? v : undefined;
+}
+
 /** Apply real price observations / trades to candles (ticks older than the last bar are ignored). */
 export function applyTicks(candles: Candle[], ticks: readonly LiveTick[], intervalSec: number, opts?: LiveTickOptions): Candle[] {
   let out = candles;
@@ -674,9 +786,23 @@ export function chainWinner(result: { attempts: readonly ChainAttempt[] } | unde
   return result?.attempts.find((a) => a.ok)?.provider;
 }
 
-/** Browser-called indexed sources (GeckoTerminal, DEX Screener) are polled at their cache age, not faster. */
+/**
+ * Poll cadence by the chain step that answered: ORBYT's keyed server route or
+ * Jupiter at the fast cadence; browser-indexed sources (GeckoTerminal, DEX
+ * Screener) at their cache age; and nothing faster while no source lists the
+ * data (an unlisted token would otherwise walk the whole chain, GeckoTerminal
+ * included, every few seconds).
+ *
+ * Use the chain winner (`chainWinner`), not `Sourced.source`: a server-proxy
+ * result carries the upstream provider (e.g. 'helius') as its source.
+ */
 export function pollForWinner(winner: ProviderId | undefined, fast: number, indexed: number): number {
-  return winner === 'geckoterminal' || winner === 'dexscreener' ? indexed : fast;
+  return winner === 'orbyt' || winner === 'jupiter' ? fast : indexed;
+}
+
+/** LIVE is reserved for stream-fed or on-chain realtime data; polled REST ('fast') and indexed data show their age. */
+export function isLiveFreshness(freshness: Freshness | undefined): boolean {
+  return freshness === 'stream' || freshness === 'realtime';
 }
 
 /** Failed attempts worth showing (a 501 "not configured" server route is skipped silently). */
@@ -688,6 +814,15 @@ export function visibleFailures(attempts: readonly ChainAttempt[] | undefined): 
 export function describeAttempt(attempt: ChainAttempt): string {
   const detail = attempt.code === 'empty' ? 'no data' : (attempt.error ?? 'failed').replace(/^[a-z][a-z-]*:\s*/i, '');
   return `${providerLabel(attempt.provider)}: ${detail}`;
+}
+
+/**
+ * Every source answered "not found": a definitive absence. Timeouts, rate
+ * limits and network errors are not, so they never turn into "not listed" /
+ * "not a token mint" claims.
+ */
+export function isDefinitelyAbsent(error: unknown): boolean {
+  return error instanceof ChainError && error.allNotFound;
 }
 
 /** User-facing lines for a failed load, one per provider tried. */

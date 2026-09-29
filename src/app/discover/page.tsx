@@ -4,7 +4,7 @@ import { DiscoverView } from '@/components/discover/DiscoverView';
 export const metadata: Metadata = {
   title: 'Discover',
   description:
-    'Every Solana memecoin the public indexes list, merged from Jupiter, GeckoTerminal and DEX Screener, plus trending, top-volume, organic and new lists with live market data, holder concentration and launch stage.',
+    'Solana tokens from Jupiter, GeckoTerminal and DEX Screener lists: price, market cap, liquidity, volume, transactions, holder concentration and launch stage.',
 };
 
 export default async function Page({ searchParams }: PageProps<'/discover'>) {

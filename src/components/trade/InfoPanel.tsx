@@ -6,7 +6,7 @@ import { CopyButton } from '@/components/ui/CopyButton';
 import type { TokenOverviewState } from '@/data/hooks/useTokenOverview';
 import { formatAmount, formatDateTime } from '@/lib/core/format';
 import { shortAddress } from '@/lib/core/solana';
-import { explorerLinks, safeHttpUrl } from '@/lib/services/token';
+import { explorerLinks, isIndexedPool, safeHttpUrl } from '@/lib/services/token';
 import { Dash, KV, SocialLinks } from './parts';
 
 function authorityText(value: string | null | undefined): React.ReactNode {
@@ -21,7 +21,7 @@ function authorityText(value: string | null | undefined): React.ReactNode {
 
 export function InfoPanel({ state }: { state: TokenOverviewState }) {
   const { meta, mintInfo, supply, market, primaryPool } = state;
-  const links = explorerLinks(state.mint, { pool: primaryPool?.address, launchpad: meta.launchpad?.launchpad });
+  const links = explorerLinks(state.mint, { pool: isIndexedPool(primaryPool) ? primaryPool?.address : undefined, launchpad: meta.launchpad?.launchpad });
   const website = safeHttpUrl(meta.socials.website);
   return (
     <div className="min-h-0 flex-1 overflow-auto px-3 py-2">

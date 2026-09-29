@@ -11,7 +11,7 @@ import { TokenAvatar } from '@/components/ui/TokenAvatar';
 import type { TokenOverviewState } from '@/data/hooks/useTokenOverview';
 import { formatAmount, formatCompact, formatPrice, formatUsd } from '@/lib/core/format';
 import { shortAddress } from '@/lib/core/solana';
-import { curveMarketCapUsd, describeAttempt, explorerLinks, providerLabel, visibleFailures } from '@/lib/services/token';
+import { curveMarketCapUsd, describeAttempt, explorerLinks, isIndexedPool, providerLabel, visibleFailures } from '@/lib/services/token';
 import { Age, Dash, SocialLinks, WatchStar } from './parts';
 
 // Full class names so Tailwind generates them; motion-safe honours reduced motion.
@@ -35,9 +35,11 @@ export function TokenHeader({ state, priceUsd }: { state: TokenOverviewState; pr
   const flash = useFlash(priceUsd);
   const mc = market?.marketCapUsd ?? (curve && !curve.complete ? curveMarketCapUsd(curve, solUsd) : undefined);
   const progress = launchpad?.stage === 'bonding' ? launchpad.progressPct : undefined;
-  const links = explorerLinks(mint, { pool: state.primaryPool?.address, launchpad: launchpad?.launchpad });
+  const links = explorerLinks(mint, { pool: isIndexedPool(state.primaryPool) ? state.primaryPool?.address : undefined, launchpad: launchpad?.launchpad });
   const failures = visibleFailures(state.attempts);
-  const loadingIdentity = state.isPending && !meta.symbol;
+  // The market row carries identity and price: keep the skeleton until it answers (mint info alone is not enough).
+  const rowPending = state.queries.row.isPending;
+  const loadingIdentity = rowPending && !meta.symbol;
   const sourceTitle = [
     state.source ? `Market data: ${providerLabel(state.source)}` : undefined,
     ...failures.map(describeAttempt),
@@ -106,7 +108,7 @@ export function TokenHeader({ state, priceUsd }: { state: TokenOverviewState; pr
       </div>
 
       <div className="flex items-baseline gap-2 lg:ml-2">
-        {priceUsd === undefined && state.isPending ? (
+        {priceUsd === undefined && rowPending ? (
           <Skeleton className="h-5 w-24" />
         ) : (
           <span className={cn('rounded-sm px-0.5 font-display text-lg font-semibold tabular text-fg', FLASH[flash])} title={priceUsd === undefined ? 'No price reported' : 'Price in USD'}>

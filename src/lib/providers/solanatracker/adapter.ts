@@ -41,7 +41,7 @@ import {
 } from '@/lib/core/types';
 import { isAbortError, isProviderError, ProviderError } from '@/lib/net/errors';
 import type { JsonFetcher } from '@/lib/net/types';
-import { bondingCurvePdaOf, DISTRIBUTION_NOTE, staticLiquidityLabel } from '@/lib/providers/helius/labels';
+import { DISTRIBUTION_NOTE, launchpadPdasOf, staticLiquidityLabel } from '@/lib/providers/helius/labels';
 import { parseCandles, parseHolders, parsePulseToken, parseRiskReport, parseTrade, PULSE_KEYS, rec, text, tradeRows, type Rec } from './parse';
 
 export const SOLANATRACKER_BASE_URL = 'https://data.solanatracker.io';
@@ -289,9 +289,9 @@ export function createSolanaTracker(opts: SolanaTrackerOptions): SolanaTrackerAd
     const max = clampInt(limit, DEFAULT_HOLDERS, 1, SOLANATRACKER_MAX_HOLDERS);
     // Top 100 plus the total holder count in one request (the /holders/top variant has no total).
     // enrich=identity labels pool, developer, bot and KOL wallets (no extra request).
-    const [body, curvePda] = await Promise.all([get(`/tokens/${mint}/holders`, { enrich: 'identity' }, signal), bondingCurvePdaOf(mint)]);
+    const [body, pdas] = await Promise.all([get(`/tokens/${mint}/holders`, { enrich: 'identity' }, signal), launchpadPdasOf(mint)]);
     const fetchedAt = Date.now();
-    const parsed = parseHolders(body, mint, max, fetchedAt, isProgramOwner, (owner) => staticLiquidityLabel(owner, curvePda));
+    const parsed = parseHolders(body, mint, max, fetchedAt, isProgramOwner, (owner) => staticLiquidityLabel(owner, pdas.curve, pdas.pumpSwapPool));
     if (!parsed) throw malformed('holders');
     const notes = parsed.snapshot.distribution && parsed.liquidity ? [DISTRIBUTION_NOTE] : [];
     return sourced(parsed.snapshot, fetchedAt, 'indexed', notes);

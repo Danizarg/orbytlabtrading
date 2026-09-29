@@ -7,7 +7,7 @@ import { cn } from '@/components/ui/cn';
 import { usePulseStore } from '@/data/pulse/store';
 import { formatAge } from '@/lib/core/format';
 import type { PulseColumn } from '@/lib/core/types';
-import { sourceHealth } from '@/lib/services/pulse';
+import { LIVE_WINDOW_MS, sourceHealth } from '@/lib/services/pulse';
 import { PULSE_COLUMNS } from './columns';
 
 const COLUMN_TABS: readonly TabItem<PulseColumn>[] = PULSE_COLUMNS.map((c) => ({ value: c.id, label: c.short }));
@@ -18,10 +18,13 @@ function StreamStatus() {
   let dot: string;
   let label: string;
   switch (s.status) {
-    case 'open':
-      dot = 'bg-up animate-pulse-dot';
-      label = 'Live';
+    case 'open': {
+      // "Live" only while frames actually arrive; an open but silent socket is just connected.
+      const delivering = !!now && s.lastMessageAt !== undefined && now - s.lastMessageAt <= LIVE_WINDOW_MS;
+      dot = delivering ? 'bg-up animate-pulse-dot' : 'bg-up';
+      label = delivering ? 'Live' : 'Connected';
       break;
+    }
     case 'connecting':
       dot = 'bg-faint';
       label = 'Connecting';

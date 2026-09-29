@@ -50,7 +50,7 @@ export function WatchlistView() {
     empty = (
       <EmptyState title="Your watchlist is empty">
         <p>
-          Star a token with <Star aria-hidden className="inline size-3 align-[-2px] text-warn" />
+          Star a token with <Star aria-hidden className="inline size-3.5 align-[-3px] text-warn" strokeWidth={1.75} />
           <span className="sr-only">the star button</span> in Discover or on its token page to follow it here. Up to {MAX_WATCHLIST} tokens, saved in
           this browser only.
         </p>
@@ -66,7 +66,7 @@ export function WatchlistView() {
   const loading = !hydrated || (count > 0 && !result && !query.isError);
 
   return (
-    <div className="flex h-[calc(100dvh-76px)] min-h-[460px] flex-col">
+    <div className="flex h-[calc(100dvh-var(--shell-header-h)-var(--shell-footer-h))] min-h-[460px] flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-panel px-3 py-2 lg:h-11 lg:flex-nowrap lg:py-0">
         <h1 className="font-display text-sm font-semibold tracking-tight text-fg">Watchlist</h1>
         <span className="text-2xs tabular text-muted" title={`Up to ${MAX_WATCHLIST} tokens, stored in this browser`}>
@@ -95,10 +95,11 @@ export function WatchlistView() {
           onSort={onSort}
           variant="watchlist"
           loading={loading}
-          skeletonRows={result ? pending.length : 0}
+          skeletonRows={result ? pending.length : loading ? count : 0}
           missing={result ? missing : undefined}
           empty={empty}
-          onHover={prefetch}
+          onHover={prefetch.intent}
+          onHoverEnd={prefetch.cancel}
           caption={`Watchlist tokens, ${win} window`}
         />
       </ErrorBoundary>

@@ -12,6 +12,8 @@ import { TrackerWalletWorker } from './TrackerWorkers';
 import { WalletList } from './WalletList';
 
 const NONE: readonly TrackedWallet[] = [];
+/** A read that follows a live event within this window still counts as live (settle delay plus request time). */
+const LIVE_FOLLOW_MS = 15_000;
 
 /**
  * /tracker: tracked wallets (left) and their merged live feed (right).
@@ -28,13 +30,16 @@ export function TrackerView() {
     const s = feed.status[w.address];
     return Math.max(max, s?.lastStreamAt ?? 0, s?.lastPollAt ?? 0, s?.backfilledAt ?? 0);
   }, 0);
-  const wsLive = feed.ws.status === 'open' && feed.ws.subscriptions > 0 && feed.ws.confirmed >= feed.ws.subscriptions;
+  // Live evidence: a log notification or a wallet balance change (which triggers an immediate read).
+  const lastLiveAt = wallets.reduce((max, w) => Math.max(max, feed.status[w.address]?.lastStreamAt ?? 0, feed.status[w.address]?.lastAccountAt ?? 0), 0);
+  const updatedAt = Math.max(lastAt, lastLiveAt);
   const failing = wallets.filter((w) => feed.live[w.address] === 'error').length;
+  const fastestPoll = wallets.reduce((min, w) => Math.min(min, feed.pollMs[w.address] ?? TRACKER_POLL_MS), TRACKER_POLL_MS);
 
   return (
-    <div className="flex h-[calc(100dvh-76px)] min-h-[32rem] flex-col">
+    <div className="flex h-[calc(100dvh-var(--shell-header-h)-var(--shell-footer-h))] min-h-[32rem] flex-col">
       {wallets.map((w, i) => (
-        <TrackerWalletWorker key={w.address} wallet={w.address} index={i} />
+        <TrackerWalletWorker key={w.address} wallet={w.address} index={i} walletCount={wallets.length} wsLive={feed.wsLive} wsOpen={feed.wsOpen} />
       ))}
       <div className="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-panel px-3 lg:px-4">
         <h1 className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight text-fg">
@@ -46,16 +51,21 @@ export function TrackerView() {
             {wallets.length} wallet{wallets.length === 1 ? '' : 's'}
           </span>
         )}
-        <span className="hidden text-2xs text-faint md:inline">Log subscriptions + {TRACKER_POLL_MS / 1000} s reconciliation</span>
-        <span className="ml-auto">
-          <FreshnessBadge
-            updatedAt={lastAt > 0 ? lastAt : undefined}
-            live={wsLive}
-            liveWindowMs={TRACKER_POLL_MS + 15_000}
-            staleAfterMs={TRACKER_POLL_MS * 2 + 15_000}
-            error={failing > 0 ? `${failing} wallet${failing === 1 ? '' : 's'} failing` : wallets.length === 0 && hydrated ? 'No wallets tracked' : null}
-          />
+        <span className="hidden text-2xs text-faint md:inline">
+          Log and balance subscriptions + {TRACKER_POLL_MS / 1000} s reconciliation{fastestPoll < TRACKER_POLL_MS ? ` (${fastestPoll / 1000} s while the stream misses events)` : ''}
         </span>
+        {hydrated && wallets.length > 0 && (
+          <span className="ml-auto">
+            {/* LIVE only while stream events keep arriving (the newest update follows one); otherwise the age of the last check. */}
+            <FreshnessBadge
+              updatedAt={updatedAt > 0 ? updatedAt : undefined}
+              live={feed.wsLive && lastLiveAt > 0 && updatedAt - lastLiveAt <= LIVE_FOLLOW_MS}
+              liveWindowMs={60_000}
+              staleAfterMs={TRACKER_POLL_MS * 2 + 15_000}
+              error={failing > 0 ? `${failing} wallet${failing === 1 ? '' : 's'} failing` : null}
+            />
+          </span>
+        )}
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-px bg-line lg:grid-cols-[336px_minmax(0,1fr)] lg:grid-rows-1">
         <ErrorBoundary label="Tracked wallets" className="flex max-h-72 min-h-0 flex-col items-center justify-center gap-2 bg-panel p-4 text-center lg:max-h-none">

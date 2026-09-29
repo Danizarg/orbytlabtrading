@@ -33,10 +33,21 @@ import type { TradesDeps } from './trades';
  * asks only for what it uses, so unrelated providers are never constructed.
  */
 
+/**
+ * True when server RPC calls actually go to the public mainnet endpoint.
+ * rpcKind() reports 'helius' when SOLANA_RPC_URL is set to the public URL
+ * alongside a Helius key, yet serverRpcUrl() then uses that public URL.
+ */
+export function serverRpcIsPublic(): boolean {
+  const kind = rpcKind();
+  return kind === 'public' || (kind !== 'custom' && env.solanaRpcUrl() !== undefined);
+}
+
 export function tradesDeps(): TradesDeps {
   const gecko = geckoKeyed();
   return {
-    rpcTrades: serverRpcTrades(),
+    // The public RPC's 10 getTransaction / 10 s per IP cannot sustain a trade feed.
+    rpcTrades: serverRpcIsPublic() ? null : serverRpcTrades(),
     birdeye: birdeye(),
     solanaTracker: solanaTracker(),
     coingeckoPro: gecko?.plan === 'pro' ? gecko : null,

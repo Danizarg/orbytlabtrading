@@ -5,7 +5,7 @@ import type { ProviderId } from '@/lib/core/providers';
 import { MINTS } from '@/lib/core/solana';
 import { isProviderError, ProviderError } from '@/lib/net/errors';
 import type { JsonFetcher, JsonRequest } from '@/lib/net/types';
-import { birdeyeDex, birdeyeLaunchpad, BIRDEYE_INTERVALS, BIRDEYE_TOP10_NOTE, createBirdeye } from './index';
+import { birdeyeDex, birdeyeLaunchpad, BIRDEYE_INTERVALS, BIRDEYE_TOP10_NOTE, BIRDEYE_TOP10_OMITTED_NOTE, createBirdeye } from './index';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -194,13 +194,35 @@ describe('birdeye getCandles', () => {
 
   it('sorts ascending, drops duplicates and invalid rows, and pages with `before`', async () => {
     const list = items(OHLCV);
-    const shuffled = withItems(OHLCV, [list[1], list[0], { ...(list[0] as object), c: 999 }, { unix_time: 1726672500, o: 'x' }, null]);
+    const shuffled = withItems(OHLCV, [list[1], list[0], { ...(list[0] as object), c: 128.5 }, { unix_time: 1726672500, o: 'x' }, null]);
     const { fetcher, calls } = fakeFetcher([['/defi/v3/ohlcv', shuffled]]);
     const res = await createBirdeye({ apiKey: API_KEY, fetcher }).getCandles({ mint: MINTS.SOL, interval: '15m', before: 1726671600, limit: 10 });
     // 1726671600 is excluded by `before`; the duplicate 1726670700 keeps the last occurrence.
-    expect(res.data.candles).toEqual([{ time: 1726670700, open: 128.27328370924414, high: 128.6281001340782, low: 127.91200927364626, close: 999, volume: 7506048 }]);
+    expect(res.data.candles).toEqual([{ time: 1726670700, open: 128.27328370924414, high: 128.6281001340782, low: 127.91200927364626, close: 128.5, volume: 7506048 }]);
     expect(calls[0]?.url.searchParams.get('time_to')).toBe('1726671599');
     expect(res.data.hasMore).toBe(false);
+  });
+
+  it('drops candles that cannot be charted as reported, while a full page still reports more history', async () => {
+    const list = items(OHLCV);
+    const [first, second] = list as [object, object];
+    const page = withItems(OHLCV, [
+      first,
+      // high below open/close, a zero open and a negative low: upstream values that no chart can draw.
+      { ...second, h: 1 },
+      { ...second, unix_time: 1726672500, o: 0 },
+      { ...second, unix_time: 1726673400, l: -1 },
+    ]);
+    const { fetcher } = fakeFetcher([['/defi/v3/ohlcv', page]]);
+    const res = await createBirdeye({ apiKey: API_KEY, fetcher }).getCandles({ mint: MINTS.SOL, interval: '15m', limit: 4 });
+    expect(res.data.candles).toEqual([{ time: 1726670700, open: 128.27328370924414, high: 128.6281001340782, low: 127.91200927364626, close: 127.97284640184616, volume: 7506048 }]);
+    // Four rows came back for count_limit=4: older history may exist even though three were unusable.
+    expect(res.data.hasMore).toBe(true);
+
+    // Only unusable rows: an honest empty series (the candles route then tries the next provider).
+    const unusable = withItems(OHLCV, [{ ...second, h: 1 }]);
+    const empty = await createBirdeye({ apiKey: API_KEY, fetcher: fakeFetcher([['/defi/v3/ohlcv', unusable]]).fetcher }).getCandles({ mint: MINTS.SOL, interval: '15m' });
+    expect(empty.data.candles).toEqual([]);
   });
 
   it('serves token-level USD candles when a pool is requested (pair candles are quote-priced)', async () => {
@@ -332,14 +354,17 @@ describe('birdeye getTrades', () => {
 // ---------------------------------------------------------------------------
 
 describe('birdeye getHolders', () => {
-  it('maps token-account holders with the total count and a 0–100 top-10 share', async () => {
+  it("maps token-account holders with the total count, withholding Birdeye's top-10 share when a known pool vault is in it", async () => {
     const { fetcher, calls } = fakeFetcher([['/defi/v3/token/holder', HOLDERS]]);
     const res = await createBirdeye({ apiKey: API_KEY, fetcher }).getHolders(HOLDER_MINT, 250);
     expect(calls[0]?.url.searchParams.get('limit')).toBe('100');
     expect(res.freshness).toBe('indexed');
     expect(res.data.mint).toBe(HOLDER_MINT);
     expect(res.data.totalHolders).toBe(5321);
-    expect(res.data.distribution).toEqual({ top10Pct: 22.15 });
+    // top10HoldPercent (22.15) sums token accounts including the Raydium vault below: counting
+    // pool liquidity as a holder contradicts ORBYT's concentration, so the figure is not passed on.
+    expect('distribution' in res.data).toBe(false);
+    expect(res.notes).toEqual([BIRDEYE_TOP10_OMITTED_NOTE]);
     expect(res.data.top).toEqual([
       { owner: '6Zk9e3nfXdYLXHYu5NvDiPHGMcjujVBv6gWRr7ckSdhP', tokenAccount: 'HdmGPmTkBgsiJcyVDgiGkYdTZr4h5XmpjYoUjU2rapf4', amount: 100, isProgramAccount: false },
       // 5Q544f… is the Raydium AMM v4 vault authority PDA.
@@ -354,8 +379,31 @@ describe('birdeye getHolders', () => {
     // No supply in this payload → no invented percentages.
     expect(res.data.top.every((h) => !('pctOfSupply' in h))).toBe(true);
     expect('supply' in res.data).toBe(false);
-    // Birdeye's account-level top-10 share is kept, with its caveat, because a pool vault is in the list.
-    expect(res.notes).toEqual(['Top-10 share from Birdeye; it may include bonding-curve or pool accounts.']);
+  });
+
+  it('checks all ten accounts behind the top-10 share even when fewer holders are requested', async () => {
+    const { fetcher, calls } = fakeFetcher([['/defi/v3/token/holder', HOLDERS]]);
+    const res = await createBirdeye({ apiKey: API_KEY, fetcher }).getHolders(HOLDER_MINT, 1);
+    // Same 30 CU per page: ten rows are fetched so the vault in row 2 is still seen.
+    expect(calls[0]?.url.searchParams.get('limit')).toBe('10');
+    expect(res.data.top).toHaveLength(1);
+    expect(res.data.top[0]?.owner).toBe('6Zk9e3nfXdYLXHYu5NvDiPHGMcjujVBv6gWRr7ckSdhP');
+    expect('distribution' in res.data).toBe(false);
+    expect(res.notes).toEqual([BIRDEYE_TOP10_OMITTED_NOTE]);
+  });
+
+  it("labels a graduated coin's canonical PumpSwap pool without a lookup", async () => {
+    // Live-verified vector: tests/fixtures/pump/pumpswap_canonical_pool_decoded_rpc_2026-09-28.json
+    const mint = '4ov9rwwS4iBHeTWGCrVaQYW1HzWK51MSfs8csGAApump';
+    const pool = '8HbgiXuiNbHRcxiNG8UBD8GLewoy6QVDnPFPgjFGmszf';
+    const list = items(HOLDERS).map((i, n) => ({ ...(i as object), mint, owner: n === 0 ? pool : '6Zk9e3nfXdYLXHYu5NvDiPHGMcjujVBv6gWRr7ckSdhP' }));
+    const payload = { ...HOLDERS, data: { holder: 900, top10HoldPercent: 99.4, items: list } };
+    const { fetcher, calls } = fakeFetcher([['/defi/v3/token/holder', payload]]);
+    const res = await createBirdeye({ apiKey: API_KEY, fetcher }).getHolders(mint);
+    expect(calls).toHaveLength(1);
+    expect(res.data.top[0]).toMatchObject({ owner: pool, label: 'PumpSwap pool', isProgramAccount: true });
+    expect('distribution' in res.data).toBe(false);
+    expect(res.notes).toEqual([BIRDEYE_TOP10_OMITTED_NOTE]);
   });
 
   it("labels the mint's pump.fun bonding-curve vault", async () => {

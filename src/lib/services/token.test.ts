@@ -1,15 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { ChainError } from '@/lib/core/chain';
 import { MINTS } from '@/lib/core/solana';
 import type { BondingCurveState, Candle, MintInfo, PoolInfo, RiskReport, TokenMeta, TokenRow, Trade } from '@/lib/core/types';
 import {
   applyOnchainAuthorities,
   buildQuoteRequest,
+  chainWinner,
+  chartCurrencyOption,
   curvePriceUsd,
   explorerLinks,
   filterTrades,
   formatSlippage,
   frozenPools,
+  geckoQuoteOhlcvPath,
   intervalOptions,
+  isDefinitelyAbsent,
+  isIndexedPool,
+  isLiveFreshness,
+  isSolQuoted,
   jupiterSwapUrl,
   marketCapAtTrade,
   mergeLaunchpad,
@@ -18,15 +26,20 @@ import {
   parseMinUsd,
   parsePoolParam,
   parseSlippagePct,
+  pollForWinner,
+  poolFromCurve,
   priceImpactTone,
+  quoteMatchesRequest,
   quoteRate,
   quoteToGraduation,
   riskTone,
   sanitizeAmountInput,
   selectPrimaryPool,
+  solPricedTrades,
   toRawAmount,
   tokenTradeHref,
   tradeTicks,
+  usdToSol,
   visibleFailures,
 } from './token';
 
@@ -219,6 +232,16 @@ describe('quote requests', () => {
     expect(priceImpactTone(undefined)).toBe('unknown');
   });
 
+  it('keeps a previous quote on screen only for the same pair direction', () => {
+    const buy = buildQuoteRequest({ side: 'buy', mint: MINT, amount: '1', tokenDecimals: 6 });
+    const sell = buildQuoteRequest({ side: 'sell', mint: MINT, amount: '1', tokenDecimals: 6 });
+    const buyQuote = { inputMint: MINTS.SOL, outputMint: MINT };
+    expect(quoteMatchesRequest(buyQuote, buy)).toBe(true);
+    expect(quoteMatchesRequest(buyQuote, sell)).toBe(false);
+    expect(quoteMatchesRequest(buyQuote, undefined)).toBe(false);
+    expect(quoteMatchesRequest(undefined, buy)).toBe(false);
+  });
+
   it('links to Jupiter with the pair preselected', () => {
     expect(jupiterSwapUrl(MINT, 'buy')).toBe(`https://jup.ag/swap?sell=${MINTS.SOL}&buy=${MINT}`);
     expect(jupiterSwapUrl(MINT, 'sell')).toBe(`https://jup.ag/swap?sell=${MINT}&buy=${MINTS.SOL}`);
@@ -312,6 +335,47 @@ describe('chart intervals', () => {
   });
 });
 
+describe('SOL-denominated charts', () => {
+  const GECKO = ['1m', '5m', '15m', '1h', '4h', '1d'] as const;
+
+  it('recognises SOL-quoted pools by mint, else by symbol', () => {
+    expect(isSolQuoted(ammPool)).toBe(true);
+    expect(isSolQuoted({ quoteMint: MINTS.USDC, quoteSymbol: 'SOL' })).toBe(false);
+    expect(isSolQuoted({ quoteSymbol: 'WSOL' })).toBe(true);
+    expect(isSolQuoted(undefined)).toBe(false);
+  });
+
+  it('offers SOL only where real SOL prices exist (quote-token OHLCV or trade legs)', () => {
+    expect(chartCurrencyOption({ quoteIsSol: false, kind: 'gecko', interval: '1m', geckoIntervals: GECKO }).available).toBe(false);
+    expect(chartCurrencyOption({ quoteIsSol: true, kind: 'gecko', interval: '5m', geckoIntervals: GECKO }).available).toBe(true);
+    expect(chartCurrencyOption({ quoteIsSol: true, kind: 'server', interval: '1h', geckoIntervals: GECKO }).available).toBe(true);
+    expect(chartCurrencyOption({ quoteIsSol: true, kind: 'server', interval: '1s', geckoIntervals: GECKO }).available).toBe(false);
+    expect(chartCurrencyOption({ quoteIsSol: true, kind: 'trades', interval: '5s', geckoIntervals: GECKO }).available).toBe(true);
+    expect(chartCurrencyOption({ quoteIsSol: true, kind: undefined, interval: '1m', geckoIntervals: GECKO }).available).toBe(false);
+  });
+
+  it('prices trades by their own SOL / token legs with SOL volume, dropping trades without both legs', () => {
+    const out = solPricedTrades([
+      { signature: 's1', timestamp: 1_000, side: 'buy', solAmount: 2, tokenAmount: 1_000_000, priceUsd: 0.0003, usdValue: 300, marketCapUsd: 300_000, source: 'orbyt' },
+      { signature: 's2', timestamp: 2_000, side: 'sell', tokenAmount: 5, priceUsd: 1, source: 'orbyt' },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.priceUsd).toBeCloseTo(2e-6, 15);
+    expect(out[0]?.usdValue).toBe(2);
+    expect(out[0]?.marketCapUsd).toBeUndefined();
+  });
+
+  it('builds the GeckoTerminal quote-token OHLCV path and converts live USD ticks with the live SOL price', () => {
+    expect(geckoQuoteOhlcvPath({ pool: AMM_POOL, mint: MINT, interval: '4h', limit: 300, before: 1_790_000_000.5 })).toBe(
+      `/networks/solana/pools/${AMM_POOL}/ohlcv/hour?aggregate=4&limit=300&currency=token&token=${MINT}&before_timestamp=1790000000`,
+    );
+    expect(geckoQuoteOhlcvPath({ pool: AMM_POOL, mint: MINT, interval: '1s', limit: 300 })).toBeUndefined();
+    expect(geckoQuoteOhlcvPath({ pool: 'nope', mint: MINT, interval: '1m', limit: 300 })).toBeUndefined();
+    expect(usdToSol(3.6e-6, 120)).toBeCloseTo(3e-8, 20);
+    expect(usdToSol(1, undefined)).toBeUndefined();
+  });
+});
+
 describe('links and params', () => {
   it('builds token hrefs, explorer links and validates the pool param', () => {
     expect(tokenTradeHref(MINT)).toBe(`/trade/${MINT}`);
@@ -324,6 +388,45 @@ describe('links and params', () => {
     expect(links[1]?.href).toContain(`/pools/${AMM_POOL}`);
     expect(explorerLinks(MINT).map((l) => l.id)).not.toContain('pumpfun');
     expect(visibleFailures([{ provider: 'orbyt', ok: false, code: 'not_configured' }, { provider: 'jupiter', ok: false, error: 'jupiter: rate limited' }])).toHaveLength(1);
+  });
+});
+
+describe('poll cadence and freshness honesty', () => {
+  it('polls fast only when ORBYT or Jupiter answered, by chain winner (not the upstream source)', () => {
+    expect(pollForWinner('orbyt', 3_000, 30_000)).toBe(3_000);
+    expect(pollForWinner('jupiter', 10_000, 30_000)).toBe(10_000);
+    expect(pollForWinner('geckoterminal', 10_000, 30_000)).toBe(30_000);
+    expect(pollForWinner('dexscreener', 10_000, 30_000)).toBe(30_000);
+    // Nothing lists the token yet: never walk the whole chain every few seconds.
+    expect(pollForWinner(undefined, 10_000, 30_000)).toBe(30_000);
+    // A server-proxy result names its upstream provider as `source`; the winner is the 'orbyt' step.
+    const viaServer = { source: 'helius' as const, attempts: [{ provider: 'orbyt' as const, ok: true }] };
+    expect(chainWinner(viaServer)).toBe('orbyt');
+    expect(chainWinner({ attempts: [{ provider: 'orbyt', ok: false, code: 'not_configured' }, { provider: 'geckoterminal', ok: true }] })).toBe('geckoterminal');
+  });
+
+  it('reserves LIVE for stream / realtime data', () => {
+    expect(isLiveFreshness('stream')).toBe(true);
+    expect(isLiveFreshness('realtime')).toBe(true);
+    expect(isLiveFreshness('fast')).toBe(false);
+    expect(isLiveFreshness('indexed')).toBe(false);
+    expect(isLiveFreshness(undefined)).toBe(false);
+  });
+
+  it('treats only an all-"not found" chain failure as a definitive absence', () => {
+    expect(isDefinitelyAbsent(new ChainError('mint-info', [{ provider: 'orbyt', ok: false, code: 'not_found' }, { provider: 'solana-rpc', ok: false, code: 'not_found' }]))).toBe(true);
+    expect(isDefinitelyAbsent(new ChainError('mint-info', [{ provider: 'orbyt', ok: false, code: 'not_found' }, { provider: 'solana-rpc', ok: false, code: 'timeout' }]))).toBe(false);
+    expect(isDefinitelyAbsent(new ChainError('token', [{ provider: 'jupiter', ok: false, code: 'rate_limited' }]))).toBe(false);
+    expect(isDefinitelyAbsent(new Error('network'))).toBe(false);
+    expect(isDefinitelyAbsent(null)).toBe(false);
+  });
+
+  it('only sends aggregator-indexed pools to GeckoTerminal', () => {
+    expect(isIndexedPool(ammPool)).toBe(true);
+    const onChainOnly = poolFromCurve(curve(), 150);
+    expect(onChainOnly.source).toBe('solana-rpc');
+    expect(isIndexedPool(onChainOnly)).toBe(false);
+    expect(isIndexedPool(undefined)).toBe(false);
   });
 });
 
