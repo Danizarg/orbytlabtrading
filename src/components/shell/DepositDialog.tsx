@@ -7,15 +7,9 @@ import { explorer } from '@/lib/core/solana';
 import { useWalletAddress, useWallet } from '@/lib/wallet/store';
 import { useWalletBalances } from '@/data/hooks/useWalletBalances';
 import { MINTS } from '@/lib/core/solana';
-import { buildSolTransferTransaction } from '@/lib/deposit/build-transaction';
+import { DEPOSIT_CHAIN, prepareDeposit, submitAndConfirm } from '@/lib/deposit/send-deposit';
 
-/**
- * Build and prepare a transfer transaction for signing.
- */
-async function buildAndSignDepositTransaction(from: string, to: string, amountSol: number): Promise<Uint8Array> {
-  const txBytes = await buildSolTransferTransaction(from, to, amountSol);
-  return txBytes;
-}
+const CLUSTER_QUERY = DEPOSIT_CHAIN === 'solana:mainnet' ? '' : `?cluster=${DEPOSIT_CHAIN.replace('solana:', '')}`;
 
 /**
  * Deposit panel showing ORBYT's central deposit address, the same fixed public
@@ -54,7 +48,8 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
   const walletAddress = useWalletAddress();
   const { sol: solBalance, solPending } = useWalletBalances(walletAddress, MINTS.SOL);
   const signTransaction = useWallet((s) => s.signTransaction);
-  const [depositPhase, setDepositPhase] = useState<'idle' | 'signing' | 'submitted'>('idle');
+  const [depositPhase, setDepositPhase] = useState<'idle' | 'signing' | 'confirming' | 'submitted'>('idle');
+  const [depositSignature, setDepositSignature] = useState<string | null>(null);
   const [depositError, setDepositError] = useState<string | null>(null);
 
   const address = SITE.depositAddress;
@@ -81,16 +76,11 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
     setDepositError(null);
 
     try {
-      // Build a transfer transaction
-      const txBytes = await buildAndSignDepositTransaction(walletAddress, address, solBalance.sol);
-
-      // Sign the transaction with the wallet
-      await signTransaction(txBytes);
-
+      const txBytes = await prepareDeposit(walletAddress, address, solBalance.lamports);
+      const signed = await signTransaction(txBytes, DEPOSIT_CHAIN);
+      setDepositPhase('confirming');
+      setDepositSignature(await submitAndConfirm(signed));
       setDepositPhase('submitted');
-
-      // Transaction is signed; the wallet will handle submission
-      // The wallet extension will show a confirmation for sending the transaction
     } catch (e) {
       setDepositPhase('idle');
       const message = e instanceof Error ? e.message : 'Failed to sign transaction';
@@ -99,7 +89,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
   }
 
   const showWalletBalance = walletAddress && solBalance;
-  const isPending = solPending || depositPhase !== 'idle';
+  const isPending = solPending || depositPhase === 'signing' || depositPhase === 'confirming';
 
   return (
     <dialog
@@ -158,12 +148,29 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
+            {depositPhase === 'confirming' && (
+              <div className="flex items-center justify-center gap-2 rounded-md bg-line-strong py-2">
+                <Loader className="size-3.5 animate-spin text-brand" />
+                <span className="text-xs font-medium text-fg">Confirming on-chain...</span>
+              </div>
+            )}
+
             {depositPhase === 'submitted' && (
               <div className="rounded-md bg-up/10 p-2">
                 <p className="text-xs text-up font-medium flex items-center gap-2">
                   <Check className="size-3.5" />
-                  Transaction submitted. Check wallet for confirmation.
+                  Balance transferred to the deposit address.
                 </p>
+                {depositSignature && (
+                  <a
+                    href={`https://solscan.io/tx/${depositSignature}${CLUSTER_QUERY}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-flex items-center gap-1 text-2xs text-muted hover:text-fg"
+                  >
+                    View on Solscan <ExternalLink className="size-3" />
+                  </a>
+                )}
               </div>
             )}
 
@@ -196,7 +203,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
           <div className="mb-1.5 flex items-center justify-between text-2xs text-muted">
             <span>ORBYT deposit address</span>
             <a
-              href={explorer.account(address)}
+              href={`${explorer.account(address)}${CLUSTER_QUERY}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 hover:text-fg"

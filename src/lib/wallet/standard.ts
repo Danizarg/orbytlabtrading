@@ -183,13 +183,18 @@ export async function signInWith(wallet: Wallet, input: SolanaSignInInput): Prom
   return { account: output.account, signedMessage: new Uint8Array(output.signedMessage), signature: new Uint8Array(output.signature) };
 }
 
-/** solana:signTransaction on mainnet. Returns the signed, serialized transaction. */
-export async function signTransactionWith(wallet: Wallet, account: WalletAccount, transaction: Uint8Array): Promise<Uint8Array> {
+/** solana:signTransaction (mainnet unless `chain` says otherwise). Returns the signed, serialized transaction. */
+export async function signTransactionWith(
+  wallet: Wallet,
+  account: WalletAccount,
+  transaction: Uint8Array,
+  chain: 'solana:mainnet' | 'solana:devnet' | 'solana:testnet' = SOLANA_MAINNET,
+): Promise<Uint8Array> {
   const f = feature<SolanaSignTransactionFeature[typeof SolanaSignTransaction]>(wallet, SolanaSignTransaction);
   if (!f) throw new WalletError('unsupported', `${wallet.name} cannot sign transactions in ORBYT.`);
   let output: SolanaSignTransactionOutput | undefined;
   try {
-    [output] = await f.signTransaction({ account, transaction, chain: SOLANA_MAINNET });
+    [output] = await f.signTransaction({ account, transaction, chain });
   } catch (e) {
     throw toWalletError(e, `${wallet.name} did not sign the transaction.`);
   }

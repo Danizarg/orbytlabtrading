@@ -231,3 +231,10 @@ State as of 2026-09-29 (after wallet deposit feature):
 - 1595 tests pass; typecheck and lint are clean (6 pre-existing format test failures in formatUsd)
 - Wallet balance auto-deposit feature complete and ready for testing
 - All code follows existing patterns: proper error handling, Wallet Standard integration, transaction safety
+
+## Deposit flow fixed for devnet (2026-09-29)
+
+- The earlier deposit builder emitted a bare message (no account-count byte, no signature slot, dummy blockhash), and nothing submitted the signed transaction. `src/lib/deposit/build-transaction.ts` now builds a valid legacy transfer; `src/lib/deposit/send-deposit.ts` fetches a real blockhash, sends it and waits for confirmation through `NEXT_PUBLIC_SOLANA_BROWSER_RPC_URL`.
+- The wallet chain follows that URL (`devnet` in the URL means `solana:devnet`, otherwise mainnet); `signTransaction` takes an optional chain. Solscan links get `?cluster=devnet` on devnet.
+- The deposit sends the whole balance minus the 5,000 lamport fee, to `SITE.depositAddress` only. It is still started by the "Deposit Balance" button, not automatically.
+- To test on devnet locally, put `NEXT_PUBLIC_SOLANA_BROWSER_RPC_URL=https://api.devnet.solana.com` and `NEXT_PUBLIC_SOLANA_WS_URL=wss://api.devnet.solana.com` in `.env.local` (gitignored, never committed). Not yet verified with a real Phantom signature; typecheck, lint and unit tests pass.

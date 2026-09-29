@@ -64,7 +64,7 @@ export interface WalletState {
   /** solana:signMessage with the connected account. Throws WalletError. */
   signMessage: (message: Uint8Array) => Promise<SignedBytes>;
   /** solana:signTransaction on mainnet with the connected account. Throws WalletError. */
-  signTransaction: (transaction: Uint8Array) => Promise<Uint8Array>;
+  signTransaction: (transaction: Uint8Array, chain?: 'solana:mainnet' | 'solana:devnet' | 'solana:testnet') => Promise<Uint8Array>;
   clearFeedback: () => void;
 }
 
@@ -340,11 +340,11 @@ export const useWallet = create<WalletState>()((set, get) => {
       }
     },
 
-    signTransaction: async (transaction) => {
+    signTransaction: async (transaction, chain) => {
       const entry = requireActive('sign a transaction');
       set({ status: 'signing' });
       try {
-        return await signTransactionWith(entry.wallet, entry.account, transaction);
+        return await signTransactionWith(entry.wallet, entry.account, transaction, chain);
       } catch (e) {
         throw isWalletError(e) ? e : toWalletError(e, 'Signing failed.');
       } finally {
