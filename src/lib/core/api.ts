@@ -54,8 +54,10 @@ export const API_ROUTES = {
   mint: (mint: string) => `/api/v1/onchain/mint/${mint}`,
   /** ?mint=&pool=&limit= → Trade[] (keyed RPC/indexers) */
   trades: '/api/v1/trades',
-  /** ?mint=&pool=&interval=&before=&limit= → CandleSeries (keyed providers) */
+  /** ?mint=&pool=&interval=&before=&limit= → CandleSeries (keyed providers, then keyless GeckoTerminal 1m–1d) */
   candles: '/api/v1/candles',
+  /** ?mint= → PoolInfo[] (DEX Screener + GeckoTerminal merged; keyless, CDN-cached 60 s) */
+  pools: '/api/v1/pools',
   /** ?mint=&limit= → HolderSnapshot */
   holders: '/api/v1/holders',
   /** ?mint= → RiskReport */
@@ -64,7 +66,7 @@ export const API_ROUTES = {
   pulse: '/api/v1/pulse',
   /** ?list=&window=&limit= → TokenRow[] (keyed discovery) */
   discover: '/api/v1/discover',
-  /** ?mints=a,b → TokenRow[] (keyed batch rows) */
+  /** ?mints=a,b → TokenRow[] (keyed batch rows, then keyless Jupiter + DEX Screener) */
   tokens: '/api/v1/tokens',
   /** ?inputMint=&outputMint=&amountRaw=&inputDecimals=&outputDecimals=&slippageBps= → SwapQuote */
   quote: '/api/v1/quote',

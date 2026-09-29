@@ -1,0 +1,35 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. Copied from the official 'Get top 100 token holders' OpenAPI example (response with enrich=identity,walletPnl), abridged: the second account's pnl block was trimmed. The example's own percentages (103.26 and 96.74) exceed a 0-100 share and sum to 200, which is why ORBYT drops out-of-range percentages instead of clamping them. The first account is labelled by Solana Tracker as a pump.fun pool (identity.type 'pool').",
+  "source": "https://docs.solanatracker.io/data-api/openapi.json (#/paths/~1tokens~1{tokenAddress}~1holders)",
+  "request": "GET https://data.solanatracker.io/tokens/{tokenAddress}/holders?enrich=identity (header x-api-key)",
+  "response": {
+    "total": 2,
+    "enrich": ["identity", "walletPnl"],
+    "accounts": [
+      {
+        "wallet": "HYLHTXn74S378oYQHmoJa9yqrfr3DCd8TZtnFCNvySC5",
+        "amount": 1032622458.645721,
+        "value": { "quote": 7.100269258380428, "usd": 597.7253928072596 },
+        "percentage": 103.2622458645721,
+        "identity": {
+          "pool": { "program": "pumpfun", "poolAddress": "HYLHTXn74S378oYQHmoJa9yqrfr3DCd8TZtnFCNvySC5" },
+          "type": "pool",
+          "tags": ["pool"]
+        }
+      },
+      {
+        "wallet": "BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s",
+        "amount": 967377541.354279,
+        "value": { "quote": 6.651647909279076, "usd": 559.9588853192754 },
+        "percentage": 96.7377541354279,
+        "identity": {
+          "bot": { "name": "Mayhem Bot", "avatar": "https://kol-avatar.solanatracker.io/BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s" },
+          "name": "Mayhem Bot",
+          "avatar": "https://kol-avatar.solanatracker.io/BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s",
+          "type": "bot",
+          "tags": ["bot"]
+        }
+      }
+    ]
+  }
+}

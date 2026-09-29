@@ -12,7 +12,10 @@ import type { JsonFetcher, JsonRequest } from './types';
  *   it as rate limiting.
  * - Jupiter keyless: 5 requests / rolling 10 s; exposes x-ratelimit-reset.
  * - DEX Screener: 300/min for pair endpoints (edge cached 30 s).
- * - publicnode Solana RPC: undocumented; keep modest.
+ * - publicnode Solana RPC: undocumented, no rate-limit headers. Live test
+ *   2026-09-29: 81 getTransaction (jsonParsed) in under 2 s from one IP, no
+ *   429. 45 / 10 s leaves the on-chain trade feed (which keeps itself to 28)
+ *   room next to bonding-curve reads (~7 / 10 s) and wallet reads.
  *
  * Features: sliding-window budgets with bounded queueing, cooldown after rate
  * limiting, in-flight de-duplication, short response cache, timeout + abort.
@@ -30,7 +33,7 @@ const BUDGETS: Partial<Record<ProviderId, Budget>> = {
   geckoterminal: { limit: 8, windowMs: 60_000, concurrency: 2, maxWaitMs: 4_000 },
   jupiter: { limit: 4, windowMs: 10_000, concurrency: 2, maxWaitMs: 6_000 },
   dexscreener: { limit: 200, windowMs: 60_000, concurrency: 4, maxWaitMs: 4_000 },
-  'solana-rpc': { limit: 30, windowMs: 10_000, concurrency: 4, maxWaitMs: 4_000 },
+  'solana-rpc': { limit: 45, windowMs: 10_000, concurrency: 4, maxWaitMs: 4_000 },
 };
 
 interface State {

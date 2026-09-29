@@ -4,7 +4,7 @@ node_modules/
 # next.js / build
 .next/
 out/
-build/
+/build/
 coverage/
 *.tsbuildinfo
 next-env.d.ts

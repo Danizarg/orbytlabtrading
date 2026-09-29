@@ -1,0 +1,19 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. Response shape copied from the official getTokenLargestAccounts reference (solana.com/docs/rpc/http/gettokenlargestaccounts, served unchanged by Helius at https://mainnet.helius-rpc.com/?api-key=KEY; no key was available to capture a live response). Values abridged/adapted for tests: the first account (pump.fun bonding-curve vault of 7ehsm...pump, 603185974.343956 tokens) comes from the live getMultipleAccounts fixture in tests/fixtures/solana-rpc; FYjHN... is the address used in the official doc example; the remaining accounts and amounts are illustrative. The last row has a zero balance on purpose.",
+  "source": "https://solana.com/docs/rpc/http/gettokenlargestaccounts",
+  "request": { "method": "getTokenLargestAccounts", "params": ["7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump", { "commitment": "confirmed" }] },
+  "response": {
+    "jsonrpc": "2.0",
+    "result": {
+      "context": { "apiVersion": "4.3.0", "slot": 451431134 },
+      "value": [
+        { "address": "5R4MoQJCn3NDtMCzTNeJi6mFKB5cfTvyehFQcudPhWCU", "amount": "603185974343956", "decimals": 6, "uiAmount": 603185974.343956, "uiAmountString": "603185974.343956" },
+        { "address": "FYjHNoFtSQ5uijKrZFyYAxvEr87hsKXkXcxkcmkBAf4r", "amount": "20000000000000", "decimals": 6, "uiAmount": 20000000, "uiAmountString": "20000000" },
+        { "address": "HdmGPmTkBgsiJcyVDgiGkYdTZr4h5XmpjYoUjU2rapf4", "amount": "5000000000000", "decimals": 6, "uiAmount": 5000000, "uiAmountString": "5000000" },
+        { "address": "EauuZAnB7CcnCrwvCMcnb2Rjk12Ecs13ycAZQBb5tLYM", "amount": "1500000000000", "decimals": 6, "uiAmount": 1500000, "uiAmountString": "1500000" },
+        { "address": "BUvduFTd2sWFagCunBPLupG8fBTJqweLw9DuhruNFSCm", "amount": "0", "decimals": 6, "uiAmount": 0, "uiAmountString": "0" }
+      ]
+    },
+    "id": 1
+  }
+}

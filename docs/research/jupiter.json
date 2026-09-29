@@ -1,0 +1,242 @@
+{
+ "provider": "Jupiter (jup.ag): Tokens API V2, Price API V3, Ultra API v1 (deprecated), Swap API V2/V1, Portfolio v1",
+ "summary": "Status on 2026-09-28, checked against live responses and the current docs at developers.jup.ag. dev.jup.ag and portal.jup.ag now 301-redirect to developers.jup.ag. The official index is https://developers.jup.ag/docs/llms.txt, and any docs page can be read as markdown by adding .md.\n\n(1) api.jup.ag is the canonical host and works WITHOUT a key. The docs say \"Keyless access is available at 0.5 RPS on api.jup.ag with no sign-up\". A request with no x-api-key header is served keyless; 401 is returned only for an invalid key. Verified today: every Tokens, Price, Ultra, Swap and Portfolio endpoint returned 200 keyless on api.jup.ag.\n\n(2) lite-api.jup.ag is deprecated but still works today. Tokens V2, Price V3 and ultra/v1 answered 200 without any rate-limit headers. /swap/v2/* returns 404 \"Route not found\" on lite-api. The docs say lite-api \"will be phased out once the new API gateway is stable. The rate limit on lite-api.jup.ag will be reduced progressively until it is fully retired\". The Nov-2025 retirement was postponed (\"new date TBA\"). Do not build on it.\n\n(3) Developer Platform tiers, all keyed with x-api-key from developers.jup.ag/portal:\n- Keyless: 0.5 RPS, no sign-up\n- Free: 1 RPS, unlimited credits\n- Developer: $25/mo, 10 RPS, 25M credits\n- Launch: $100/mo, 50 RPS, 100M credits\n- Pro: $500/mo, 150 RPS, 500M credits\nLimits apply per organisation and use a sliding window.\n\n(4) Ultra API (/ultra/v1/*) is marked \"no longer actively maintained and has been superseded by Swap V2\". It still works keyless on api.jup.ag: search, holdings, holdings/native, shield and order were all VERIFIED. /ultra/v1/search returns a RICHER token object than Tokens V2, including bondingCurve (0-100), fees, audit.botHoldersCount/botHoldersPercentage, audit.bundlerStats, audit.sniperPct/insiderPct, devFundedAt, iconReused, primaryTwitter, dexBanner/dexPaidAt, ctLikes/smartCtLikes and stats7d/stats30d. That extra data looks backed by the undocumented datapi.\n\nGood for: token discovery and metadata (Discover table), 5m/1h/6h/24h trading stats, organic score, audit flags, a New Pairs feed (/tokens/v2/recent), graduation status (graduatedPool/graduatedAt), USD prices for up to 50 mints (Price V3), wallet token balances (Ultra holdings, deprecated), risk warnings (Ultra shield, deprecated), and read-only quotes (/swap/v2/order without taker, or /swap/v1/quote).\n\nHeadline limitations:\n- No OHLCV/candles, no trades or transaction feed, no holder list, no wallet PnL or trade history.\n- No public WebSocket or streaming for market data.\n- /recent returns only the latest 30 first-pool creations, with no pagination.\n- There is no list endpoint for \"recently migrated\" or \"final stretch\" tokens.\n- Tokens V2 does not return bondingCurve; only the deprecated Ultra search does.\n- Keyless limits are tiny (5 requests per 10 s, measured).\n- datapi.jup.ag (used by jup.ag/pro) is NOT publicly documented: zero mentions in llms-full.txt. The host exists (root returns 200 text/plain) and Ultra search returns dexBanner URLs on static.datapi.jup.ag. It was not used and should not be relied on.",
+ "auth": "Header x-api-key: jup_... (new key format), created at https://developers.jup.ag/portal (sign-up required; not done here). A missing header is treated as KEYLESS (0.5 RPS), not rejected. An invalid or unknown key returns 401. A key without permission for an endpoint returns 403 \"API key does not have access to this endpoint\"; a firewall deny returns 403 \"Request blocked by firewall\". Keys can be restricted per product by path-prefix allow-list (Swap, Tokens, Price, Trigger, Recurring, Portfolio, Lend, Send, Studio, Prediction). Up to 50 firewall rules per team (per-IP/key/team rate limits, country/IP/header deny) are meant for protecting keys used client-side.\n\nFree tier: 1 RPS (60/min), unlimited credits, community support.\nPaid tiers:\n- Developer: $25/mo ($250/yr), 10 RPS, 25M credits\n- Launch: $100/mo, 50 RPS, 100M credits\n- Pro: $500/mo, 150 RPS, 500M credits\nOverage is billed; above 150 RPS is enterprise.\n\nCredit costs per call: /tokens/v2/search 10, /tokens/v2/tag 50, /tokens/v2/{category}/{interval} 5, /tokens/v2/recent 1, /price/v3 1, /swap/v2/order 1, /swap/v2/build 1, /swap/v1/quote 1, /portfolio/v1/positions/{address} 100, /portfolio/v1/platforms 5, all execute endpoints 0. Ultra endpoints are not listed. Credits matter only on paid tiers; RPS limits count requests, not credits.\n\nKeyless: no key, 0.5 RPS, documented as intended for prototyping and agents, not production. Measured today: 5 requests per rolling 10 s window.",
+ "base_urls": [
+  "https://api.jup.ag (canonical; keyless 0.5 RPS or keyed via x-api-key)",
+  "https://api.jup.ag/tokens/v2",
+  "https://api.jup.ag/price/v3",
+  "https://api.jup.ag/ultra/v1 (deprecated / unmaintained, still live)",
+  "https://api.jup.ag/swap/v2",
+  "https://api.jup.ag/swap/v1 (legacy Metis quote, still live)",
+  "https://api.jup.ag/portfolio/v1 (beta)",
+  "https://lite-api.jup.ag (deprecated, being phased out; tokens/price/ultra/swap v1 still answer, swap/v2 is 404)",
+  "Docs: https://developers.jup.ag/docs (llms.txt, llms-full.txt, OpenAPI at /docs/openapi-spec/{tokens/v2/tokens.yaml, price/v3/price.yaml, swap/v2/swap.yaml, ultra/ultra.yaml, portfolio/portfolio.yaml})"
+ ],
+ "cors": "Browsers can call the API directly.\n\napi.jup.ag GET: the request Origin is echoed back (\"access-control-allow-origin: https://www.orbytai.org\"), with \"vary: Origin\" and \"access-control-allow-credentials: true\". It also sends \"access-control-expose-headers: x-ratelimit-remaining, x-ratelimit-current, x-ratelimit-reset, x-api-gateway-request-id, server-timing\", so browser JS can read the rate-limit headers.\n\nOPTIONS preflight with Access-Control-Request-Headers: x-api-key returns 200 with:\n- allow-origin echoed\n- allow-methods GET, HEAD, POST, PUT, DELETE, PATCH, OPTIONS\n- allow-headers x-api-key\n- max-age 86400\nSo a keyed browser call also passes CORS, but the key would be exposed to users (Jupiter's answer is key permissions plus firewall rules).\n\nlite-api.jup.ag also echoes Origin with credentials true; its preflight returns 204. The lite-api 404 body (\"Route not found\") came with ACAO *.\n\nVerified on every sampled endpoint: tokens, price, ultra search/holdings/shield/order, swap v2 order, swap v1 quote, portfolio.",
+ "endpoints": [
+  {
+   "name": "Tokens V2 - search",
+   "request": "GET https://api.jup.ag/tokens/v2/search?query={symbol|name|mint|comma-separated mints}",
+   "status": "VERIFIED",
+   "purpose": "Token metadata, market data and stats by mint (batch of up to 100) or by fuzzy symbol/name search.",
+   "response_shape": "Array<MintInformation>; the root is a JSON array (an empty query returns a default list of 20 top tokens). Field presence is CONDITIONAL: missing fields are OMITTED, not null.\n\nIdentity and metadata:\n- id (string, mint)\n- name, symbol (string)\n- icon (string URL; can be absent)\n- decimals (number)\n- twitter, telegram, website, discord, instagram, tiktok, otherUrl (string URLs; absent if unset)\n- dev (string, creator wallet)\n- mintAuthority, freezeAuthority (string; present only when NOT disabled)\n- tokenProgram (Tokenkeg... or TokenzQd... for Token-2022)\n\nSupply and launch:\n- circSupply, totalSupply (number, decimal-adjusted whole tokens; e.g. 1000000000 for pump.fun)\n- launchpad (string: 'pump.fun', 'met-dbc', 'stonkfun', ...)\n- metaLaunchpad (string: 'raydium-launchlab', 'met-dbc', ...; only when launched via a partner config)\n- partnerConfig (string pubkey)\n- graduatedPool (string AMM pool pubkey)\n- graduatedAt (ISO string). Both graduation fields are present ONLY after migration: this is how graduation is indicated.\n- createdAt (ISO; equals firstPool.createdAt for new tokens; for legacy tokens it is the Jupiter index date, e.g. JUP 2024-06-07)\n- firstPool {id (string; for pump.fun bonding-curve tokens id == the mint), createdAt (ISO, second precision)}\n\nMarket (all USD):\n- holderCount (number)\n- fdv, mcap (number, USD)\n- usdPrice (number, USD per 1 whole token)\n- priceBlockId (number, a Solana slot, ~451.43M today)\n- liquidity (number, USD)\n- apy {jupEarn: number %} (only for Jupiter Lend Earn assets)\n\nstats5m / stats1h / stats6h / stats24h (objects, each field optional):\n- priceChange, holderChange, liquidityChange, volumeChange: PERCENT (3374.49 means +3374%)\n- buyVolume, sellVolume, buyOrganicVolume, sellOrganicVolume: USD\n- numBuys, numSells, numTraders, numOrganicBuyers, numNetBuyers: counts\nFor tokens younger than the window, all four stats objects are identical.\n\naudit (object, all fields conditional):\n- mintAuthorityDisabled, freezeAuthorityDisabled (bool)\n- topHoldersPercentage (0-100 scale)\n- devBalancePercentage (0-100 scale)\n- devMints (number of tokens this dev created)\n- devMigrations (number; undocumented but observed)\n- isSus (bool; present only when flagged)\n\nClassification:\n- organicScore (0-100)\n- organicScoreLabel ('high' | 'medium' | 'low')\n- isVerified (bool; absent for unverified tokens)\n- tags (string[]; observed: verified, strict, community, lst, stocks, token-2022, unknown, meme, defi, launchpad, infra, birdeye-trending, moonshot-verified, community-assist)\n- updatedAt (ISO, nanosecond precision)\n\nNOT present in Tokens V2 (observed across 84 objects): bondingCurve, cexes, ctLikes, smartCtLikes, fees, sniper/bundler/insider stats. Use /ultra/v1/search for those.",
+   "params_limits": "query is required. Up to 100 comma-separated mints; the 101st is SILENTLY DROPPED (verified: 101 mints in, 100 returned, input order preserved). Symbol/name search returns max 20 results and is fuzzy: 'SOL' returned tokenized stocks such as FPSon and SWKSon, so disambiguate by mint or isVerified. Comma lists are for mints only. Unknown mints are omitted. Costs 10 credits.",
+   "auth": "none (keyless 0.5 RPS) or x-api-key",
+   "freshness": "cache-control: public, max-age=10. Served via Cloudflare/CloudFront (cf-cache-status HIT seen, age up to ~9 s). updatedAt is typically 5-30 s behind real time.",
+   "sample_file": "tests/fixtures/jupiter/tokens_v2_search_multi_mints_graduated_fartcoin_jup.json (also tokens_v2_search_bonding_curve_pumpfun_token.json, tokens_v2_search_symbol_SOL.trimmed.json, tokens_v2_search_empty_query_default_list.trimmed.json)"
+  },
+  {
+   "name": "Tokens V2 - recent (first pool created)",
+   "request": "GET https://api.jup.ag/tokens/v2/recent",
+   "status": "VERIFIED",
+   "purpose": "Newest tokens by FIRST POOL creation time (not mint time): a New Pairs feed.",
+   "response_shape": "Array<MintInformation> (same object as search). Exactly 30 items, sorted by firstPool.createdAt descending. Today's 30 spanned only about 34 s (20:45:33Z to 20:46:07Z).\n\nMix observed: pump.fun, met-dbc (Meteora DBC, e.g. with partnerConfig), stonkfun (metaLaunchpad 'raydium-launchlab').\n\nFields present on all 30: id, name, symbol, decimals, dev, circSupply, totalSupply, tokenProgram, launchpad, firstPool, holderCount, audit, organicScore, organicScoreLabel, tags, createdAt, updatedAt.\n\nConditional fields and counts out of 30:\n- usdPrice, mcap, fdv, liquidity, priceBlockId: 27 (absent for brand-new tokens with no priced trade yet)\n- icon: 21\n- stats5m..stats24h: 28\n- twitter: 5\n- metaLaunchpad and partnerConfig: 9\n- audit.topHoldersPercentage: 14\n- audit.devBalancePercentage: 18\n- audit.devMigrations: 10\n\ntags were only ['unknown', 'token-2022']. No bondingCurve field.",
+   "params_limits": "No pagination, no limit parameter (the docs say 'Default to 30 mints'), no since/cursor. Costs 1 credit.",
+   "auth": "none or x-api-key",
+   "freshness": "cache-control: public, max-age=5 (CDN HIT observed). New tokens appeared about 4-10 s after pool creation.",
+   "sample_file": "tests/fixtures/jupiter/tokens_v2_recent.trimmed.json"
+  },
+  {
+   "name": "Tokens V2 - category (toporganicscore | toptraded | toptrending)",
+   "request": "GET https://api.jup.ag/tokens/v2/{toporganicscore|toptraded|toptrending}/{5m|1h|6h|24h}?limit={1..100}",
+   "status": "VERIFIED",
+   "purpose": "Ranked token lists for a Discover/Trending table.",
+   "response_shape": "Array<MintInformation> (same object as search).\n\nVerified calls:\n- toptrending/1h?limit=20: 20 items (CARDS, PUMP, TRUMP, ..., and graduated launchpad tokens such as COLLECT pump.fun and SI stonkfun/raydium-launchlab, which carry graduatedPool/graduatedAt).\n- toporganicscore/5m?limit=3: SOL, USDC, CARDS.\n- toptraded/24h?limit=3: PUMP, cbBTC, ZEC.\nThe docs claim SOL and USDC are filtered out; that is NOT true for toporganicscore.",
+   "params_limits": "category is one of the 3 values; interval is 5m, 1h, 6h or 24h. limit defaults to 50, max 100. No pagination. Costs 5 credits.",
+   "auth": "none or x-api-key",
+   "freshness": "cache-control: public, max-age=15",
+   "sample_file": "tests/fixtures/jupiter/tokens_v2_toptrending_1h.trimmed.json (also tokens_v2_toporganicscore_5m_limit3.json, tokens_v2_toptraded_24h_limit3.json)"
+  },
+  {
+   "name": "Tokens V2 - tag",
+   "request": "GET https://api.jup.ag/tokens/v2/tag?query={verified|lst|stocks}",
+   "status": "VERIFIED",
+   "purpose": "Full list of tokens carrying a tag (verified list, LSTs, tokenized stocks).",
+   "response_shape": "Array<MintInformation>. Returns the ENTIRE set in one response, with no pagination:\n- verified: 3705 tokens, 5,322,567 bytes (5.3 MB)\n- lst: 165 tokens, 225 KB\nSOL carries apy {jupEarn: 3.86}; 150 of the verified entries have apy.",
+   "params_limits": "query is one of lst, verified, stocks. Costs 50 credits. Too large to fetch per request in a serverless function; cache it (e.g. in KV/blob) instead.",
+   "auth": "none or x-api-key",
+   "freshness": "cache-control: public, max-age=30",
+   "sample_file": "tests/fixtures/jupiter/tokens_v2_tag_verified.trimmed.json (also tokens_v2_tag_lst.trimmed.json)"
+  },
+  {
+   "name": "Price API V3",
+   "request": "GET https://api.jup.ag/price/v3?ids={mint1,mint2,...}",
+   "status": "VERIFIED",
+   "purpose": "Batch USD prices, liquidity and 24h change.",
+   "response_shape": "An object keyed by mint. Each value has:\n- usdPrice (number, USD per 1 whole token)\n- blockId (integer slot; nullable in the spec)\n- decimals (integer)\n- priceChange24h (number, PERCENT: 28.70 means +28.7%; nullable)\n- liquidity (number, USD)\n- createdAt (ISO string; fixed 2024-06-05 for legacy tokens like SOL/USDC)\n- launchpad (string, e.g. 'pump.fun' or 'stonkfun'; UNDOCUMENTED, present for launchpad tokens)\n\nMints without a reliable price (untraded for 7 days, or flagged by heuristics) are OMITTED: no key, no null, no error. Unknown or invalid ids return {} with HTTP 200 (verified).\n\nNote: a near-dead stonkfun token was still priced with liquidity 7.4e-7 USD, so apply your own liquidity filter.",
+   "params_limits": "Max 50 ids. The 51st is SILENTLY DROPPED (verified: 51 in, 50 keys out, last id missing). Costs 1 credit.",
+   "auth": "none or x-api-key",
+   "freshness": "cache-control: public, max-age=5. blockId values were within a few slots of each other across mints.",
+   "sample_file": "tests/fixtures/jupiter/price_v3_mixed_sol_usdc_graduated_bonding_illiquid.json (also price_v3_50_ids.trimmed.json, price_v3_unknown_id_returns_empty_object.json)"
+  },
+  {
+   "name": "Ultra v1 - search (deprecated, richer token object)",
+   "request": "GET https://api.jup.ag/ultra/v1/search?query={symbol|name|mint|comma mints}",
+   "status": "VERIFIED",
+   "purpose": "Token search with launchpad and risk extras: bonding-curve progress, bundlers, snipers, bot holders, Twitter profile, fees.",
+   "response_shape": "Array (max 20 for a symbol search). Contains all Tokens V2 fields, plus:\n\n- bondingCurve (number, 0-100 percent progress; 50.03 for a live pump.fun curve, 100 after graduation, 0 for a fresh curve; absent for non-launchpad tokens like JUP)\n- fees (number; unit undocumented, values consistent with SOL paid in fees: AI6 30.65, CC 0.0616, JUP 1873.29; UNCERTAIN)\n- graduatedPool, graduatedAt (as in Tokens V2)\n- dexBanner (string URL on static.datapi.jup.ag)\n- dexPaidAt (ISO; when DEX Screener was paid)\n- primaryTwitter {handle, followerCount, followingCount, type:'user'}\n- ctLikes, smartCtLikes (numbers; DEPRECATED Nov-2025 but still returned for JUP: 397 / 177)\n- stats7d {priceChange}, stats30d {priceChange} (percent; seen for JUP)\n\nExtra audit fields:\n- botHoldersCount (number)\n- botHoldersPercentage (0-100)\n- devFundedAt (ISO)\n- iconReused (bool)\n- sniperPct (percent)\n- insiderPct (percent)\n- bundlerStats {totalBundles (number), totalNativeVol (number, presumably SOL), holdingPct (percent now), holdingPctATH (percent at ATH)}\n\nAll audit extras are conditional. In a 20-result search:\n- bundlerStats: 7\n- sniperPct and insiderPct: 1\n- botHolders fields: 3-6",
+   "params_limits": "Up to 100 comma-separated mints (docs); max 20 results for symbol search. Credit cost not listed.",
+   "auth": "none or x-api-key",
+   "freshness": "cache-control: public, max-age=10",
+   "sample_file": "tests/fixtures/jupiter/ultra_v1_search_mints_bonding_graduated_verified.json (also ultra_v1_search_symbol_AI6.trimmed.json)"
+  },
+  {
+   "name": "Ultra v1 - holdings (deprecated)",
+   "request": "GET https://api.jup.ag/ultra/v1/holdings/{walletAddress}",
+   "status": "VERIFIED",
+   "purpose": "A wallet's native SOL plus every SPL/Token-2022 token account.",
+   "response_shape": "Top level is NATIVE SOL:\n- amount (string, lamports, e.g. '860805774')\n- uiAmount (number, SOL, 0.860805774)\n- uiAmountString (string)\n\ntokens is an object keyed by MINT. Each value is an ARRAY of token accounts (one mint can have several accounts). Each account has:\n- account (string, token-account pubkey)\n- amount (string, raw base units)\n- uiAmount (number, decimal-adjusted)\n- uiAmountString (string)\n- isFrozen (bool)\n- isAssociatedTokenAccount (bool)\n- decimals (number)\n- programId (string, token program)\n- UNDOCUMENTED extras: excludeFromNetWorth (bool), lamports (string, rent lamports), reclaimableLamports (string), reclaimAction (string, e.g. 'excess')\n\nNo prices, USD values or PnL: join with Price V3. The test wallet held 34 mints, 13.7 KB.",
+   "params_limits": "One wallet per call. The docs warn that wallets with thousands of accounts can respond slowly. Credit cost not listed.",
+   "auth": "none or x-api-key",
+   "freshness": "No cache-control header (live).",
+   "sample_file": "tests/fixtures/jupiter/ultra_v1_holdings.trimmed.json"
+  },
+  {
+   "name": "Ultra v1 - holdings native (deprecated)",
+   "request": "GET https://api.jup.ag/ultra/v1/holdings/{walletAddress}/native",
+   "status": "VERIFIED",
+   "purpose": "SOL balance only.",
+   "response_shape": "{amount: string lamports, uiAmount: number SOL, uiAmountString: string}",
+   "params_limits": "One wallet per call.",
+   "auth": "none or x-api-key",
+   "freshness": "No cache-control header (live).",
+   "sample_file": "tests/fixtures/jupiter/ultra_v1_holdings_native.json"
+  },
+  {
+   "name": "Ultra v1 - shield (deprecated)",
+   "request": "GET https://api.jup.ag/ultra/v1/shield?mints={mint1,mint2,...}",
+   "status": "VERIFIED",
+   "purpose": "Per-mint risk warnings for a token risk panel.",
+   "response_shape": "{warnings: {<mint>: Array<{type, message, severity, source?}>}}\n- An empty array means no warnings (e.g. SOL).\n- severity is one of 'info', 'warning', 'critical'.\n- source is optional; the only documented value is 'RugCheck'.\n\ntype enum (documented): NOT_VERIFIED, LOW_LIQUIDITY, NOT_SELLABLE, LOW_ORGANIC_ACTIVITY, HAS_MINT_AUTHORITY, HAS_FREEZE_AUTHORITY, HAS_PERMANENT_DELEGATE, NEW_LISTING, VERY_LOW_TRADING_ACTIVITY, HIGH_SUPPLY_CONCENTRATION, NON_TRANSFERABLE, MUTABLE_TRANSFER_FEES, SUSPICIOUS_DEV_ACTIVITY, SUSPICIOUS_TOP_HOLDER_ACTIVITY, HIGH_SINGLE_OWNERSHIP, '{}%_TRANSFER_FEES'.\n\nObserved today for new pump tokens: NOT_VERIFIED, LOW_ORGANIC_ACTIVITY and NEW_LISTING, all with severity 'info'.",
+   "params_limits": "mints is required (comma-separated); no documented maximum. Credit cost not listed.",
+   "auth": "none or x-api-key",
+   "freshness": "cache-control: public, max-age=10",
+   "sample_file": "tests/fixtures/jupiter/ultra_v1_shield.json"
+  },
+  {
+   "name": "Swap V2 - order as a read-only quote (no taker)",
+   "request": "GET https://api.jup.ag/swap/v2/order?inputMint=So11111111111111111111111111111111111111112&outputMint={mint}&amount={raw input units, e.g. lamports}[&slippageBps=][&excludeRouters=][&excludeDexes=]",
+   "status": "VERIFIED",
+   "purpose": "Best quote across Metis, JupiterZ RFQ, Dflow and OKX for a quote panel. taker is NOT required: without it, transaction is null (quote only).",
+   "response_shape": "Amounts (raw base-unit strings):\n- inputMint, outputMint (string)\n- inAmount (e.g. '100000000' lamports)\n- outAmount (e.g. '41665048348' raw token units; divide by 10^decimals)\n- otherAmountThreshold (min out after slippage; equal to outAmount when no taker/slippage)\n- swapMode ('ExactIn'; the only supported mode)\n- slippageBps (number; 0 without taker; echoes the param otherwise)\n\nPrice impact and USD values:\n- priceImpact (number, PERCENT POINTS; -10.42 means -10.42%). Equals (outUsdValue - inUsdValue)/inUsdValue*100, so it includes USD-price staleness and fees.\n- priceImpactPct (string, DEPRECATED decimal ratio = priceImpact/100)\n- inUsdValue, outUsdValue, swapUsdValue (numbers, USD)\n\nRoute:\n- routePlan[] {percent (number, 100), bps (number, 10000), usdValue (number USD), swapInfo {ammKey, label ('Pump.fun Amm' for PumpSwap, 'Pump.fun' for the bonding curve), inputMint, outputMint, inAmount, outAmount (strings)}}\n- router ('metis' | 'jupiterz' | 'dflow' | 'okx')\n- swapType (deprecated: 'aggregator', ...)\n- mode ('ultra' when no optional params; 'manual' when slippageBps etc. are set)\n\nFees:\n- feeBps (number, total fee; 10 observed)\n- platformFee {feeBps, feeMint, amount?}\n- feeMint\n- signatureFeeLamports, prioritizationFeeLamports, rentFeeLamports (numbers; 0 without taker)\n- *FeePayer (null)\n\nTransaction and metadata:\n- transaction (null without taker; '' with taker if unbuildable, plus errorCode/errorMessage)\n- gasless (bool), taker (null), requestId (string UUID), totalTime (ms)\n- undocumented: jitOptimized (bool), guaranteedPrice (bool)\n- RFQ only: quoteId, maker, expireAt",
+   "params_limits": "inputMint, outputMint and amount are required. slippageBps ranges 0-10000. ExactIn only. /order routes pump.fun bonding curves (label 'Pump.fun') and PumpSwap ('Pump.fun Amm'). Costs 1 credit.",
+   "auth": "none or x-api-key",
+   "freshness": "No cache-control header (live). totalTime was 70-83 ms.",
+   "sample_file": "tests/fixtures/jupiter/swap_v2_order_quote_no_taker.json (also swap_v2_order_quote_bonding_curve_manual_slippage.json)"
+  },
+  {
+   "name": "Ultra v1 - order as quote (deprecated alias of /swap/v2/order)",
+   "request": "GET https://api.jup.ag/ultra/v1/order?inputMint=...&outputMint=...&amount=...",
+   "status": "VERIFIED",
+   "purpose": "Same as /swap/v2/order (the docs call the migration 'just a base URL change').",
+   "response_shape": "Byte-for-byte the same schema as /swap/v2/order. transaction is null and taker is null without a taker. Observed: outAmount '41190228294', priceImpact -11.44, router 'metis', mode 'ultra', feeBps 10.",
+   "params_limits": "Same as swap/v2/order.",
+   "auth": "none or x-api-key",
+   "freshness": "live",
+   "sample_file": "tests/fixtures/jupiter/ultra_v1_order_quote_no_taker.json"
+  },
+  {
+   "name": "Swap V1 - quote (legacy Metis)",
+   "request": "GET https://api.jup.ag/swap/v1/quote?inputMint=So11111111111111111111111111111111111111112&outputMint={mint}&amount={lamports}&slippageBps={bps}",
+   "status": "VERIFIED",
+   "purpose": "Metis-only quote (no Jupiter platform fee, no RFQ). No taker concept.",
+   "response_shape": "Amounts:\n- inputMint, inAmount (string raw)\n- outputMint, outAmount (string raw)\n- otherAmountThreshold (string raw min out, e.g. 39782908214 at 100 bps)\n- swapMode, slippageBps\n- platformFee (null)\n\nPrice impact and USD:\n- priceImpactPct (string decimal ratio, e.g. '0.00695...' is about 0.7%; v1 semantics not in the current docs, so UNCERTAIN)\n- swapUsdValue (STRING USD)\n\nRoute:\n- routePlan[] {swapInfo {ammKey, label, inputMint, outputMint, inAmount, outAmount, updateContextSlot (string)}, percent (number; may be null per the Nov-2025 changelog), bps (null)}\n\nDiagnostics:\n- contextSlot (number)\n- timeTaken (number, SECONDS, e.g. 0.000092)\n- mostReliableAmmsQuoteReport {info {...}}, longtailMarketQuoteReport, otherRoutePlans, loadedLongtailToken, instructionVersion, transactionVersion\n\nA bonding-curve token quoted via label 'Pump.fun', ammKey = the bonding-curve account.",
+   "params_limits": "Not in the current OpenAPI (only swap v2 is). It still appears in the credit table (1 credit), and the docs point to /swap/v2/build or /order instead. Returns NO_ROUTES_FOUND if a market is not in Metis.",
+   "auth": "none or x-api-key",
+   "freshness": "live",
+   "sample_file": "tests/fixtures/jupiter/swap_v1_quote_graduated_pumpswap.json (also swap_v1_quote_bonding_curve_pumpfun.json)"
+  },
+  {
+   "name": "Swap V2 - build",
+   "request": "GET https://api.jup.ag/swap/v2/build?inputMint=&outputMint=&amount=&taker={wallet}[&slippageBps=rtse|n][&mode=fast][&maxAccounts=]",
+   "status": "DOCUMENTED",
+   "purpose": "Raw swap instructions for custom transactions (Metis only). taker is REQUIRED, so it is not usable for a keyless read-only quote.",
+   "response_shape": "computeBudgetInstructions, setupInstructions, swapInstruction, cleanupInstruction, otherInstructions, tipInstruction, address lookup tables, and the quote fields (per the OpenAPI at /docs/openapi-spec/swap/v2/swap.yaml).",
+   "params_limits": "taker is required. No Jupiter swap fee. Costs 1 credit.",
+   "auth": "none or x-api-key",
+   "freshness": "live"
+  },
+  {
+   "name": "Portfolio v1 - positions (beta)",
+   "request": "GET https://api.jup.ag/portfolio/v1/positions/{walletAddress}",
+   "status": "VERIFIED",
+   "purpose": "DeFi positions across protocols (lending, staking, LP, Jupiter limit orders/DCA/perps). Not a spot token PnL.",
+   "response_shape": "{date: number (epoch MILLISECONDS), owner: string, fetcherReports: [], elements: [] (position elements), duration: number ms, tokenInfo: {}}\nThe sample wallet had no positions, so elements was empty; the element schema is in /docs/openapi-spec/portfolio/portfolio.yaml.",
+   "params_limits": "One wallet per call. Costs 100 credits (the most expensive endpoint).",
+   "auth": "none or x-api-key",
+   "freshness": "cache-control: public, max-age=30. Latency ~750 ms.",
+   "sample_file": "tests/fixtures/jupiter/portfolio_v1_positions_empty_wallet.json"
+  },
+  {
+   "name": "lite-api.jup.ag (legacy keyless host)",
+   "request": "GET https://lite-api.jup.ag/{tokens/v2/*, price/v3, ultra/v1/*, swap/v1/*}",
+   "status": "VERIFIED",
+   "purpose": "Old free host. Works today but is being phased out.",
+   "response_shape": "Same payloads as api.jup.ag. No x-ratelimit-* headers are returned. /swap/v2/order returns 404 with text/plain body 'Route not found'.",
+   "params_limits": "Rate limit undisclosed and 'reduced progressively until it is fully retired'. The retirement date is TBA.",
+   "auth": "none",
+   "freshness": "Same cache-control as api.jup.ag."
+  },
+  {
+   "name": "datapi.jup.ag (jup.ag/pro internal data API)",
+   "request": "n/a (undocumented)",
+   "status": "UNCERTAIN",
+   "purpose": "Status only. It is NOT publicly documented: zero mentions in developers.jup.ag llms-full.txt, OpenAPI specs, plans or credit tables. The host exists (GET / returns 200 text/plain), and Ultra search returns dexBanner URLs on static.datapi.jup.ag. No endpoints were probed; do not rely on it.",
+   "response_shape": "n/a"
+  }
+ ],
+ "streaming": [
+  {
+   "name": "Public market-data streaming (WebSocket/SSE)",
+   "url": "none",
+   "status": "NOT AVAILABLE",
+   "auth": "n/a",
+   "subscribe_message": "n/a",
+   "event_shape": "n/a",
+   "notes": "developers.jup.ag documents no WebSocket, SSE or gRPC feed for prices, trades, candles or new tokens. The only streams are the JupiterZ RFQ V2 gRPC StreamQuotes and StreamSwap, which are for approved market makers, and the Trading MCP (mcp.jup.ag, Streamable HTTP for AI agents). Neither is usable as a market-data feed. ORBYT has to poll (/tokens/v2/recent max-age 5 s, /price/v3 max-age 5 s) or use another provider for live trades and candles."
+  }
+ ],
+ "rate_limits": "Documented limits (portal/rate-limits, 60-second sliding window, applied per ORGANISATION, not per key):\n\n| Tier | RPS | Requests per minute |\n|---|---|---|\n| Keyless | 0.5 | 30 |\n| Free | 1 | 60 |\n| Developer ($25/mo) | 10 | 600 |\n| Launch ($100/mo) | 50 | 3,000 |\n| Pro ($500/mo) | 150 | 9,000 |\n| Enterprise | above 150 | on request |\n\n/swap/v2/execute (and /submit) has its own separate bucket: Keyless 20 RPS, Free 50 RPS, Paid 100 RPS.\n\nMeasured keyless behaviour today on api.jup.ag:\n- The limit was 5 requests per rolling 10 s. x-ratelimit-current rose 1 to 5 while x-ratelimit-remaining fell 4 to 0.\n- x-ratelimit-reset is a Unix timestamp in SECONDS, equal to the oldest in-window request plus about 10 s. For example, a request at 20:44:34 returned reset 1790628284 (20:44:44).\n- The 6th request inside 10 s got HTTP 429 with body {\"code\":429,\"message\":\"[API Gateway] Too many requests\"}.\n- There is no Retry-After header. Back off until x-ratelimit-reset*1000.\n- The docs say the headers appear only on 200 and 429 responses, not on 401, 403 or 5xx. No lockout: a request succeeds as soon as a slot frees.\n- Requests served from the CDN cache (cf-cache-status: HIT) STILL count against the limit.\n- A firewall rate-limit rule instead returns 429 \"Too many requests\" (without the [API Gateway] prefix).\n\nlite-api.jup.ag exposes no rate-limit headers; its limit is being reduced progressively.\n\nKeyless limits are presumably tracked per client IP. On Vercel, serverless functions share egress IPs with other tenants, so keyless calls from server code are unreliable. Use a key server-side (Developer tier or higher for a terminal).",
+ "orbyt_fit": [
+  "Discover token table: /tokens/v2/toptrending|toptraded|toporganicscore/{5m|1h|6h|24h}?limit=100 give up to 100 ranked tokens with usdPrice, mcap, fdv, liquidity (USD), holderCount, stats{5m,1h,6h,24h} (priceChange %, buy/sell volume USD, numBuys/numSells/numTraders), organicScore, isVerified, audit. Refresh with /tokens/v2/search?query=<up to 100 mints> (10 credits) or /price/v3 (50 ids, 1 credit).",
+  "Token metadata (logo, name, socials, supply, decimals, token program, creator, launchpad): /tokens/v2/search by mint. Socials are twitter/telegram/website/discord; Ultra search adds primaryTwitter.followerCount.",
+  "Price: /price/v3?ids=<=50 mints> gives usdPrice, priceChange24h %, liquidity USD and blockId (slot). The 5 s CDN cache makes it fine for 5-10 s polling. Missing keys mean 'no reliable price'; show that honestly and do not invent a value.",
+  "Liquidity: the liquidity field (USD) in Tokens V2 and Price V3. There is no per-pool breakdown or pool reserves; only firstPool.id and graduatedPool are given.",
+  "Pulse New Pairs: /tokens/v2/recent returns the 30 most recent first-pool creations (pump.fun, met-dbc, stonkfun/raydium-launchlab). Poll every ~5 s (its cache max-age is 5), and dedupe in client or DB state because there is no cursor or backfill. At the current launch rate 30 items cover only about 30-40 s.",
+  "Pulse Final Stretch: needs bonding-curve progress. Only the DEPRECATED /ultra/v1/search?query=<up to 100 mints> returns bondingCurve (0-100 %). Tokens V2 lacks it, and there is no 'near graduation' list endpoint: re-query tracked mints from /recent in batches. Keep the dependency optional because Ultra is unmaintained.",
+  "Pulse Migrated: graduatedPool plus graduatedAt (ISO) appear in Tokens V2 once a token migrates, and bondingCurve=100 in Ultra search. There is no list-recent-migrations endpoint (toptrending only incidentally includes fresh graduates), so detect by re-checking tracked mints or use another provider.",
+  "Holders: only holderCount, audit.topHoldersPercentage (0-100) and stats*.holderChange %. Ultra search adds botHoldersCount/Percentage. There is NO holder list endpoint.",
+  "Risk panel: Tokens V2 audit gives mintAuthorityDisabled, freezeAuthorityDisabled, topHoldersPercentage, devBalancePercentage, devMints, devMigrations, and isSus (present only when flagged), plus organicScore/Label and isVerified/tags. The deprecated /ultra/v1/shield adds warning types with severity. The deprecated Ultra search adds bundlerStats {totalBundles, totalNativeVol, holdingPct, holdingPctATH}, sniperPct, insiderPct, devFundedAt and iconReused.",
+  "Quotes (read-only quote panel): /swap/v2/order without taker returns outAmount (raw), priceImpact (percent points), inUsdValue/outUsdValue, routePlan with DEX labels, router and feeBps. /swap/v1/quote returns a Metis-only quote with otherAmountThreshold at your slippageBps. The licence (clause 2.3) requires labelling the quote source to end users as 'Jupiter Ultra' or 'Metis'.",
+  "Portfolio / wallet tracker balances: the DEPRECATED /ultra/v1/holdings/{wallet} gives SOL lamports plus every token account (raw amount, uiAmount, decimals, frozen flag). Join with /price/v3 for USD value. /portfolio/v1/positions/{wallet} (beta, 100 credits) covers DeFi positions.",
+  "Wallet activity / wallet PnL analytics: NOT covered. There is no transaction history, trade list or PnL endpoint; use an RPC or indexer provider.",
+  "Trades feed and live transactions: NOT covered. There are no trades endpoints and no WebSocket.",
+  "Candlestick charts: NOT covered. There is no OHLCV endpoint (jup.ag/pro charts come from the undocumented datapi); use another provider."
+ ],
+ "gotchas": [
+  "lite-api.jup.ag still works today (tokens, price, ultra, swap v1), but it is officially being phased out with progressively lower limits and no fixed date. /swap/v2/* is 404 there. Use api.jup.ag, keyless or keyed.",
+  "Keyless is really 5 requests per 10 s (measured), shared across ALL endpoints in the main bucket. A Discover table, a Pulse poller and quote refreshes can easily exceed it. CDN cache hits still count.",
+  "On Vercel, keyless server calls share egress IPs with other tenants, so expect random 429s. Call keyed from the server, or keyless from the browser, where each user's IP gets its own bucket (CORS allows it), accepting the docs' 'not for production' guidance.",
+  "Silent truncation: /price/v3 keeps only the first 50 ids and /tokens/v2/search only the first 100 mints, with no error. Chunk client-side.",
+  "Price V3 OMITS mints it can't price reliably (no key, no null). An invalid id returns {} with HTTP 200. Always diff requested vs returned keys.",
+  "Missing fields are OMITTED rather than null: usdPrice/mcap/liquidity are missing for brand-new tokens, isVerified is absent for unverified tokens, and audit fields are conditional. audit.isSus appears only when flagged, so test for presence, not value.",
+  "All percentage fields are on a 0-100 scale: priceChange, holderChange, liquidityChange, volumeChange, priceChange24h, topHoldersPercentage, devBalancePercentage and bondingCurve. For example 3374.49 means +3374%, not a fraction.",
+  "For tokens younger than a stats window, stats5m, stats1h, stats6h and stats24h are identical, because each covers the token's whole life.",
+  "Tokens V2 has NO bondingCurve, cexes, ctLikes, smartCtLikes or fees. Graduation is indicated only by graduatedPool plus graduatedAt being present. bondingCurve % exists only in the deprecated /ultra/v1/search (100 means graduated).",
+  "ctLikes and smartCtLikes were announced as deprecated in Nov 2025 for both Ultra and Tokens search, but Ultra search still returned them for JUP. Don't depend on them.",
+  "The docs say category endpoints filter out SOL/USDC, but toporganicscore/5m returned SOL and USDC as #1 and #2. Filter them yourself.",
+  "Symbol search is fuzzy and returns max 20. 'SOL' returned wrapped SOL plus tokenized stocks (FPSon, SWKSon, ...). Resolve by mint and check isVerified. An empty query returns a default top-20 list.",
+  "/tokens/v2/recent is only the latest 30 by first-pool time, with no cursor. At the current launch rate that is about 34 s of history, so poll at least every 5-10 s or you will miss launches. createdAt equals firstPool.createdAt for new tokens.",
+  "/tokens/v2/tag?query=verified is 5.3 MB (3705 tokens) and costs 50 credits. Fetch rarely and cache; don't call it per request in a serverless function.",
+  "Quote semantics differ. /swap/v2/order priceImpact is in percent points and is computed from USD values (inUsdValue vs outUsdValue), so a stale USD price on a pumping token inflates it (-10.4% seen for a $12 buy). priceImpactPct is a deprecated ratio string. /swap/v1/quote priceImpactPct is a ratio string, its swapUsdValue is a STRING, and its timeTaken is in SECONDS.",
+  "/swap/v2/order without taker returns transaction: null, slippageBps 0, and otherAmountThreshold == outAmount. Passing slippageBps flips mode to 'manual' and may restrict routers. With a taker, an unbuildable quote returns transaction '' plus errorCode/errorMessage with HTTP 200.",
+  "The /order platform fee was 10 bps on SOL to meme swaps, even for tokens under 24 h old, although the docs' fee table says 50 bps for new tokens. Read feeBps and platformFee from each response and never hardcode them. /swap/v1/quote has platformFee: null.",
+  "All amounts in quotes and holdings are raw base-unit STRINGS (lamports for SOL); convert using decimals. Holdings tokens[mint] is an ARRAY, because a wallet can have several accounts per mint.",
+  "Timestamps are ISO-8601 strings (firstPool.createdAt has second precision; updatedAt has nanosecond precision). The exceptions are portfolio 'date' (epoch ms) and x-ratelimit-reset (epoch seconds). priceBlockId and blockId are Solana slots.",
+  "Undocumented fields seen: price_v3[mint].launchpad; audit.devMigrations; holdings excludeFromNetWorth, lamports, reclaimableLamports and reclaimAction; order jitOptimized and guaranteedPrice. Treat them as optional.",
+  "The Ultra API (search, holdings, shield, order) is officially 'no longer actively maintained', and Ultra endpoints are absent from the credit table. It can disappear or change without notice, so build fallbacks.",
+  "Never use datapi.jup.ag: it is undocumented and not covered by the public tiers."
+ ],
+ "terms_and_risks": "The Jupiter API & SDK License Agreement (developers.jup.ag/docs/legal/sdk-api-license-agreement) and the Terms of Use apply as soon as you use the API.\n\nClauses that matter for ORBYT:\n- 2.3 requires \"prominently\" labelling the routing API used, visible to end users: \"Jupiter Ultra\" when using Ultra, \"Metis\" for anything else. Presenting output as plain \"Jupiter\", or as the same product as jup.ag, is forbidden. Quote panels must carry this label.\n- 3.2(d) bans selling, sharing, transferring or sublicensing \"any content obtained through the API\" to third parties. Displaying it inside your own product is the intended use, but redistributing raw data (e.g. a public data API) is not allowed.\n- 3.2(e) forbids usage Jupiter considers excessive or abusive.\n- 3.2(f) forbids competitive analysis or publishing performance benchmarks of the API.\n- 3.2(g) forbids using or combining API content \"with content obtained through scraping or any other means outside the API\". This is broadly worded; merging Jupiter data with other providers' data may need legal review or written consent (info@jup.ag).\n- 3.2(i) forbids reformatting or creating derivative works of the API or content \"through automated or other means\" (broad).\n- 3.3: if the product competes with Jupiter's service (a trading terminal overlaps jup.ag/pro), Jupiter may access it and request information about it.\n- 5.1 says access is only with issued Keys, which sits awkwardly with keyless access.\n- The licence is \"fee-bearing\"; fees are set via the portal and can change with notice there.\n- Governing law is Panama.\n\nOperational risks:\n- Ultra endpoints are unmaintained and may be removed.\n- lite-api is being retired.\n- Keyless is explicitly not meant for production.\n- Response schemas are \"subject to changes\".\n- Per the docs, rate limits apply per organisation, and firewall rules can add per-IP limits.\n- Exposing an x-api-key in browser code leaks it; mitigate with key permissions (e.g. Tokens and Price only) and firewall rate limits.\n\nThere is no market-data SLA below the enterprise tier. status.jup.ag shows availability."
+}

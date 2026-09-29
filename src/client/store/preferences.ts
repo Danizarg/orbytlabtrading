@@ -5,8 +5,8 @@ import { createJSONStorage, persist, type StateStorage } from 'zustand/middlewar
 import { isSolanaAddress } from '@/lib/core/solana';
 
 /**
- * Browser-local user state: watchlist, tracked wallets and the optional
- * deposit-address override. Nothing here leaves the browser.
+ * Browser-local user state: watchlist and tracked wallets. Nothing here
+ * leaves the browser.
  */
 
 export interface TrackedWallet {
@@ -21,13 +21,11 @@ export const MAX_TRACKED_WALLETS = 25;
 interface PreferencesState {
   watchlist: string[];
   trackedWallets: TrackedWallet[];
-  depositOverride: string | null;
   toggleWatch: (mint: string) => boolean;
   isWatched: (mint: string) => boolean;
   addWallet: (address: string, label?: string) => { ok: true } | { ok: false; reason: string };
   removeWallet: (address: string) => void;
   renameWallet: (address: string, label: string) => void;
-  setDepositOverride: (address: string | null) => void;
 }
 
 // localStorage can throw (private mode, blocked storage); degrade to memory.
@@ -61,7 +59,6 @@ export const usePreferences = create<PreferencesState>()(
     (set, get) => ({
       watchlist: [],
       trackedWallets: [],
-      depositOverride: null,
       toggleWatch: (mint) => {
         if (!isSolanaAddress(mint)) return false;
         const list = get().watchlist;
@@ -89,13 +86,12 @@ export const usePreferences = create<PreferencesState>()(
         set({
           trackedWallets: get().trackedWallets.map((w) => (w.address === address ? { ...w, label: label.trim().slice(0, 32) || w.label } : w)),
         }),
-      setDepositOverride: (address) => set({ depositOverride: address && isSolanaAddress(address) ? address : null }),
     }),
     {
       name: 'orbyt-preferences-v1',
       version: 1,
       storage: createJSONStorage(() => safeStorage),
-      partialize: (s) => ({ watchlist: s.watchlist, trackedWallets: s.trackedWallets, depositOverride: s.depositOverride }),
+      partialize: (s) => ({ watchlist: s.watchlist, trackedWallets: s.trackedWallets }),
       // Validate anything read back from storage.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<PreferencesState>;
@@ -106,8 +102,7 @@ export const usePreferences = create<PreferencesState>()(
             ? p.trackedWallets
                 .filter((w): w is TrackedWallet => !!w && isSolanaAddress(w.address) && typeof w.label === 'string')
                 .slice(0, MAX_TRACKED_WALLETS)
-            : [],
-          depositOverride: typeof p.depositOverride === 'string' && isSolanaAddress(p.depositOverride) ? p.depositOverride : null,
+            : []
         };
       },
     },

@@ -1,0 +1,49 @@
+{
+  "_note": "DOC EXAMPLE, NOT LIVE DATA. Constructed from the documented /tokens/{tokenAddress}/holders?enrich=identity schema (total, accounts[]: {wallet, amount, value, percentage, identity?: {type, tags, name, pool{program, poolAddress}, developer{...}, bot{...}}}) to exercise every label ORBYT maps. Mint 7ehsm...pump and its pump.fun bonding-curve PDA 9ZZuz... come from the live RPC fixtures; the curve row deliberately has NO identity so the exact PDA derivation labels it. Wallet addresses 8Tp9f... onward are the documented addresses from the official /holders/top example; D45QQ... is the PumpSwap pool id from the Birdeye trades doc example. Amounts, percentages, names and the total are illustrative.",
+  "source": "https://docs.solanatracker.io/data-api/openapi.json (#/components/schemas/HolderAccount, #/components/schemas/EnrichedIdentity) ; https://docs.solanatracker.io/guides/token-holders.md",
+  "request": "GET https://data.solanatracker.io/tokens/7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump/holders?enrich=identity (header x-api-key)",
+  "response": {
+    "total": 812,
+    "enrich": ["identity"],
+    "accounts": [
+      { "wallet": "9ZZuz4cVoYhbAFomLMHJjpPijY7EXryqHRjY79f9VC7A", "amount": 603185974.343956, "value": { "quote": 42.5, "usd": 7480.5 }, "percentage": 60.3185974343956 },
+      {
+        "wallet": "D45QQMsxGhohYXGZKDJEowMv2HArrKAsw5V3JnyDZWeS",
+        "amount": 50000000,
+        "value": { "quote": 3.52, "usd": 620 },
+        "percentage": 5,
+        "identity": { "type": "pool", "tags": ["pool"], "pool": { "program": "pumpfun-amm", "poolAddress": "D45QQMsxGhohYXGZKDJEowMv2HArrKAsw5V3JnyDZWeS" } }
+      },
+      {
+        "wallet": "J5gXsyettqJsMScenY7q7KnNDcojmaKX9jeBCNAMCgBW",
+        "amount": 15000000,
+        "value": { "quote": 1.06, "usd": 186 },
+        "percentage": 1.5,
+        "identity": { "type": "developer", "tags": ["developer"], "developer": { "token": "7ehsmTN3JRgZ54A4T6WN2PSKgM2FhxJ4bbgGV8Y1pump", "createdAt": 1790000000000 } }
+      },
+      {
+        "wallet": "8Tp9fFkZ2KcRBLYDTUNXo98Ez6ojGb6MZEPXfGDdeBzG",
+        "amount": 12000000,
+        "value": { "quote": 0.85, "usd": 148.8 },
+        "percentage": 1.2,
+        "identity": { "name": "Example KOL", "type": "kol", "tags": ["kol"] }
+      },
+      {
+        "wallet": "8N2ssXZGJbvVLszanERuCJpLZd2nuADgpZwLkDDxwNnS",
+        "amount": 11000000,
+        "value": { "quote": 0.77, "usd": 136.4 },
+        "percentage": 1.1,
+        "identity": { "type": "bot", "tags": ["bot"], "bot": { "name": "Example Bot", "avatar": null } }
+      },
+      { "wallet": "CBEADkb8TZAXHjVE3zwad4L995GZE7rJcacJ7asebkVG", "amount": 10000000, "value": { "quote": 0.7, "usd": 124 }, "percentage": 1 },
+      { "wallet": "8Mm46CsqxiyAputDUp2cXHg41HE3BfynTeMBDwzrMZQH", "amount": 9000000, "value": { "quote": 0.63, "usd": 111.6 }, "percentage": 0.9 },
+      { "wallet": "C68a6RCGLiPskbPYtAcsCjhG8tfTWYcoB4JjCrXFdqyo", "amount": 8000000, "value": { "quote": 0.56, "usd": 99.2 }, "percentage": 0.8 },
+      { "wallet": "42brAgAVNzMBP7aaktPvAmBSPEkehnFQejiZc53EpJFd", "amount": 7000000, "value": { "quote": 0.49, "usd": 86.8 }, "percentage": 0.7 },
+      { "wallet": "8NBEbxLknGv5aRYefFrW2qFXoDZyi9fSHJNiJRvEcMBE", "amount": 6000000, "value": { "quote": 0.42, "usd": 74.4 }, "percentage": 0.6 },
+      { "wallet": "4xLpwxgYuPwPvtQjE94RLS4WZ4aD8NJYYKr2AJk99Qdg", "amount": 5000000, "value": { "quote": 0.35, "usd": 62 }, "percentage": 0.5 },
+      { "wallet": "3B7XAQrLoEMDEGvX8569F9GRb9PcXXocJmj5wvhhei9z", "amount": 4000000, "value": { "quote": 0.28, "usd": 49.6 }, "percentage": 0.4 },
+      { "wallet": "FQEmsV5A6jZdmb3KuP3YBLmHfFNoKuoWddBGMQuW1M9f", "amount": 3000000, "value": { "quote": 0.21, "usd": 37.2 }, "percentage": 0.3 },
+      { "wallet": "2qo8jvuc49pFmTjmUHLiARSV6ppPTaE7gw27ZJ6DnNZy", "amount": 2000000, "value": { "quote": 0.14, "usd": 24.8 }, "percentage": 0.2 }
+    ]
+  }
+}

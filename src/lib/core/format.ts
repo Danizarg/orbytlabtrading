@@ -24,10 +24,12 @@ export function formatPrice(n: Num, opts: { currency?: boolean } = {}): string {
   const sign = n < 0 ? '-' : '';
   if (abs >= 1_000) return `${sign}${prefix}${abs.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
   if (abs >= 1) return `${sign}${prefix}${abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
-  if (abs >= 0.001) return `${sign}${prefix}${abs.toPrecision(4).replace(/0+$/, '').replace(/\.$/, '')}`;
+  // Round to 4 significant digits first so a carry (0.0009999 → 0.001) moves the magnitude too.
+  const rounded = Number(abs.toPrecision(4));
+  if (rounded >= 0.001) return `${sign}${prefix}${rounded.toPrecision(4).replace(/0+$/, '').replace(/\.$/, '')}`;
   // Zeros between the decimal point and the first significant digit.
-  const zeros = Math.ceil(-Math.log10(abs)) - 1;
-  const digits = Math.round(abs * 10 ** (zeros + 4))
+  const zeros = Math.ceil(-Math.log10(rounded)) - 1;
+  const digits = Math.round(rounded * 10 ** (zeros + 4))
     .toString()
     .slice(0, 4)
     .replace(/0+$/, '');

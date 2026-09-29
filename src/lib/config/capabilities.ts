@@ -24,6 +24,20 @@ export interface Capabilities {
   serverTrades: boolean;
   /** Keyed candle source (server route /api/v1/candles). */
   serverCandles: boolean;
+  /**
+   * /api/v1/candles also answers keyless: GeckoTerminal OHLCV (1m–1d) fetched
+   * by the server and CDN-cached (30 s latest page, 10 min older pages). Always
+   * true: clients use it as the fallback after the direct GeckoTerminal call,
+   * so a visitor whose own GeckoTerminal quota is spent still gets candles.
+   */
+  serverCandlesKeyless: boolean;
+  /** /api/v1/pools (DEX Screener + GeckoTerminal merged, CDN-cached 60 s). Always true (keyless). */
+  serverPools: boolean;
+  /**
+   * /api/v1/tokens answers keyless too (Jupiter + DEX Screener from the server,
+   * CDN-cached 15 s). Always true; `serverDiscover` still means a keyed source.
+   */
+  serverTokensKeyless: boolean;
   /** Sub-minute intervals available from a keyed candle source. */
   serverSecondIntervals: Interval[];
   /** Holder list (server route /api/v1/holders). */
@@ -49,6 +63,9 @@ export function deriveCapabilities(c: ConfiguredProviders): Capabilities {
     configured: c,
     serverTrades: c.helius || c.customRpc || c.birdeye || c.solanatracker || c.coingecko === 'pro',
     serverCandles: c.birdeye || c.solanatracker || c.coingecko !== null,
+    serverCandlesKeyless: true,
+    serverPools: true,
+    serverTokensKeyless: true,
     serverSecondIntervals: [...secondIntervals],
     serverHolders: c.helius || c.birdeye || c.solanatracker,
     serverRisk: c.solanatracker || c.birdeye,

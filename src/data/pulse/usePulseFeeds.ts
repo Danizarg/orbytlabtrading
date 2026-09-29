@@ -1,0 +1,554 @@
+'use client';
+
+import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useCapabilities } from '@/client/capabilities';
+import { usePumpPortalMigrations, usePumpPortalNewTokens } from '@/client/hooks/usePumpPortal';
+import { useSolPrice } from '@/data/hooks/useSolPrice';
+import { browserCurves, browserRpc, gecko, jup, server } from '@/data/sources';
+import { PUBLIC_ENDPOINTS } from '@/lib/config/capabilities';
+import { ChainError, chunk, runChain, type ChainStep } from '@/lib/core/chain';
+import { PROVIDER_LABELS, type DiscoverQuery } from '@/lib/core/providers';
+import type { BondingCurveState, PulseColumn, Sourced, TokenRow } from '@/lib/core/types';
+import { isAbortError, isProviderError } from '@/lib/net/errors';
+import {
+  classifyGeckoPool,
+  feedErrorText,
+  geckoMigrationAction,
+  isCurveTarget,
+  mergeSourcedRecords,
+  MIGRATED_WINDOW_MS,
+  patchFromCurve,
+  patchFromGeckoPool,
+  patchFromMigration,
+  patchFromNewToken,
+  patchFromPoolOwner,
+  patchFromServerToken,
+  patchFromTokenRow,
+  patchFromUltra,
+  pickBatch,
+  poolDexTargets,
+  poolOwnersFromRpc,
+  verifyCandidate,
+  type PatchMeta,
+  type PendingCandidate,
+  type PulseFeedId,
+  type PulsePatch,
+} from '@/lib/services/pulse';
+import { enqueuePatches, flushPatches, FLUSH_INTERVAL_MS, getVisibleMints, usePulseStore, visibleMintSet } from './store';
+import { useVisibleInterval } from './timers';
+
+/**
+ * Every Pulse input, mounted once by the page:
+ *
+ * 1. PumpPortal stream (browser WebSocket): pump.fun creates appear instantly,
+ *    migrations flip tokens to graduated. bonk creates wait for confirmation.
+ * 2. Keyless backfill: Jupiter /tokens/v2/recent (6 s) and 1 h trending
+ *    launchpad tokens (90 s; fresh graduations and late-curve tokens),
+ *    GeckoTerminal new pools and pump.fun curve pools (60 s each, 2 calls/min).
+ * 3. On-chain pump.fun curves via publicnode (4 s, falling back to ORBYT's
+ *    RPC proxy): exact progress, price and market cap. publicnode refuses
+ *    getMultipleAccounts beyond 10 addresses (HTTP 403 "Request blocked",
+ *    verified 2026-09-29), so a browser poll reads 30 mints as 3 sub-batches
+ *    (6 RPC calls per 4 s ≈ 15 / 10 s against a 30 / 10 s budget); a keyed
+ *    server RPC takes 100 per poll.
+ * 4. Enrichment: Jupiter token rows (15 s) and Ultra risk extras (60 s).
+ *    Graduations whose destination DEX is unknown get it on-chain from the
+ *    migration pool's owner program (10 s, ≤ 10 pools, one owner-only
+ *    getMultipleAccounts on the browser RPC).
+ * 5. Keyed server lists when configured (10 s per column).
+ *
+ * Jupiter keyless budget (4 calls / 10 s per browser): recent 1.7 + rows 0.7
+ * + Ultra 0.2 + trending 0.1 + SOL price 0.3 ≈ 3.0 calls / 10 s, leaving
+ * headroom for the global search. React Query pauses polling while the tab
+ * is hidden; the manual timers here do the same. The poll observers never
+ * re-render their host: results land in the store, not in component state.
+ */
+
+export const PULSE_CADENCE = {
+  jupRecent: 6_000,
+  jupTrending: 90_000,
+  geckoNew: 60_000,
+  geckoPump: 60_000,
+  curves: 4_000,
+  poolDex: 10_000,
+  jupRows: 15_000,
+  jupUltra: 60_000,
+  server: 10_000,
+  prune: 10_000,
+} as const;
+
+/** Re-check sooner when the previous run had nothing to request (no network call was made). */
+const IDLE_RETRY_MS = { curves: 1_500, poolDex: 3_000, jupRows: 3_000, jupUltra: 20_000 } as const;
+
+const BATCH = { curvesBrowser: 30, curvesServer: 100, rows: 100, ultra: 100 } as const;
+/** Largest share of a curve batch visible Final Stretch tokens and GeckoTerminal candidates may take (browser: 18 + 6 of 30). */
+const CURVE_TIER_SHARE = { final: 0.6, candidates: 0.2 } as const;
+/** Largest getMultipleAccounts the browser RPC (publicnode) serves; larger requests are blocked with HTTP 403. */
+export const BROWSER_ACCOUNTS_PER_CALL = 10;
+/**
+ * A mint whose pump.fun curve account was missing this many times in a row is
+ * skipped for CURVE_MISS_BACKOFF_MS, then read once more (an account not yet
+ * visible at 'confirmed' must not lose on-chain progress for the whole session).
+ */
+const MAX_CURVE_MISSES = 2;
+const CURVE_MISS_BACKOFF_MS = 2 * 60_000;
+/** A migration pool account missing this many times (not yet visible at 'confirmed') is given up on. */
+const MAX_POOL_MISSES = 2;
+const MAX_PENDING = 100;
+const PENDING_TTL_MS = 5 * 60_000;
+const MAX_VERIFY_ATTEMPTS = 4;
+const MAX_PUMP_CANDIDATES = 60;
+const TRACKING_LIMIT = 1_500;
+
+// ---------------------------------------------------------------------------
+// Poller bookkeeping (tab-wide, outside React state: nothing here is rendered)
+// ---------------------------------------------------------------------------
+
+const curveLastPolled = new Map<string, number>();
+const curveMisses = new Map<string, { count: number; at: number }>();
+const rowsLastPicked = new Map<string, number>();
+const ultraLastPicked = new Map<string, number>();
+/** GeckoTerminal pump.fun curves not yet tracked; inserted together with their first on-chain read. */
+const pumpCandidates = new Map<string, PulsePatch>();
+/** Readings waiting for launchpad confirmation (bonk creates, unknown migration pools). */
+const pending = new Map<string, PendingCandidate>();
+/** Migration pools whose owner program has been read (known AMM or not): never read again. */
+const poolOwnerSettled = new Set<string>();
+const poolMisses = new Map<string, number>();
+let pumpSortByVolume = false;
+
+function addPending(candidate: PendingCandidate): void {
+  const existing = pending.get(candidate.patch.mint);
+  if (existing && existing.kind === candidate.kind) return;
+  pending.set(candidate.patch.mint, candidate);
+  while (pending.size > MAX_PENDING) {
+    const oldest = pending.keys().next().value;
+    if (oldest === undefined) break;
+    pending.delete(oldest);
+  }
+}
+
+function trimTracking(): void {
+  const { items } = usePulseStore.getState();
+  const keep = (mint: string) => items.has(mint) || pumpCandidates.has(mint) || pending.has(mint);
+  for (const map of [curveLastPolled, curveMisses, rowsLastPicked, ultraLastPicked]) {
+    if (map.size <= TRACKING_LIMIT) continue;
+    for (const mint of map.keys()) if (!keep(mint)) map.delete(mint);
+  }
+  if (poolOwnerSettled.size + poolMisses.size > TRACKING_LIMIT) {
+    const pools = new Set<string>();
+    for (const item of items.values()) if (item.launchpad.migratedPool) pools.add(item.launchpad.migratedPool);
+    for (const pool of poolOwnerSettled) if (!pools.has(pool)) poolOwnerSettled.delete(pool);
+    for (const pool of poolMisses.keys()) if (!pools.has(pool)) poolMisses.delete(pool);
+  }
+  const now = Date.now();
+  for (const [mint, c] of pending) if (now - c.addedAt > PENDING_TTL_MS) pending.delete(mint);
+}
+
+const browserRpcLabel = (() => {
+  try {
+    const host = new URL(PUBLIC_ENDPOINTS.solanaRpc).hostname;
+    return host.includes('publicnode') ? 'publicnode' : host;
+  } catch {
+    return 'browser RPC';
+  }
+})();
+
+// ---------------------------------------------------------------------------
+// Poll runner
+// ---------------------------------------------------------------------------
+
+interface PollResult {
+  polled: number;
+  applied: number;
+  via?: string;
+}
+
+/** Runs one poll, records feed health and keeps provider errors visible. `null` = nothing to request. */
+async function runFeed(id: PulseFeedId, task: () => Promise<PollResult | null>): Promise<PollResult> {
+  const store = usePulseStore.getState();
+  try {
+    const result = await task();
+    if (!result) return { polled: 0, applied: 0 };
+    store.reportOk(id, Date.now(), result.via);
+    return result;
+  } catch (error) {
+    if (!isAbortError(error)) {
+      const notConfigured = (isProviderError(error) && error.code === 'not_configured') || (error instanceof ChainError && error.allNotConfigured);
+      if (notConfigured) store.disableFeed(id);
+      else store.reportError(id, feedErrorText(error), Date.now());
+    }
+    throw error;
+  }
+}
+
+function usePulsePoll(
+  id: PulseFeedId,
+  intervalMs: number,
+  task: (signal: AbortSignal) => Promise<PollResult | null>,
+  opts: { idleMs?: number; enabled?: boolean } = {},
+) {
+  const idleMs = opts.idleMs ?? intervalMs;
+  return useQuery({
+    queryKey: ['pulse-feed', id],
+    queryFn: ({ signal }) => runFeed(id, () => task(signal)),
+    enabled: opts.enabled ?? true,
+    refetchInterval: (query) => (query.state.data?.polled === 0 ? idleMs : intervalMs),
+    // Polls own their cadence: no focus bursts against keyless budgets, no retries on top of the next poll.
+    refetchOnWindowFocus: false,
+    retry: false,
+    staleTime: Math.min(intervalMs, idleMs),
+    gcTime: 60_000,
+    // Results go to the store; the host component never re-renders for a poll.
+    notifyOnChangeProps: [],
+  });
+}
+
+function metaOf(r: { source: PatchMeta['source']; freshness: PatchMeta['freshness']; fetchedAt: number }): PatchMeta {
+  return { source: r.source, freshness: r.freshness, fetchedAt: r.fetchedAt };
+}
+
+// ---------------------------------------------------------------------------
+// Polls
+// ---------------------------------------------------------------------------
+
+/**
+ * Discovery rows → readings. Launches only (tokens without a launchpad are
+ * plain AMM listings); pending candidates are verified on the way. A
+ * graduation that cannot be placed (no time, or older than 24 h) and an
+ * unknown stage only update tokens already tracked.
+ */
+function launchRowPatches(rows: readonly TokenRow[], meta: PatchMeta): PulsePatch[] {
+  const now = Date.now();
+  const patches: PulsePatch[] = [];
+  for (const row of rows) {
+    const lp = row.token.launchpad;
+    if (!lp?.launchpad || lp.stage === 'amm') continue;
+    const mint = row.token.mint;
+    const candidate = pending.get(mint);
+    if (candidate) {
+      const outcome = verifyCandidate(candidate, row, meta, now);
+      if (outcome.status !== 'unknown') pending.delete(mint);
+      if (outcome.status === 'confirmed') {
+        patches.push(...outcome.patches);
+        continue;
+      }
+    }
+    const patch = patchFromTokenRow(row, meta);
+    const placeable =
+      lp.stage === 'bonding' ||
+      (lp.stage === 'graduated' && typeof lp.graduatedAt === 'number' && now - lp.graduatedAt <= MIGRATED_WINDOW_MS);
+    if (!placeable) patch.updateOnly = true;
+    patches.push(patch);
+    rowsLastPicked.set(mint, now);
+  }
+  return patches;
+}
+
+async function pollDiscoverList(label: string, query: DiscoverQuery, signal: AbortSignal, serverFirst: boolean): Promise<PollResult> {
+  const result = await runChain<TokenRow[]>(
+    label,
+    [
+      serverFirst && { id: 'orbyt', run: () => server.discover.discover(query, signal) },
+      { id: 'jupiter', run: () => jup.discover(query, signal) },
+    ],
+    { signal },
+  );
+  const patches = launchRowPatches(result.data, metaOf(result));
+  enqueuePatches(patches);
+  return { polled: result.data.length, applied: patches.length, via: PROVIDER_LABELS[result.source] };
+}
+
+/** Jupiter's 30 latest first-pool creations (all launchpads). */
+function pollRecent(signal: AbortSignal, serverFirst: boolean): Promise<PollResult> {
+  return pollDiscoverList('pulse recent', { list: 'new', window: '5m' }, signal, serverFirst);
+}
+
+/** Trending launchpad tokens of the last hour: recent graduations (Migrated) and busy curves (Final Stretch candidates). */
+function pollTrending(signal: AbortSignal, serverFirst: boolean): Promise<PollResult> {
+  return pollDiscoverList('pulse trending', { list: 'trending', window: '1h', limit: 100 }, signal, serverFirst);
+}
+
+/** GeckoTerminal newest pools: launchpad curves → New Pairs; migration venues → Migrated (after confirmation). */
+async function pollGeckoNew(signal: AbortSignal): Promise<PollResult> {
+  const result = await gecko.getNewPools(1, signal);
+  const meta = metaOf(result);
+  const { items } = usePulseStore.getState();
+  const now = Date.now();
+  const patches: PulsePatch[] = [];
+  for (const pool of result.data) {
+    const kind = classifyGeckoPool(pool);
+    if (kind === 'other') continue;
+    const patch = patchFromGeckoPool(pool, meta);
+    if (!patch) continue;
+    if (kind === 'bonding') {
+      patches.push(patch);
+      continue;
+    }
+    const action = geckoMigrationAction(items.get(pool.baseMint), pool);
+    if (action === 'apply') patches.push(patch);
+    else if (action === 'verify') addPending({ kind: 'migration', patch, addedAt: now, attempts: 0 });
+  }
+  enqueuePatches(patches);
+  return { polled: result.data.length, applied: patches.length, via: PROVIDER_LABELS[result.source] };
+}
+
+/**
+ * Busiest pump.fun curve pools (Final Stretch candidates). Most are already
+ * complete, so untracked ones are held until their curve is read on-chain.
+ * Alternates the tx-count and volume sorts to widen the candidate set.
+ */
+async function pollGeckoPump(signal: AbortSignal): Promise<PollResult> {
+  const sort = pumpSortByVolume ? 'h24_volume_usd_desc' : 'h24_tx_count_desc';
+  pumpSortByVolume = !pumpSortByVolume;
+  const result = await gecko.getDexPools('pump-fun', { sort }, signal);
+  const meta = metaOf(result);
+  const { items } = usePulseStore.getState();
+  const patches: PulsePatch[] = [];
+  for (const pool of result.data) {
+    if (classifyGeckoPool(pool) !== 'bonding') continue;
+    const patch = patchFromGeckoPool(pool, meta);
+    if (!patch) continue;
+    if (items.has(pool.baseMint)) {
+      patches.push({ ...patch, updateOnly: true });
+    } else {
+      pumpCandidates.delete(pool.baseMint);
+      pumpCandidates.set(pool.baseMint, patch);
+    }
+  }
+  while (pumpCandidates.size > MAX_PUMP_CANDIDATES) {
+    const oldest = pumpCandidates.keys().next().value;
+    if (oldest === undefined) break;
+    pumpCandidates.delete(oldest);
+  }
+  enqueuePatches(patches);
+  return { polled: result.data.length, applied: patches.length, via: PROVIDER_LABELS[result.source] };
+}
+
+/** Browser RPC reads in sub-batches the public endpoint accepts; one failing sub-batch fails the step (the chain then tries the proxy). */
+async function readCurvesInBrowser(mints: readonly string[], signal: AbortSignal): Promise<Sourced<Record<string, BondingCurveState>>> {
+  const parts = await Promise.all(chunk(mints, BROWSER_ACCOUNTS_PER_CALL).map((group) => browserCurves.getCurves(group, signal)));
+  return mergeSourcedRecords(parts, { source: 'solana-rpc', freshness: 'realtime' });
+}
+
+/** Decoded pump.fun bonding curves for visible tokens, candidates and a rotation of the rest. */
+async function pollCurves(signal: AbortSignal, serverFirst: boolean, solPriceUsd: number | undefined): Promise<PollResult | null> {
+  const now = Date.now();
+  const { items } = usePulseStore.getState();
+  const visible = getVisibleMints();
+  const eligible = (mint: string) => {
+    const miss = curveMisses.get(mint);
+    if (miss && miss.count >= MAX_CURVE_MISSES && now - miss.at < CURVE_MISS_BACKOFF_MS) return false;
+    const item = items.get(mint);
+    return item ? isCurveTarget(item) : pumpCandidates.has(mint);
+  };
+  const rotation: string[] = [];
+  for (const item of items.values()) if (eligible(item.mint)) rotation.push(item.mint);
+  const cap = serverFirst ? BATCH.curvesServer : BATCH.curvesBrowser;
+  // Visible Final Stretch first, but a full column (40) must not starve candidates, New Pairs and the rotation.
+  const mints = pickBatch(
+    [visible.final.filter(eligible), [...pumpCandidates.keys()].filter(eligible), visible.new.filter(eligible)],
+    rotation,
+    curveLastPolled,
+    cap,
+    [Math.ceil(cap * CURVE_TIER_SHARE.final), Math.ceil(cap * CURVE_TIER_SHARE.candidates)],
+  );
+  if (!mints.length) return null;
+  for (const mint of mints) curveLastPolled.set(mint, now);
+
+  const browser: ChainStep<Record<string, BondingCurveState>> = { id: 'solana-rpc', run: () => readCurvesInBrowser(mints, signal) };
+  const proxied: ChainStep<Record<string, BondingCurveState>> = { id: 'orbyt', run: () => server.curves.getCurves(mints, signal) };
+  const result = await runChain('pulse curves', serverFirst ? [proxied, browser] : [browser, proxied], { signal });
+
+  const tracked = usePulseStore.getState().items;
+  const patches: PulsePatch[] = [];
+  for (const mint of mints) {
+    const curve = result.data[mint];
+    if (!curve) {
+      // No pump.fun curve account for this mint.
+      curveMisses.set(mint, { count: (curveMisses.get(mint)?.count ?? 0) + 1, at: now });
+      if (!tracked.has(mint)) pumpCandidates.delete(mint);
+      continue;
+    }
+    curveMisses.delete(mint);
+    const candidate = tracked.has(mint) ? undefined : pumpCandidates.get(mint);
+    if (candidate) {
+      patches.push(candidate);
+      pumpCandidates.delete(mint);
+    }
+    patches.push(patchFromCurve(curve, solPriceUsd));
+  }
+  enqueuePatches(patches);
+  const via = result.attempts.at(-1)?.provider === 'orbyt' ? 'ORBYT RPC proxy' : browserRpcLabel;
+  return { polled: mints.length, applied: patches.length, via };
+}
+
+/**
+ * Destination DEX of graduations known only by pool address (Jupiter
+ * `graduatedPool`): the pool account's owner program names the AMM. One
+ * owner-only read (dataSlice length 0) of ≤ 10 pools; optional enrichment.
+ */
+async function pollPoolDex(signal: AbortSignal): Promise<PollResult | null> {
+  const targets = poolDexTargets(usePulseStore.getState().items, getVisibleMints().migrated, poolOwnerSettled, BROWSER_ACCOUNTS_PER_CALL);
+  if (!targets.length) return null;
+  const pools = targets.map((t) => t.pool);
+  const result = await browserRpc.call<unknown>(
+    'getMultipleAccounts',
+    [pools, { encoding: 'base64', dataSlice: { offset: 0, length: 0 }, commitment: 'confirmed' }],
+    signal,
+  );
+  const fetchedAt = Date.now();
+  const owners = poolOwnersFromRpc(result, pools);
+  const tracked = usePulseStore.getState().items;
+  const patches: PulsePatch[] = [];
+  for (const { mint, pool } of targets) {
+    const owner = owners[pool];
+    if (owner === undefined) continue;
+    if (owner === null) {
+      const misses = (poolMisses.get(pool) ?? 0) + 1;
+      poolMisses.set(pool, misses);
+      if (misses >= MAX_POOL_MISSES) poolOwnerSettled.add(pool);
+      continue;
+    }
+    poolOwnerSettled.add(pool);
+    poolMisses.delete(pool);
+    // Only label the pool the token still reports as its migration pool.
+    if (tracked.get(mint)?.launchpad.migratedPool !== pool) continue;
+    const patch = patchFromPoolOwner(mint, pool, owner, fetchedAt);
+    if (patch) patches.push(patch);
+  }
+  enqueuePatches(patches);
+  return { polled: pools.length, applied: patches.length, via: browserRpcLabel };
+}
+
+/** Token rows: identity, holders, 24 h activity, audit, graduation; also confirms pending candidates. */
+async function pollRows(signal: AbortSignal, serverFirst: boolean): Promise<PollResult | null> {
+  const now = Date.now();
+  const { items } = usePulseStore.getState();
+  const visible = getVisibleMints();
+  const shown = [...visible.final, ...visible.new, ...visible.migrated];
+  // Stream creates carry no image (only a metadata URI): fill logos first.
+  const missingIdentity = shown.filter((mint) => {
+    const item = items.get(mint);
+    return !item?.symbol || !item.image;
+  });
+  const awaitingMigration: string[] = [];
+  for (const item of items.values()) if (item.launchpad.stage === 'bonding' && item.curveComplete === true) awaitingMigration.push(item.mint);
+  const mints = pickBatch([[...pending.keys()], missingIdentity, awaitingMigration, shown], items.keys(), rowsLastPicked, BATCH.rows);
+  if (!mints.length) return null;
+  for (const mint of mints) rowsLastPicked.set(mint, now);
+
+  const result = await runChain<TokenRow[]>(
+    'pulse rows',
+    [
+      serverFirst && { id: 'orbyt', run: () => server.tokens.getRows(mints, signal) },
+      { id: 'jupiter', run: () => jup.getRows(mints, signal) },
+    ],
+    { signal },
+  );
+  const meta = metaOf(result);
+  const rows = new Map(result.data.map((row) => [row.token.mint, row]));
+  const patches: PulsePatch[] = [];
+  for (const mint of mints) {
+    const row = rows.get(mint);
+    const candidate = pending.get(mint);
+    if (candidate) {
+      const outcome = verifyCandidate(candidate, row, meta, now);
+      if (outcome.status === 'confirmed') patches.push(...outcome.patches);
+      if (outcome.status !== 'unknown' || candidate.attempts + 1 >= MAX_VERIFY_ATTEMPTS) pending.delete(mint);
+      else pending.set(mint, { ...candidate, attempts: candidate.attempts + 1 });
+      continue;
+    }
+    if (row) patches.push({ ...patchFromTokenRow(row, meta), updateOnly: true });
+  }
+  enqueuePatches(patches);
+  return { polled: mints.length, applied: patches.length, via: PROVIDER_LABELS[result.source] };
+}
+
+/** Jupiter Ultra extras (snipers, insiders, bundlers; progress for non-pump launchpads). Optional enrichment. */
+async function pollUltra(signal: AbortSignal): Promise<PollResult | null> {
+  const { items } = usePulseStore.getState();
+  const visible = getVisibleMints();
+  const nonPump: string[] = [];
+  const bonding: string[] = [];
+  for (const item of items.values()) {
+    if (item.launchpad.stage !== 'bonding' || item.curveComplete === true) continue;
+    (item.launchpad.launchpad === 'pump.fun' ? bonding : nonPump).push(item.mint);
+  }
+  // All visible cards share one least-recently-picked tier: a full Final Stretch + New Pairs (100) must not keep Migrated cards without risk data.
+  const mints = pickBatch([[...visible.final, ...visible.new, ...visible.migrated]], [...nonPump, ...bonding], ultraLastPicked, BATCH.ultra);
+  if (!mints.length) return null;
+  const now = Date.now();
+  for (const mint of mints) ultraLastPicked.set(mint, now);
+  const result = await jup.getUltraInfo(mints, signal);
+  const meta = metaOf(result);
+  const patches: PulsePatch[] = [];
+  for (const [mint, info] of Object.entries(result.data)) {
+    const patch = patchFromUltra(mint, info, meta);
+    if (patch) patches.push(patch);
+  }
+  enqueuePatches(patches);
+  return { polled: mints.length, applied: patches.length, via: 'Jupiter Ultra' };
+}
+
+/** Keyed launchpad lists (Solana Tracker / Birdeye) through /api/v1/pulse. */
+async function pollServer(column: PulseColumn, signal: AbortSignal): Promise<PollResult> {
+  const result = await server.pulse.getPulse(column, signal);
+  const meta = metaOf(result);
+  const patches = result.data.map((token) => patchFromServerToken(token, meta));
+  enqueuePatches(patches);
+  return { polled: result.data.length, applied: patches.length, via: PROVIDER_LABELS[result.source] };
+}
+
+// ---------------------------------------------------------------------------
+// Hooks
+// ---------------------------------------------------------------------------
+
+function usePulseStream(solPriceUsd: number | undefined): void {
+  usePumpPortalNewTokens((event) => {
+    const patch = patchFromNewToken(event, solPriceUsd);
+    if (event.unverified) {
+      // bonk creates: unverified schema, confirmed against Jupiter before they are shown.
+      if (!usePulseStore.getState().items.has(event.mint)) addPending({ kind: 'launch', patch, addedAt: event.receivedAt, attempts: 0 });
+      return;
+    }
+    enqueuePatches([patch]);
+  });
+  usePumpPortalMigrations((event) => enqueuePatches([patchFromMigration(event)]));
+}
+
+function pruneTick(): void {
+  usePulseStore.getState().prune(visibleMintSet(), Date.now());
+  trimTracking();
+}
+
+/** Mount every Pulse feed (call once, from the page). */
+export function usePulseFeeds(): void {
+  const caps = useCapabilities();
+  const solPriceUsd = useSolPrice().data?.data.priceUsd;
+  // A keyed RPC behind the server beats publicnode; otherwise the browser reads the chain itself.
+  const serverRpcFirst = caps.configured.helius || caps.configured.customRpc;
+  const serverNewOff = usePulseStore((s) => s.feeds.serverNew?.disabled === true);
+  const serverFinalOff = usePulseStore((s) => s.feeds.serverFinal?.disabled === true);
+  const serverMigratedOff = usePulseStore((s) => s.feeds.serverMigrated?.disabled === true);
+
+  usePulseStream(solPriceUsd);
+  useVisibleInterval(flushPatches, FLUSH_INTERVAL_MS, { runOnVisible: true });
+  useVisibleInterval(pruneTick, PULSE_CADENCE.prune);
+  useEffect(() => () => flushPatches(), []);
+
+  usePulsePoll('jupRecent', PULSE_CADENCE.jupRecent, (signal) => pollRecent(signal, caps.serverDiscover));
+  usePulsePoll('jupTrending', PULSE_CADENCE.jupTrending, (signal) => pollTrending(signal, caps.serverDiscover));
+  usePulsePoll('geckoNew', PULSE_CADENCE.geckoNew, pollGeckoNew);
+  usePulsePoll('geckoPump', PULSE_CADENCE.geckoPump, pollGeckoPump);
+  usePulsePoll('curves', PULSE_CADENCE.curves, (signal) => pollCurves(signal, serverRpcFirst, solPriceUsd), { idleMs: IDLE_RETRY_MS.curves });
+  usePulsePoll('poolDex', PULSE_CADENCE.poolDex, pollPoolDex, { idleMs: IDLE_RETRY_MS.poolDex });
+  usePulsePoll('jupRows', PULSE_CADENCE.jupRows, (signal) => pollRows(signal, caps.serverDiscover), { idleMs: IDLE_RETRY_MS.jupRows });
+  usePulsePoll('jupUltra', PULSE_CADENCE.jupUltra, pollUltra, { idleMs: IDLE_RETRY_MS.jupUltra });
+  usePulsePoll('serverNew', PULSE_CADENCE.server, (signal) => pollServer('new', signal), { enabled: caps.serverPulse && !serverNewOff });
+  usePulsePoll('serverFinal', PULSE_CADENCE.server, (signal) => pollServer('final', signal), { enabled: caps.serverPulse && !serverFinalOff });
+  usePulsePoll('serverMigrated', PULSE_CADENCE.server, (signal) => pollServer('migrated', signal), {
+    enabled: caps.serverPulse && !serverMigratedOff,
+  });
+}

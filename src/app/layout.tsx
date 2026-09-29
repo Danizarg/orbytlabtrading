@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { DM_Sans, JetBrains_Mono, Space_Grotesk } from 'next/font/google';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 import type { ReactNode } from 'react';
 import { CapabilitiesProvider } from '@/client/capabilities';
 import { AppShell } from '@/components/shell/AppShell';
@@ -8,8 +8,7 @@ import { serverCapabilities } from '@/lib/server/env';
 import { Providers } from './providers';
 import './globals.css';
 
-const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans', display: 'swap' });
-const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk', display: 'swap' });
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap', axes: ['opsz'] });
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains-mono', display: 'swap' });
 
 export const metadata: Metadata = {
@@ -37,7 +36,7 @@ export const dynamic = 'force-dynamic';
 export default function RootLayout({ children }: { children: ReactNode }) {
   const capabilities = serverCapabilities();
   return (
-    <html lang="en" className={`${dmSans.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="min-h-dvh bg-bg text-fg">
         <CapabilitiesProvider value={capabilities}>
           <Providers>
