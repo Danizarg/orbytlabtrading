@@ -11,6 +11,7 @@ import {
   onWalletChange,
   safeWalletIcon,
   signMessageWith,
+  signAndSendTransactionWith,
   signTransactionWith,
   sortWallets,
   toWalletOption,
@@ -65,6 +66,12 @@ export interface WalletState {
   signMessage: (message: Uint8Array) => Promise<SignedBytes>;
   /** solana:signTransaction on mainnet with the connected account. Throws WalletError. */
   signTransaction: (transaction: Uint8Array) => Promise<Uint8Array>;
+  /**
+   * solana:signAndSendTransaction on mainnet: the wallet signs and broadcasts.
+   * Resolves the base58 signature, or null when the wallet lacks the feature
+   * (fall back to signTransaction). Throws WalletError.
+   */
+  signAndSendTransaction: (transaction: Uint8Array) => Promise<string | null>;
   clearFeedback: () => void;
 }
 
@@ -347,6 +354,18 @@ export const useWallet = create<WalletState>()((set, get) => {
         return await signTransactionWith(entry.wallet, entry.account, transaction);
       } catch (e) {
         throw isWalletError(e) ? e : toWalletError(e, 'Signing failed.');
+      } finally {
+        if (active === entry) set({ status: 'connected' });
+      }
+    },
+
+    signAndSendTransaction: async (transaction) => {
+      const entry = requireActive('send a transaction');
+      set({ status: 'signing' });
+      try {
+        return await signAndSendTransactionWith(entry.wallet, entry.account, transaction);
+      } catch (e) {
+        throw isWalletError(e) ? e : toWalletError(e, 'Sending failed.');
       } finally {
         if (active === entry) set({ status: 'connected' });
       }

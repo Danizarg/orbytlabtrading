@@ -1,112 +1,83 @@
-import { getAddressEncoder } from '@solana/kit';
-import { LAMPORTS_PER_SOL, isSolanaAddress } from '@/lib/core/solana';
+import {
+  AccountRole,
+  address,
+  appendTransactionMessageInstruction,
+  blockhash as toBlockhash,
+  compileTransaction,
+  createTransactionMessage,
+  getTransactionEncoder,
+  pipe,
+  setTransactionMessageFeePayer,
+  setTransactionMessageLifetimeUsingBlockhash,
+  type Instruction,
+} from '@solana/kit';
+import { isSolanaAddress } from '@/lib/core/solana';
+
+/** System Program (native SOL transfers). */
+const SYSTEM_PROGRAM = address('11111111111111111111111111111111');
+
+/** SystemInstruction::Transfer is variant 2 (little-endian u32), followed by the u64 lamports. */
+const TRANSFER_DISCRIMINATOR = 2;
+
+const U64_MAX = 2n ** 64n - 1n;
 
 /**
- * System Program ID (always 11111111111111111111111111111111 on Solana).
+ * Network fee of a one-signature transaction without a priority fee: 5000
+ * lamports. The deposit sends the whole balance minus this, so the sender ends
+ * at exactly 0 (a valid system-account state) instead of failing on fees.
  */
-const SYSTEM_PROGRAM = '11111111111111111111111111111111';
+export const TRANSFER_FEE_LAMPORTS = 5_000n;
+
+/** What can be deposited from a balance: everything except the network fee (0n when the fee is not covered). */
+export function depositableLamports(balanceLamports: bigint): bigint {
+  return balanceLamports > TRANSFER_FEE_LAMPORTS ? balanceLamports - TRANSFER_FEE_LAMPORTS : 0n;
+}
+
+export interface SolTransferParams {
+  /** Sender and fee payer (the connected wallet). */
+  from: string;
+  /** Recipient. */
+  to: string;
+  lamports: bigint;
+  /** Recent blockhash from the same cluster the transaction will be sent to. */
+  blockhash: string;
+  lastValidBlockHeight: bigint;
+}
 
 /**
- * Instruction discriminator for SystemProgram.Transfer (little-endian u32 = 2).
+ * Build the unsigned, wallet-ready wire transaction for a native SOL transfer:
+ * `[compact-u16 signature count][64-byte empty signature slot][legacy message]`,
+ * exactly what Wallet Standard's solana:signTransaction / signAndSendTransaction
+ * expect. It contains ONE instruction (System Program transfer) and nothing else.
  */
-const TRANSFER_INSTRUCTION_TYPE = 2;
+export function buildSolTransferTransaction(params: SolTransferParams): Uint8Array {
+  const { from, to, lamports, blockhash, lastValidBlockHeight } = params;
+  if (!isSolanaAddress(from)) throw new Error('Invalid sender address.');
+  if (!isSolanaAddress(to)) throw new Error('Invalid recipient address.');
+  if (from === to) throw new Error('Sender and recipient are the same address.');
+  if (lamports <= 0n) throw new Error('Amount must be positive.');
+  if (lamports > U64_MAX) throw new Error('Amount is too large.');
 
-/**
- * Build an unsigned SOL transfer transaction ready for wallet signing.
- *
- * This creates a minimal, valid Solana transaction (version 0 / legacy) that:
- * - Transfers SOL from `from` to `to`
- * - Is signed only by `from` (the payer)
- * - Uses a dummy recent blockhash (the wallet may override this)
- *
- * The transaction is returned as bytes, ready for wallet.signTransaction().
- *
- * Safety: This builds ONLY a transfer instruction, no other operations.
- */
-export async function buildSolTransferTransaction(
-  from: string,
-  to: string,
-  amountSol: number,
-): Promise<Uint8Array> {
-  if (!isSolanaAddress(from)) throw new Error(`Invalid sender address: ${from}`);
-  if (!isSolanaAddress(to)) throw new Error(`Invalid recipient address: ${to}`);
-  if (amountSol <= 0) throw new Error(`Amount must be positive`);
+  const data = new Uint8Array(12);
+  const view = new DataView(data.buffer);
+  view.setUint32(0, TRANSFER_DISCRIMINATOR, true);
+  view.setBigUint64(4, lamports, true);
 
-  const lamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
-  if (lamports <= 0) throw new Error(`Amount is too small`);
+  const transfer: Instruction = {
+    programAddress: SYSTEM_PROGRAM,
+    accounts: [
+      { address: address(from), role: AccountRole.WRITABLE_SIGNER },
+      { address: address(to), role: AccountRole.WRITABLE },
+    ],
+    data,
+  };
 
-  try {
-    const encoder = getAddressEncoder();
+  const message = pipe(
+    createTransactionMessage({ version: 'legacy' }),
+    (m) => setTransactionMessageFeePayer(address(from), m),
+    (m) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: toBlockhash(blockhash), lastValidBlockHeight }, m),
+    (m) => appendTransactionMessageInstruction(transfer, m),
+  );
 
-    // Encode addresses to get 32-byte keys (convert to mutable arrays)
-    const fromKey = new Uint8Array(encoder.encode(from as Parameters<typeof encoder.encode>[0]));
-    const toKey = new Uint8Array(encoder.encode(to as Parameters<typeof encoder.encode>[0]));
-    const systemProgramKey = new Uint8Array(
-      encoder.encode(SYSTEM_PROGRAM as Parameters<typeof encoder.encode>[0]),
-    );
-    // Use a placeholder recent blockhash (wallet may override)
-    const recentBlockhash = new Uint8Array(
-      encoder.encode('11111111111111111111111111111111' as Parameters<typeof encoder.encode>[0]),
-    );
-
-    // Build the transfer instruction data (u32 discriminator + u64 amount)
-    const instructionData = new Uint8Array(4 + 8);
-    const view = new DataView(instructionData.buffer);
-    view.setUint32(0, TRANSFER_INSTRUCTION_TYPE, true); // little-endian
-    view.setBigUint64(4, BigInt(lamports), true); // little-endian
-
-    // Build transaction message format (version 0 / legacy)
-    const parts: Uint8Array[] = [];
-
-    // Header
-    // - byte 0: number of required signer (1 = from)
-    parts.push(new Uint8Array([1]));
-    // - byte 1: number of read-only signers (0)
-    parts.push(new Uint8Array([0]));
-    // - byte 2: number of read-only non-signers (1 = system program)
-    parts.push(new Uint8Array([1]));
-
-    // Account list (accounts are ordered: signers first, then read-only)
-    // Account 0: from (signer, writable)
-    parts.push(fromKey);
-    // Account 1: to (non-signer, writable)
-    parts.push(toKey);
-    // Account 2: system program (non-signer, read-only)
-    parts.push(systemProgramKey);
-
-    // Recent blockhash (32 bytes)
-    parts.push(recentBlockhash);
-
-    // Instructions
-    // - byte: instruction count (1)
-    parts.push(new Uint8Array([1]));
-
-    // Instruction 0
-    // - program index (2 = system program, the 3rd account)
-    parts.push(new Uint8Array([2]));
-    // - accounts referenced: 2 accounts (from=0, to=1)
-    parts.push(new Uint8Array([2, 0, 1]));
-    // - data length (varint: 12 bytes for our instruction)
-    parts.push(new Uint8Array([12]));
-    // - data
-    parts.push(instructionData);
-
-    // Concatenate all parts into the transaction message
-    const totalLen = parts.reduce((sum, p) => sum + p.length, 0);
-    const messageBytes = new Uint8Array(totalLen);
-    let offset = 0;
-    for (const part of parts) {
-      messageBytes.set(part, offset);
-      offset += part.length;
-    }
-
-    // Build the transaction wire format: signatures + message
-    // For an unsigned transaction, the wallet will add signatures
-    // We'll return just the message; the wallet will wrap it with signature placeholders
-    return messageBytes;
-  } catch (error) {
-    throw new Error(
-      `Failed to build transfer transaction: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+  return new Uint8Array(getTransactionEncoder().encode(compileTransaction(message)));
 }

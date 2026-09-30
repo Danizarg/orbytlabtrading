@@ -8,6 +8,7 @@ import { POST as logoutPOST } from '@/app/api/v1/auth/logout/route';
 import { GET as nonceGET } from '@/app/api/v1/auth/nonce/route';
 import { GET as sessionGET } from '@/app/api/v1/auth/session/route';
 import { POST as verifyPOST } from '@/app/api/v1/auth/verify/route';
+import { bytesToBase58 } from './bytes';
 import { isWalletError } from './errors';
 import { __resetWalletRuntimeForTests, useWallet, WALLET_STORAGE_KEY } from './store';
 
@@ -55,6 +56,7 @@ interface FakeWallet extends Wallet {
   emit(props: StandardEventsChangeProperties): void;
   connect: ReturnType<typeof vi.fn>;
   signTx: ReturnType<typeof vi.fn>;
+  sendTx: ReturnType<typeof vi.fn>;
   signMsg: ReturnType<typeof vi.fn>;
   setAccounts(accounts: WalletAccount[]): void;
 }
@@ -63,7 +65,10 @@ function account(address: string): WalletAccount {
   return { address, publicKey: new Uint8Array(32), chains: ['solana:mainnet'], features: ['solana:signMessage', 'solana:signTransaction'] };
 }
 
-function fakeWallet(name: string, opts: { accounts?: WalletAccount[]; keys?: CryptoKeyPair; chains?: `${string}:${string}`[]; icon?: string } = {}): FakeWallet {
+function fakeWallet(
+  name: string,
+  opts: { accounts?: WalletAccount[]; keys?: CryptoKeyPair; chains?: `${string}:${string}`[]; icon?: string; canSend?: boolean } = {},
+): FakeWallet {
   let authorised: WalletAccount[] = [];
   const all = opts.accounts ?? [];
   const listeners = new Set<(p: StandardEventsChangeProperties) => void>();
@@ -77,6 +82,7 @@ function fakeWallet(name: string, opts: { accounts?: WalletAccount[]; keys?: Cry
     return [{ signedMessage: message, signature: new Uint8Array(await signBytes(opts.keys.privateKey, message)) }];
   });
   const signTx = vi.fn(async ({ transaction }: { transaction: Uint8Array }) => [{ signedTransaction: new Uint8Array([...transaction, 1]) }]);
+  const sendTx = vi.fn(async (_input: { transaction: Uint8Array }) => [{ signature: new Uint8Array(64).fill(7) }]);
   const wallet = {
     version: '1.0.0' as const,
     name,
@@ -97,6 +103,7 @@ function fakeWallet(name: string, opts: { accounts?: WalletAccount[]; keys?: Cry
       },
       'solana:signMessage': { version: '1.0.0', signMessage: signMsg },
       'solana:signTransaction': { version: '1.0.0', supportedTransactionVersions: ['legacy', 0], signTransaction: signTx },
+      ...(opts.canSend ? { 'solana:signAndSendTransaction': { version: '1.0.0', supportedTransactionVersions: ['legacy', 0], signAndSendTransaction: sendTx } } : {}),
     },
     emit: (props: StandardEventsChangeProperties) => listeners.forEach((l) => l(props)),
     setAccounts: (accounts: WalletAccount[]) => {
@@ -104,6 +111,7 @@ function fakeWallet(name: string, opts: { accounts?: WalletAccount[]; keys?: Cry
     },
     connect,
     signTx,
+    sendTx,
     signMsg,
   };
   return wallet as unknown as FakeWallet;
@@ -445,5 +453,47 @@ describe('signTransaction', () => {
     const error = await useWallet.getState().signTransaction(new Uint8Array([9])).catch((e: unknown) => e);
     expect(isWalletError(error) && error.kind).toBe('rejected');
     expect(useWallet.getState().status).toBe('connected');
+  });
+});
+
+describe('signAndSendTransaction', () => {
+  it('has the wallet sign and broadcast on mainnet and returns the base58 signature', async () => {
+    const phantom = fakeWallet('Phantom', { accounts: [account(addressA)], canSend: true });
+    register(phantom);
+    release = useWallet.getState().init();
+    await expect(useWallet.getState().signAndSendTransaction(new Uint8Array([9]))).rejects.toMatchObject({ kind: 'not_connected' });
+    await useWallet.getState().connect('Phantom');
+
+    const signature = await useWallet.getState().signAndSendTransaction(new Uint8Array([9]));
+    expect(signature).toBe(bytesToBase58(new Uint8Array(64).fill(7)));
+    expect(phantom.sendTx.mock.calls[0]![0]).toMatchObject({ chain: 'solana:mainnet', account: { address: addressA }, transaction: new Uint8Array([9]) });
+    expect(useWallet.getState().status).toBe('connected');
+  });
+
+  it('resolves null when the wallet cannot sign and send, so callers can fall back to signTransaction', async () => {
+    const phantom = fakeWallet('Phantom', { accounts: [account(addressA)] });
+    register(phantom);
+    release = useWallet.getState().init();
+    await useWallet.getState().connect('Phantom');
+
+    await expect(useWallet.getState().signAndSendTransaction(new Uint8Array([9]))).resolves.toBeNull();
+    expect(phantom.sendTx).not.toHaveBeenCalled();
+    expect(useWallet.getState().status).toBe('connected');
+  });
+
+  it('surfaces a declined prompt as a rejected WalletError and rejects malformed wallet output', async () => {
+    const phantom = fakeWallet('Phantom', { accounts: [account(addressA)], canSend: true });
+    register(phantom);
+    release = useWallet.getState().init();
+    await useWallet.getState().connect('Phantom');
+
+    phantom.sendTx.mockRejectedValueOnce(Object.assign(new Error('User rejected the request.'), { code: 4001 }));
+    const rejected = await useWallet.getState().signAndSendTransaction(new Uint8Array([9])).catch((e: unknown) => e);
+    expect(isWalletError(rejected) && rejected.kind).toBe('rejected');
+    expect(useWallet.getState().status).toBe('connected');
+
+    phantom.sendTx.mockResolvedValueOnce([{ signature: new Uint8Array(3) }]);
+    const bad = await useWallet.getState().signAndSendTransaction(new Uint8Array([9])).catch((e: unknown) => e);
+    expect(isWalletError(bad) && bad.kind).toBe('failed');
   });
 });

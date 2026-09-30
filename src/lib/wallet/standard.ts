@@ -1,7 +1,10 @@
 import {
+  SolanaSignAndSendTransaction,
   SolanaSignIn,
   SolanaSignMessage,
   SolanaSignTransaction,
+  type SolanaSignAndSendTransactionFeature,
+  type SolanaSignAndSendTransactionOutput,
   type SolanaSignInFeature,
   type SolanaSignInInput,
   type SolanaSignInOutput,
@@ -21,6 +24,7 @@ import {
   type StandardEventsFeature,
 } from '@wallet-standard/features';
 import { isSolanaAddress } from '@/lib/core/solana';
+import { bytesToBase58 } from './bytes';
 import { toWalletError, WalletError } from './errors';
 
 /**
@@ -197,4 +201,25 @@ export async function signTransactionWith(wallet: Wallet, account: WalletAccount
     throw new WalletError('failed', `${wallet.name} returned no signed transaction.`);
   }
   return new Uint8Array(output.signedTransaction);
+}
+
+/**
+ * solana:signAndSendTransaction on mainnet: the wallet signs AND broadcasts
+ * through its own RPC (the path wallets recommend, and the most reliable one
+ * on a busy cluster). Returns the base58 transaction signature, or null when
+ * the wallet lacks the feature so the caller can fall back to signTransaction.
+ */
+export async function signAndSendTransactionWith(wallet: Wallet, account: WalletAccount, transaction: Uint8Array): Promise<string | null> {
+  const f = feature<SolanaSignAndSendTransactionFeature[typeof SolanaSignAndSendTransaction]>(wallet, SolanaSignAndSendTransaction);
+  if (!f) return null;
+  let output: SolanaSignAndSendTransactionOutput | undefined;
+  try {
+    [output] = await f.signAndSendTransaction({ account, transaction, chain: SOLANA_MAINNET });
+  } catch (e) {
+    throw toWalletError(e, `${wallet.name} did not send the transaction.`);
+  }
+  if (!output || !(output.signature instanceof Uint8Array) || output.signature.length !== 64) {
+    throw new WalletError('failed', `${wallet.name} returned no transaction signature.`);
+  }
+  return bytesToBase58(new Uint8Array(output.signature));
 }
