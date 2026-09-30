@@ -1,6 +1,6 @@
 # ORBYT — progress, plan and handoff
 
-Last updated: 2026-09-29 (Europe/Madrid). Working branch: **`claude/brave-gauss-uk36qy`** (wallet deposit feature). `main` still holds the old static site and must not be touched until the new app is complete and verified.
+Last updated: 2026-09-30 (Europe/Madrid). Working branch: **`claude/brave-gauss-uk36qy`** (wallet deposit feature, /discover landing page). `main` still holds the old static site and must not be touched until the new app is complete and verified.
 
 ## Start here (any machine, any assistant)
 
@@ -79,7 +79,7 @@ Per-IP rate limits drive where each call runs.
 | Resilience (dedupe, cache, backoff, failover, cooldown) | Done in the transports and chains. Error boundaries and loading states come in stage 2 UI. |
 | API keys / `.env.example` | Done. Every variable is optional and documented with provider, feature and where to get it. |
 | Server API routes `/api/v1/*` | Done: 19 routes, reviewed. Adds auth (SIWS) and a hardened logo proxy. |
-| /discover, /watchlist | Done: a universe of 14 keyless sources with pacing, enrichment and hover prefetch. Reviewed. |
+| /discover, /watchlist | Done: a universe of 14 keyless sources with pacing, enrichment and hover prefetch. Reviewed. Since 2026-09-30 `/discover` opens on a landing page (skip, or connect a wallet) before the table; see the landing section at the end. |
 | /pulse (New / Final Stretch / Migrated) | Done: PumpPortal stream, Jupiter/GeckoTerminal backfill, on-chain curve progress. Reviewed. |
 | /trade/[mint] (real chart, trades, holders, risk, quote) | Done (stage 3). Stage 3c in progress: an on-chain trade feed and trade-built candles for fresh tokens, in-app swaps with the connected wallet, and server fallbacks. |
 | /wallet/[address] + /tracker | Done: holdings, activity, progressive FIFO PnL, and a tracker with account-change hints plus reconciliation. Reviewed. |
@@ -228,3 +228,15 @@ State as of 2026-09-30:
 - No `.env.local` is used; the app runs on the keyless mainnet defaults.
 - Sign-In With Solana is configured for the mainnet chain ID (`SIWS_CHAIN_ID` in `src/lib/wallet/siws.ts`); the earlier "chain ID mismatch" was a devnet-only problem. Not re-tested with a real Phantom sign-in on mainnet yet.
 - Next concrete step: one small real deposit from Phantom on mainnet, then redeploy on Vercel.
+
+## /discover landing page (2026-09-30)
+
+`/discover` now opens on an Axiom-style landing page instead of the token table directly. Flow: landing → **Skip for now** or **Connect Phantom** → the live token terminal.
+
+- `src/components/discover/DiscoverGate.tsx`: the client gate rendered by `src/app/discover/page.tsx`. It shows a loader until hydrated (so the server and the first client render agree), then the landing for a first-time visitor, or the live `DiscoverView` when the visitor already skipped (`localStorage` key `orbyt-entered-v1`) or has a wallet connected.
+- `src/components/discover/DiscoverLanding.tsx`: hero ("Connect Phantom" opens the existing `WalletDialog`; "Skip for now" enters), a provider strip, six feature cards linking to real routes, the draggable bookmark section, and a footer. Connecting a wallet anywhere (landing or header) drops straight into the terminal; SIWS sign-in stays available later from the account menu.
+- `src/config/bookmark.ts`: **the only place the bookmark is defined** (`label`, `blurb`, `href`). The landing sets the anchor's `href` imperatively on the DOM node (React scrubs `javascript:` props), so whatever string is configured there is saved verbatim when a visitor drags the button to their bookmarks bar. A "copy the bookmark link" fallback covers browsers where dragging fails. The current `href` is only a placeholder (it opens ORBYT and jumps to `/trade/<mint>` when a Solana address is selected on the page or present in the URL): the owner will replace it with their own private bookmarklet, which they deliberately did not hand to an assistant.
+
+Verified 2026-09-30 in the dev browser (no wallet extension): the landing renders with no console errors; Connect opens the wallet dialog ("No Solana wallet detected" without Phantom); the feature and bookmark sections render; the bookmark anchor carried the exact configured `href` with `draggable: true`; Skip revealed the live table; after a reload the choice persisted and the terminal opened directly with no landing flash. `tsc --noEmit` clean, eslint clean, full suite 88 files / 1630 tests pass.
+
+Next concrete step for the landing: the owner pastes their bookmarklet into `src/config/bookmark.ts` (`href`, and `label` for the saved bookmark's title), then commits and redeploys on Vercel.

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { DiscoverView } from '@/components/discover/DiscoverView';
+import { DiscoverGate } from '@/components/discover/DiscoverGate';
 
 export const metadata: Metadata = {
   title: 'Discover',
@@ -11,5 +11,7 @@ export default async function Page({ searchParams }: PageProps<'/discover'>) {
   // The view is driven by the URL (list, window, filters): render per request so
   // useSearchParams is available during the server render.
   await searchParams;
-  return <DiscoverView />;
+  // Gate: first-time visitors see the landing page; connecting a wallet or
+  // skipping reveals the live token terminal (DiscoverView).
+  return <DiscoverGate />;
 }
