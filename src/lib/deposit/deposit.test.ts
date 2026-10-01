@@ -132,7 +132,7 @@ describe('executeDeposit', () => {
     expect(signAndSend).not.toHaveBeenCalled();
   });
 
-  it.each([0, 4_999, 5_000])('does not prompt the wallet when the balance (%i lamports) cannot cover the fee', async (balance) => {
+  it.each([0, 4_999, 5_000])('does not prompt the wallet when the balance cannot cover the fee', async (balance) => {
     const { rpc } = fakeRpc({ balance });
     const { wallet, signAndSend, signTransaction } = fakeWallet();
     await expect(executeDeposit({ rpc, from: FROM, to: TO, wallet, sleep: noSleep })).rejects.toThrow(/nothing to deposit/);

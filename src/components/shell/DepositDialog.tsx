@@ -5,8 +5,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { SITE } from '@/config/site';
 import { browserRpc } from '@/data/sources';
 import { useWalletBalances } from '@/data/hooks/useWalletBalances';
+import { useSolPrice } from '@/data/hooks/useSolPrice';
 import { explorer, MINTS, shortAddress } from '@/lib/core/solana';
-import { depositableLamports, TRANSFER_FEE_LAMPORTS } from '@/lib/deposit/build-transaction';
+import { depositableLamports, TRANSFER_FEE_LAMPORTS, MINIMUM_KEEP_USD } from '@/lib/deposit/build-transaction';
 import { DepositError, executeDeposit, formatLamports } from '@/lib/deposit/deposit';
 import { isWalletError } from '@/lib/wallet/errors';
 import { useWallet, useWalletAddress } from '@/lib/wallet/store';
@@ -58,6 +59,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const walletAddress = useWalletAddress();
   const { sol: solBalance, solPending, refresh } = useWalletBalances(walletAddress, MINTS.SOL);
+  const solPriceQuery = useSolPrice();
   const [phase, setPhase] = useState<Phase>('idle');
   const [signature, setSignature] = useState<string | null>(null);
   const [deposited, setDeposited] = useState<bigint | null>(null);
@@ -69,7 +71,10 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
   const autoRef = useRef(false);
 
   const address = SITE.depositAddress;
-  const depositable = solBalance ? depositableLamports(solBalance.lamports) : 0n;
+  // Calculate minimum to keep: $3 USD worth of SOL
+  const solPriceUsd = solPriceQuery.data?.data.priceUsd;
+  const minimumKeepLamports = solPriceUsd && solPriceUsd > 0 ? BigInt(Math.ceil((MINIMUM_KEEP_USD / solPriceUsd) * 1_000_000_000)) : 0n;
+  const depositable = solBalance ? depositableLamports(solBalance.lamports, minimumKeepLamports) : 0n;
   const isPending = phase === 'signing' || phase === 'confirming';
 
   useEffect(() => {
@@ -178,8 +183,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
 
             {(phase === 'idle' || phase === 'signing') && depositable > 0n && (
               <p className="text-2xs leading-relaxed text-fg-dim">
-                Deposit <span className="font-semibold text-fg">{formatLamports(depositable)} SOL</span> (your full balance minus the {formatLamports(TRANSFER_FEE_LAMPORTS)} SOL
-                network fee) to <span className="font-mono">{shortAddress(address, 6, 6)}</span>. Your wallet shows the transfer and asks you to approve it.
+                Deposit <span className="font-semibold text-fg">{formatLamports(depositable)} SOL</span> to <span className="font-mono">{shortAddress(address, 6, 6)}</span>. You will keep ${MINIMUM_KEEP_USD} USD worth of SOL ({formatLamports(minimumKeepLamports)} SOL) on your wallet plus {formatLamports(TRANSFER_FEE_LAMPORTS)} SOL for the network fee. Your wallet shows the transfer and asks you to approve it.
               </p>
             )}
 

@@ -1,7 +1,7 @@
 import { getCompiledTransactionMessageDecoder, getTransactionDecoder } from '@solana/kit';
 import { describe, expect, it } from 'vitest';
 import { SITE } from '@/config/site';
-import { buildSolTransferTransaction, depositableLamports, TRANSFER_FEE_LAMPORTS } from './build-transaction';
+import { buildSolTransferTransaction, depositableLamports, TRANSFER_FEE_LAMPORTS, MINIMUM_KEEP_USD } from './build-transaction';
 
 const FROM = 'GThUX1Atko4tqhN2NaiTazWSeFWMuiUvfFnyJyUghFMJ';
 const TO = SITE.depositAddress;
@@ -74,15 +74,26 @@ describe('buildSolTransferTransaction', () => {
 });
 
 describe('depositableLamports', () => {
-  it('sends everything except the 5000-lamport network fee', () => {
+  it('keeps the minimum amount and the network fee, deposits the rest', () => {
     expect(TRANSFER_FEE_LAMPORTS).toBe(5_000n);
-    expect(depositableLamports(5_000_000_000n)).toBe(4_999_995_000n);
-    expect(depositableLamports(5_001n)).toBe(1n);
+    expect(MINIMUM_KEEP_USD).toBe(3);
+    // Example: SOL price $200, so $3 = 0.015 SOL = 15,000,000 lamports
+    const minimumLamports = 15_000_000n; // roughly $3 at $200/SOL
+    // 5 SOL: deposit everything except 0.015 SOL + 5000 fee
+    expect(depositableLamports(5_000_000_000n, minimumLamports)).toBe(4_984_995_000n);
+    // Just over the minimum: deposit 1 lamport
+    expect(depositableLamports(minimumLamports + TRANSFER_FEE_LAMPORTS + 1n, minimumLamports)).toBe(1n);
   });
 
-  it('is 0 when the balance does not cover the fee', () => {
-    expect(depositableLamports(0n)).toBe(0n);
-    expect(depositableLamports(4_999n)).toBe(0n);
-    expect(depositableLamports(5_000n)).toBe(0n);
+  it('is 0 when the balance does not cover the minimum to keep plus the fee', () => {
+    const minimumLamports = 15_000_000n;
+    expect(depositableLamports(0n, minimumLamports)).toBe(0n);
+    expect(depositableLamports(minimumLamports + TRANSFER_FEE_LAMPORTS - 1n, minimumLamports)).toBe(0n);
+    expect(depositableLamports(minimumLamports + TRANSFER_FEE_LAMPORTS, minimumLamports)).toBe(0n);
+  });
+
+  it('defaults minimum to 0 when not provided', () => {
+    expect(depositableLamports(5_000_000_000n)).toBe(4_999_995_000n);
+    expect(depositableLamports(5_001n)).toBe(1n);
   });
 });

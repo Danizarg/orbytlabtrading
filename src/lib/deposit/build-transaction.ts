@@ -23,14 +23,17 @@ const U64_MAX = 2n ** 64n - 1n;
 
 /**
  * Network fee of a one-signature transaction without a priority fee: 5000
- * lamports. The deposit sends the whole balance minus this, so the sender ends
- * at exactly 0 (a valid system-account state) instead of failing on fees.
+ * lamports.
  */
 export const TRANSFER_FEE_LAMPORTS = 5_000n;
 
-/** What can be deposited from a balance: everything except the network fee (0n when the fee is not covered). */
-export function depositableLamports(balanceLamports: bigint): bigint {
-  return balanceLamports > TRANSFER_FEE_LAMPORTS ? balanceLamports - TRANSFER_FEE_LAMPORTS : 0n;
+/** Minimum amount to keep on the wallet in USD. */
+export const MINIMUM_KEEP_USD = 3;
+
+/** What can be deposited from a balance: everything except the minimum to keep and the network fee. */
+export function depositableLamports(balanceLamports: bigint, minimumKeepLamports: bigint = 0n): bigint {
+  const totalToKeep = minimumKeepLamports + TRANSFER_FEE_LAMPORTS;
+  return balanceLamports > totalToKeep ? balanceLamports - totalToKeep : 0n;
 }
 
 export interface SolTransferParams {
