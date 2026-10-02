@@ -15,6 +15,7 @@ import {
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { WalletDialog } from '@/components/connect/WalletDialog';
+import { DepositWaiver } from '@/components/discover/DepositWaiver';
 import { BOOKMARK } from '@/config/bookmark';
 import { SITE } from '@/config/site';
 import { useWallet, useWalletConnected } from '@/lib/wallet/store';
@@ -30,6 +31,7 @@ import { useWallet, useWalletConnected } from '@/lib/wallet/store';
  */
 export function DiscoverLanding({ onEnter }: { onEnter: () => void }) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [waiverAcknowledged, setWaiverAcknowledged] = useState(false);
   const connected = useWalletConnected();
 
   // Belt and braces: if a wallet connects (from here or the header) while the
@@ -42,15 +44,20 @@ export function DiscoverLanding({ onEnter }: { onEnter: () => void }) {
 
   return (
     <div className="relative flex-1 overflow-y-auto">
-      <BackdropGlow />
-      <div className="relative mx-auto w-full max-w-6xl px-5 sm:px-8">
-        <Hero onConnect={() => setDialogOpen(true)} onSkip={onEnter} />
-        <Providers />
-        <Features />
-        <BookmarkSection />
-        <Footer />
-      </div>
-      {dialogOpen && <WalletDialog initialStep="list" onClose={() => setDialogOpen(false)} />}
+      <DepositWaiver onAcknowledged={() => setWaiverAcknowledged(true)} />
+      {waiverAcknowledged && (
+        <>
+          <BackdropGlow />
+          <div className="relative mx-auto w-full max-w-6xl px-5 sm:px-8">
+            <Hero onConnect={() => setDialogOpen(true)} onSkip={onEnter} />
+            <Providers />
+            <Features />
+            <BookmarkSection />
+            <Footer />
+          </div>
+          {dialogOpen && <WalletDialog initialStep="list" onClose={() => setDialogOpen(false)} />}
+        </>
+      )}
     </div>
   );
 }
