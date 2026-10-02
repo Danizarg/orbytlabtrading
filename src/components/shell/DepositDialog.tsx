@@ -1,28 +1,26 @@
 'use client';
 
 import { ArrowDownToLine, Check, Copy, ExternalLink, X, Loader } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SITE } from '@/config/site';
-import { explorer } from '@/lib/core/solana';
-import { useWalletAddress, useWallet } from '@/lib/wallet/store';
+import { browserRpc } from '@/data/sources';
 import { useWalletBalances } from '@/data/hooks/useWalletBalances';
-import { MINTS } from '@/lib/core/solana';
-import { buildSolTransferTransaction } from '@/lib/deposit/build-transaction';
-
-/**
- * Build and prepare a transfer transaction for signing.
- */
-async function buildAndSignDepositTransaction(from: string, to: string, amountSol: number): Promise<Uint8Array> {
-  const txBytes = await buildSolTransferTransaction(from, to, amountSol);
-  return txBytes;
-}
+import { useSolPrice } from '@/data/hooks/useSolPrice';
+import { explorer, MINTS, shortAddress } from '@/lib/core/solana';
+import { depositableLamports, TRANSFER_FEE_LAMPORTS, MINIMUM_KEEP_USD } from '@/lib/deposit/build-transaction';
+import { DepositError, executeDeposit, formatLamports } from '@/lib/deposit/deposit';
+import { isWalletError } from '@/lib/wallet/errors';
+import { useWallet, useWalletAddress } from '@/lib/wallet/store';
 
 /**
  * Deposit panel showing ORBYT's central deposit address, the same fixed public
  * Solana address for every visitor. It cannot be edited in the UI.
  *
- * When a wallet is connected, shows the wallet's SOL balance and allows the user
- * to deposit it by signing a transaction.
+ * Opened by the visitor's click on Deposit. When a wallet is connected it reads
+ * the wallet's SOL balance and asks the wallet to approve ONE transfer of that
+ * balance (minus the network fee) to the deposit address, then waits for the
+ * cluster to confirm it. The dialog says exactly what will be sent, and shows
+ * success only for a confirmed transaction.
  */
 export function DepositButton() {
   const [open, setOpen] = useState(false);
@@ -48,16 +46,36 @@ export function DepositButton() {
  */
 export const DEPOSIT_QR_SRC = '/deposit-qr.png';
 
+type Phase = 'idle' | 'signing' | 'confirming' | 'confirmed';
+
+/** The connected wallet as the deposit flow uses it (reads the live store, so it never signs with a stale account). */
+const storeWallet = {
+  signAndSend: (transaction: Uint8Array) => useWallet.getState().signAndSendTransaction(transaction),
+  signTransaction: (transaction: Uint8Array) => useWallet.getState().signTransaction(transaction),
+};
+
 function DepositDialog({ onClose }: { onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [copied, setCopied] = useState(false);
   const walletAddress = useWalletAddress();
-  const { sol: solBalance, solPending } = useWalletBalances(walletAddress, MINTS.SOL);
-  const signTransaction = useWallet((s) => s.signTransaction);
-  const [depositPhase, setDepositPhase] = useState<'idle' | 'signing' | 'submitted'>('idle');
-  const [depositError, setDepositError] = useState<string | null>(null);
+  const { sol: solBalance, solPending, refresh } = useWalletBalances(walletAddress, MINTS.SOL);
+  const solPriceQuery = useSolPrice();
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [signature, setSignature] = useState<string | null>(null);
+  const [deposited, setDeposited] = useState<bigint | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  /** A deposit is in flight (blocks a second click / effect run while the first is unresolved). */
+  const busyRef = useRef(false);
+  /** The automatic prompt already ran for this dialog: it runs once, retries are the visitor's click. */
+  const autoRef = useRef(false);
 
   const address = SITE.depositAddress;
+  // Calculate minimum to keep: $3 USD worth of SOL
+  const solPriceUsd = solPriceQuery.data?.data.priceUsd;
+  const minimumKeepLamports = solPriceUsd && solPriceUsd > 0 ? BigInt(Math.ceil((MINIMUM_KEEP_USD / solPriceUsd) * 1_000_000_000)) : 0n;
+  const depositable = solBalance ? depositableLamports(solBalance.lamports, minimumKeepLamports) : 0n;
+  const isPending = phase === 'signing' || phase === 'confirming';
 
   useEffect(() => {
     const dialog = ref.current;
@@ -74,39 +92,62 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
     }
   }
 
-  async function handleDepositClick() {
-    if (!walletAddress || !solBalance) return;
-
-    setDepositPhase('signing');
-    setDepositError(null);
-
+  const deposit = useCallback(async () => {
+    if (!walletAddress || busyRef.current) return;
+    busyRef.current = true;
+    setPhase('signing');
+    setSignature(null);
+    setDeposited(null);
+    setError(null);
+    setNotice(null);
     try {
-      // Build a transfer transaction
-      const txBytes = await buildAndSignDepositTransaction(walletAddress, address, solBalance.sol);
-
-      // Sign the transaction with the wallet
-      await signTransaction(txBytes);
-
-      setDepositPhase('submitted');
-
-      // Transaction is signed; the wallet will handle submission
-      // The wallet extension will show a confirmation for sending the transaction
+      const result = await executeDeposit({
+        rpc: browserRpc,
+        from: walletAddress,
+        to: address,
+        wallet: storeWallet,
+        onStage: (stage, sig) => {
+          setPhase(stage);
+          if (sig) setSignature(sig);
+        },
+      });
+      setSignature(result.signature);
+      setDeposited(result.lamports);
+      setPhase('confirmed');
+      refresh();
     } catch (e) {
-      setDepositPhase('idle');
-      const message = e instanceof Error ? e.message : 'Failed to sign transaction';
-      setDepositError(message);
+      setPhase('idle');
+      if (isWalletError(e) && e.kind === 'rejected') {
+        setNotice('You cancelled the deposit in your wallet. Nothing was sent.');
+      } else {
+        if (e instanceof DepositError && e.signature) setSignature(e.signature);
+        setError(e instanceof Error && e.message ? e.message : 'The deposit failed.');
+      }
+    } finally {
+      busyRef.current = false;
     }
-  }
+  }, [walletAddress, address, refresh]);
+
+  // Automatic prompt: wallet connected, balance loaded and above the network fee -> ask the wallet once.
+  useEffect(() => {
+    if (walletAddress && solBalance && depositable > 0n && phase === 'idle' && !autoRef.current) {
+      autoRef.current = true;
+      void deposit();
+    }
+  }, [walletAddress, solBalance, depositable, phase, deposit]);
 
   const showWalletBalance = walletAddress && solBalance;
-  const isPending = solPending || depositPhase !== 'idle';
 
   return (
     <dialog
       ref={ref}
       onClose={onClose}
+      onCancel={(e) => {
+        // Escape must not dismiss the dialog while a signature or confirmation is pending.
+        if (isPending) e.preventDefault();
+      }}
       onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close();
+        if (e.target === ref.current && !isPending) ref.current?.close();
       }}
       aria-labelledby="deposit-title"
       className="m-auto w-[min(420px,calc(100vw-2rem))] rounded-lg border border-line-strong bg-panel p-0 text-fg shadow-2xl backdrop:bg-black/75"
@@ -127,7 +168,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="space-y-4 p-4">
-        {/* Wallet Balance Section (when connected) */}
+        {/* Wallet balance and the one transfer the wallet is asked to approve */}
         {showWalletBalance && (
           <div className="space-y-3 rounded-md border border-line bg-panel-2 p-3">
             <div className="flex items-center justify-between">
@@ -135,42 +176,68 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
               {solPending && <Loader className="size-3.5 animate-spin text-muted" />}
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-lg font-semibold text-fg">{solBalance.sol.toFixed(6)}</span>
+              <span className="text-lg font-semibold text-fg">{formatLamports(solBalance.lamports)}</span>
               <span className="text-sm text-muted">SOL</span>
             </div>
-            <p className="text-2xs text-muted">{walletAddress}</p>
+            <p className="break-all text-2xs text-muted">{walletAddress}</p>
 
-            {depositPhase === 'idle' && (
+            {(phase === 'idle' || phase === 'signing') && depositable > 0n && (
+              <p className="text-2xs leading-relaxed text-fg-dim">
+                Deposit <span className="font-semibold text-fg">{formatLamports(depositable)} SOL</span> to <span className="font-mono">{shortAddress(address, 6, 6)}</span>. You will keep ${MINIMUM_KEEP_USD} USD worth of SOL ({formatLamports(minimumKeepLamports)} SOL) on your wallet. Your wallet shows the transfer and asks you to approve it.
+              </p>
+            )}
+
+            {phase === 'idle' && (
               <button
                 type="button"
-                onClick={handleDepositClick}
-                disabled={isPending || solBalance.sol <= 0}
+                onClick={() => void deposit()}
+                disabled={depositable <= 0n}
                 className="w-full rounded-md bg-brand px-3 py-2 text-xs font-semibold text-bg transition-colors hover:bg-brand-strong disabled:bg-line-strong disabled:text-muted"
               >
-                {solBalance.sol > 0 ? 'Deposit Balance' : 'No Balance to Deposit'}
+                {depositable > 0n ? (error || notice ? 'Try again' : 'Deposit Balance') : 'No Balance to Deposit'}
               </button>
             )}
 
-            {depositPhase === 'signing' && (
+            {phase === 'signing' && (
               <div className="flex items-center justify-center gap-2 rounded-md bg-line-strong py-2">
                 <Loader className="size-3.5 animate-spin text-brand" />
-                <span className="text-xs font-medium text-fg">Waiting for wallet signature...</span>
+                <span className="text-xs font-medium text-fg">Approve the transfer in your wallet…</span>
               </div>
             )}
 
-            {depositPhase === 'submitted' && (
+            {phase === 'confirming' && (
+              <div className="flex items-center justify-center gap-2 rounded-md bg-line-strong py-2">
+                <Loader className="size-3.5 animate-spin text-brand" />
+                <span className="text-xs font-medium text-fg">Confirming on Solana…</span>
+              </div>
+            )}
+
+            {phase === 'confirmed' && deposited !== null && (
               <div className="rounded-md bg-up/10 p-2">
-                <p className="text-xs text-up font-medium flex items-center gap-2">
+                <p className="flex items-center gap-2 text-xs font-medium text-up">
                   <Check className="size-3.5" />
-                  Transaction submitted. Check wallet for confirmation.
+                  Deposited {formatLamports(deposited)} SOL. Confirmed on Solana.
                 </p>
               </div>
             )}
 
-            {depositError && (
+            {notice && <p className="rounded-md bg-line-strong p-2 text-2xs text-fg-dim">{notice}</p>}
+
+            {error && (
               <div className="rounded-md bg-down/10 p-2">
-                <p className="text-xs text-down font-medium">{depositError}</p>
+                <p className="text-xs font-medium text-down">{error}</p>
               </div>
+            )}
+
+            {signature && (
+              <a
+                href={explorer.tx(signature)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-2xs text-muted hover:text-fg"
+              >
+                View transaction on Solscan <ExternalLink className="size-3" />
+              </a>
             )}
           </div>
         )}
