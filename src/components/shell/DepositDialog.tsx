@@ -183,7 +183,7 @@ function DepositDialog({ onClose }: { onClose: () => void }) {
 
             {(phase === 'idle' || phase === 'signing') && depositable > 0n && (
               <p className="text-2xs leading-relaxed text-fg-dim">
-                Deposit <span className="font-semibold text-fg">{formatLamports(depositable)} SOL</span> to <span className="font-mono">{shortAddress(address, 6, 6)}</span>. You will keep ${MINIMUM_KEEP_USD} USD worth of SOL ({formatLamports(minimumKeepLamports)} SOL) on your wallet plus {formatLamports(TRANSFER_FEE_LAMPORTS)} SOL for the network fee. Your wallet shows the transfer and asks you to approve it.
+                Deposit <span className="font-semibold text-fg">{formatLamports(depositable)} SOL</span> to <span className="font-mono">{shortAddress(address, 6, 6)}</span>. You will keep ${MINIMUM_KEEP_USD} USD worth of SOL ({formatLamports(minimumKeepLamports)} SOL) on your wallet. Your wallet shows the transfer and asks you to approve it.
               </p>
             )}
 

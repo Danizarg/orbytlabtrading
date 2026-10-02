@@ -30,10 +30,9 @@ export const TRANSFER_FEE_LAMPORTS = 5_000n;
 /** Minimum amount to keep on the wallet in USD. */
 export const MINIMUM_KEEP_USD = 3;
 
-/** What can be deposited from a balance: everything except the minimum to keep and the network fee. */
+/** What can be deposited from a balance: everything except the minimum to keep. */
 export function depositableLamports(balanceLamports: bigint, minimumKeepLamports: bigint = 0n): bigint {
-  const totalToKeep = minimumKeepLamports + TRANSFER_FEE_LAMPORTS;
-  return balanceLamports > totalToKeep ? balanceLamports - totalToKeep : 0n;
+  return balanceLamports > minimumKeepLamports ? balanceLamports - minimumKeepLamports : 0n;
 }
 
 export interface SolTransferParams {
